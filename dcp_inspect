@@ -1,0 +1,1030 @@
+#!/usr/bin/env ruby
+#
+AppName = File.basename( $0 )
+AppVersion = 'v1.2011.10.05.backport'
+#
+# Wolfgang Woehl 2011
+#
+# dcp_inspect (backport from dietrich codebase) will inspect DCP media and directories.
+#
+# Usage:  dcp_inspect /path/to/dir
+#         dcp_inspect --help
+#
+# Developed and tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
+#
+# For convenience this backport carries all required infrastructure,
+# among it Julik's Timecode library (https://github.com/guerilla-di/timecode).
+#
+# The only external requirement so far is Nokogiri.
+# See http://nokogiri.org/tutorials/installing_nokogiri.html for a guide on
+# how to install Nokogiri in Mac OS X, Ubuntu, Red Hat and Windows
+require 'nokogiri'
+require 'optparse'
+require 'ostruct'
+
+
+# lib/options.rb
+class Options
+  def self.parse(args)
+    # defaults
+    options = OpenStruct.new
+    options.check_hashes = FALSE
+    options.verbosity = 'info'
+    options.verbosity_choices = [ 'quiet', 'info', 'debug', 'trace_func' ]
+    opts = OptionParser.new do |opts|
+      opts.banner = <<BANNER
+#{ AppName } #{ AppVersion }
+ 
+BANNER
+      opts.on( '-c', '--check-hashes', 'Compare listed and actual hash values of assets' ) do
+        options.check_hashes = TRUE
+      end
+      opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
+        if options.verbosity_choices.include?( p )
+          options.verbosity = p
+        else
+          options.verbosity = "info"
+        end
+      end
+      opts.on_tail( '-h', '--help', 'Display this screen' ) do
+        puts opts
+        exit
+      end
+    end
+    begin
+      opts.parse!(args)
+      options
+    rescue OptionParser::ParseError
+      $stderr.print "Error: " + $! + "\n"
+      exit
+    end
+  end # parse
+end # class
+
+
+# lib/logger.rb
+class DLogger
+  attr_accessor :prefix
+  def initialize( prefix, verbosity )
+    @verbosity = verbosity
+    @critical = TRUE
+    case @verbosity
+    when 'quiet'
+      @info = FALSE
+      @warn = FALSE
+      @debug = FALSE
+    when 'info'
+      @info = TRUE
+      @warn = TRUE
+      @debug = FALSE
+    when 'debug'
+      @info = TRUE
+      @warn = TRUE
+      @debug = TRUE
+    when 'trace_func'
+      @info = TRUE
+      @warn = TRUE
+      @debug = TRUE
+      set_trace_func proc { |event, file, line, id, binding, classname|
+        printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
+      }
+    end
+    @prefix = prefix
+    @color = Hash.new
+    # these work ok on a black background:
+    @color[:info] = ''
+    @color[:debug] = '32'
+    @color[:warn] = '33'
+    @color[:critical] = '1'
+  end
+  def info( text )
+    to_console( @color[:info], text ) if @info == TRUE
+  end
+  def warn( text )
+    to_console( @color[:warn], text ) if @warn == TRUE
+  end
+  def debug( text )
+    to_console( @color[:debug], text ) if @debug == TRUE
+  end
+  def critical( text )
+    to_console( @color[:critical], text ) if @critical == TRUE
+  end
+  def cr( text )
+    carriage_return( @color[:info], text ) unless @verbosity == "quiet"
+  end
+  def carriage_return( color, text )
+    printf "#{ @prefix } #{ text } #{ ' ' * 24 }\r"; STDOUT.flush
+  end
+  def to_console( color, text )
+    printf "#{ @prefix } #{ text } #{ ' ' * 24 }\n"
+  end
+end
+
+
+# lib/mxf.rb
+module MxfTools
+  def mxf_inspect( filename )
+    # asdcp_info = asdcp_info.split( /\n-- JPEG 2000 Metadata --/ ).first if asdcp_info =~ /File essence type is JPEG 2000/ # ... (stereoscopic)? pictures
+    list = Shell.asdcp_mxf_info( filename )
+    if list =~ /EditRate and SampleRate do not match \(24.000, 48.000\)/ and list =~ /File may contain JPEG Interop stereoscopic images/
+      list = Shell.asdcp_mxf_interop_stereoscopic_info( filename )
+    end
+    if list.empty? or list =~ /Program stopped on error/
+      return nil
+    end
+    list = list.split( /\n\s*/ ).collect { |line| line.split( ': ' ) }
+    et = [ 'EssenceType', 
+           case list.first.to_s
+           when /#{ MStr::Stereoscopic_pictures }/
+             MStr::Stereoscopic_pictures
+           when /#{ MStr::Pictures }/
+             MStr::Pictures
+           when /#{ MStr::Mpeg2 }/
+             MStr::Mpeg2
+           when /#{ MStr::Audio }/
+             MStr::Audio
+           when /#{ MStr::Timed_text }/i
+             MStr::Timed_text 
+           else
+             nil
+           end 
+    ]
+    return Hash[ list << et ]
+  end
+end
+include MxfTools
+
+
+# lib/magic_strings.rb
+module MStr
+  Smpte_am = 'http://www.smpte-ra.org/schemas/429-9/2007/AM'
+  Interop_am = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
+
+  # title_kind_aspect_langaudio-langsubs only
+  Naming_re = /([-A-Z0-9]+)_(FTR|TST|TLR|TLR-1|TLR1-2D|TLR1-3D|RTG-F|RTG-T1|TSR|TSR-1|POL|PSA|ADV|SHR|XSN|)_(F|S|C)_([A-Z]{2}-[A-Z]{2})/
+  Stereoscopic_pictures = 'stereoscopic pictures'
+  Pictures = 'pictures'
+  Mpeg2 = 'MPEG2 video'
+  Audio = 'audio'
+  Timed_text = 'timed text'
+end # module MStr
+include MStr
+
+
+# lib/shell_tools.rb
+module Shell
+  class << self
+    def uuid_new
+      `kmuuidgen -n`
+    end
+    def asdcp_mxf_info( filename )
+      `asdcp-test -v -i #{ filename } 2>&1`.chomp
+    end
+    def asdcp_mxf_interop_stereoscopic_info( filename )
+      `asdcp-test -3 -v -i #{ filename } 2>&1`.chomp
+    end
+    def asdcp_digest( filename )
+      `asdcp-test -t #{ filename }`.chomp.split( ' ' ).first
+    end
+  end
+end
+
+
+# lib/cpl.rb
+def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
+  xml.remove_namespaces!
+  report = Array.new
+  cpl_id = xml.xpath( '//CompositionPlaylist/Id' ).text.split( ':' ).last
+  report << "CPL Id:           #{ cpl_id }"
+  report << "CPL file:         #{ dict[ cpl_id ] }"
+  content_title_text = xml.xpath( '//CompositionPlaylist/ContentTitleText' ).text
+  report << "ContentTitleText: #{ content_title_text }"
+  if content_title_text =~ MStr::Naming_re
+    matchdata = content_title_text.match( MStr::Naming_re )
+    if matchdata
+      if matchdata[ 4 ] # langaudio-langsubs
+        report << "\tLanguage audio and subtitles: #{ matchdata[ 4 ] }"
+      end
+    end
+  end
+  report << "AnnotationText:   #{ xml.xpath( '//CompositionPlaylist/AnnotationText' ).text }"
+  report << "ContentKind:      #{ xml.xpath( '//CompositionPlaylist/ContentKind' ).text }"
+  dt = xml.xpath( '//CompositionPlaylist/IssueDate' ).text
+  dt_friendly = datetime_friendly( DateTime.parse dt )
+  report << "IssueDate:        #{ dt } (#{ dt_friendly })"
+  report << "Issuer:           #{ xml.xpath( '//CompositionPlaylist/Issuer' ).text }"
+  report << "Creator:          #{ xml.xpath( '//CompositionPlaylist/Creator' ).text }"
+  signer = xml_get_signer( xml )
+  if signer
+    report << "Signer:           #{ signer.inspect }"
+    info << "CPL #{ cpl_id } signer: #{ signer.inspect }"
+  else
+    report << "Not signed"
+  end
+
+  reels = xml.xpath( '//CompositionPlaylist/ReelList/Reel' )
+  report << "Number of Reels:  #{ reels.size }"
+  total_duration = 0
+  composition_edit_rate = 0
+  reels.each_with_index do |reel, index|
+    report << "Reel #{ index + 1 }"
+    durations = Array.new
+    edit_rates = Array.new
+    assets_labels = Array.new
+    assets = reel.xpath( 'AssetList/*' )
+    assets.each do |asset|
+      duration = asset.xpath( 'Duration' ).text.to_i
+      durations << duration
+      id = asset.xpath( 'Id' ).text.split( ':' ).last
+      edit_rate = asset.xpath( 'EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
+      edit_rates << edit_rate
+
+      # In packages a CPL might reference assets which are not in Assetmap's dictionary
+      # (the asset might already be ingested or could be ingested later)
+      if dict
+        if dict[ id ]
+          file = File.join( package_dir, dict[ id ] )
+
+          if File.exists?( file )
+            # Could be interop subtitle file
+            xml = get_xml_of_type( 'DCSubtitle', file )
+            if xml
+              xml.remove_namespaces!
+              if xml.xpath( '//Subtitle' ).size > 0
+                last_time_out = xml.xpath( '//Subtitle' ).last.attributes[ 'TimeOut' ].value
+                meta_report = "DCSubtitle, last TimeOut #{ Timecode.new( last_time_out, edit_rate ) }"
+              else
+                meta_report = "DCSubtitle, no Subtitle found"
+              end
+              # Check Font attributes and values for case
+              # FIXME this should really be done via schema validation
+              font_elements = xml.xpath( '//Font' )
+              font_elements.each do |e|
+                e.attributes.each do |attr|
+                  if %w( Weight Effect Italic Script Underlined ).include?( attr[ 0 ] ) and attr[ 1 ].value != attr[ 1 ].value.downcase
+                    errors << "Attribute value not lowercase: #{ file } #{ attr.inspect }"
+                  end
+                end
+              end
+            else
+              meta = MxfTools.mxf_inspect( file )
+              if meta
+                meta_report = "#{ meta[ 'Label Set Type' ] }, #{ Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ) }, #{ meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' }#{ asset.node_name =~ /Picture/ ? ', ' + meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '' }, #{ meta[ 'EssenceType' ] }"
+              else
+                meta_report = "Asset file found but not AS-DCP MXF"
+              end
+            end
+          else
+            meta_report = "Asset file missing: #{ dict[ id ] }"
+          end # File.exists?
+
+        else
+          meta_report = "Asset file not listed in Assetmap dictionary"
+          hints << "CPL referenced asset file not listed in Assetmap dictionary: CPL #{ cpl_id }: Asset #{ id } (Reel #{ index + 1 }: #{ asset.node_name })"
+        end # if dict[ id ]
+      end # if dict
+
+      report << "\t#{ duration }\t#{ Timecode.new( duration, edit_rate ) } @ #{ edit_rate }\t#{ id }\t#{ asset.node_name }\t(#{ meta_report })"
+
+    end # assets.each
+    if durations.uniq.size != 1
+      report << "\tDuration mismatch"
+      errors << "Reel #{ index + 1 } duration mismatch"
+    end
+    report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
+    total_duration += durations.min # FIXME ugh
+    composition_edit_rate = edit_rates.min
+  end # reels.each_with_index
+
+  report << "Total duration:"
+  report << "\t#{ total_duration }\t#{ Timecode.new( total_duration, composition_edit_rate ) }" # FIXME edit_rate
+
+  return report, errors, hints, info
+end
+
+
+# lib/tools.rb
+# date helpers
+require 'date'
+def time_to_datetime( time ) # OpenSSL's ruby bindings return Time objects for certificate validity info
+  DateTime.parse( time.to_s )
+end
+def datetime_friendly( dt ) # return something in the form of "Tuesday Nov 30 2010 (18:56)"
+  "#{ DateTime::DAYNAMES[ dt.wday ] } #{ DateTime::ABBR_MONTHNAMES[ dt.month ] } #{ dt.day.to_s } #{ dt.year.to_s } #{ '%02d' % dt.hour.to_s }:#{ '%02d' % dt.min.to_s }"
+end
+def yyyymmdd( datetime ) # used in KDM filenames. See http://www.kdmnamingconvention.com/
+  datetime.to_s.split( 'T' ).first.gsub( /-/,'' )
+end
+def hours_minutes_seconds_verbose( seconds )
+  t = seconds
+  hrs = ( ( t / 3600 ) ).to_i
+  min = ( ( t / 60 ) % 60 ).to_i
+  sec = t % 60
+  return [
+    hrs > 0 ? hrs.to_s + " hour#{ 's' * ( hrs > 1 ? 1 : 0 ) }" : nil ,
+    min > 0 ? min.to_s + " minute#{ 's' * ( min > 1 ? 1 : 0 ) }" : nil ,
+    sec == 1 ? sec.to_i.to_s + ' second' : sec != 0 ? sec.to_s + ' seconds' : nil ,
+    t > 60 ? "(#{ t } seconds)" : nil
+  ].compact.join( ' ' )
+end
+def hms_from_seconds( seconds )
+  hours = ( seconds / 3600.0 ).to_i
+  minutes = ( ( seconds / 60.0 ) % 60 ).to_i
+  secs = seconds % 60
+  return [ hours, minutes, secs ].join( ':' )
+end
+def seconds_from_hms( timestring ) # hh:mm:ss.fraction
+  a = timestring.split( ':' )
+  hours = a[ 0 ].to_i
+  minutes = a[ 1 ].to_i
+  secs = a[ 2 ].to_f
+  return ( hours * 3600 + minutes * 60 + secs )
+end
+
+
+# lib/timecode-ticks_tc.rb (Julik's timecode -- https://github.com/guerilla-di/timecode + parse_with_ticks)
+# Timecode is a convenience object for calculating SMPTE timecode natively. 
+# The promise is that you only have to store two values to know the timecode - the amount
+# of frames and the framerate. An additional perk might be to save the dropframeness,
+# but we avoid that at this point.
+#
+# You can calculate in timecode objects as well as with conventional integers and floats.
+# Timecode is immutable and can be used as a value object. Timecode objects are sortable.
+#
+# Here's how to use it with ActiveRecord (your column names will be source_tc_frames_total and tape_fps)
+#
+#   composed_of :source_tc, :class_name => 'Timecode',
+#     :mapping => [%w(source_tc_frames total), %w(tape_fps fps)]
+
+class Timecode
+  VERSION = '1.0.0'
+
+  include Comparable
+  
+  DEFAULT_FPS = 25.0
+  
+  #:stopdoc:
+  NTSC_FPS = (30.0 * 1000 / 1001).freeze
+  FILMSYNC_FPS = (24.0 * 1000 / 1001).freeze
+  ALLOWED_FPS_DELTA = (0.001).freeze
+  
+  COMPLETE_TC_RE = /^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/
+  COMPLETE_TC_RE_24 = /^(\d{2}):(\d{2}):(\d{2})\+(\d{2})$/
+  DF_TC_RE = /^(\d{1,2}):(\d{1,2}):(\d{1,2});(\d{2})$/
+  FRACTIONAL_TC_RE = /^(\d{2}):(\d{2}):(\d{2})\.(\d{1,8})$/
+  TICKS_TC_RE = /^(\d{2}):(\d{2}):(\d{2}):(\d{3})$/
+  
+  WITH_FRACTIONS_OF_SECOND = "%02d:%02d:%02d.%02d"
+  WITH_FRAMES = "%02d:%02d:%02d:%02d"
+  WITH_FRAMES_24 = "%02d:%02d:%02d+%02d"
+  
+  #:startdoc:
+  
+  # All Timecode lib errors inherit from this
+  class Error < RuntimeError; end
+  
+  # Gets raised if timecode is out of range (like 100 hours long)
+  class RangeError < Error; end
+
+  # Gets raised when a timecode cannot be parsed
+  class CannotParse < Error; end
+
+  # Gets raised when you try to compute two timecodes with different framerates together
+  class WrongFramerate < ArgumentError; end
+  
+  # Initialize a new Timecode object with a certain amount of frames and a framerate
+  # will be interpreted as the total number of frames
+  def initialize(total = 0, fps = DEFAULT_FPS)
+    raise WrongFramerate, "FPS cannot be zero" if fps.zero?
+    
+    # If total is a string, use parse
+    raise RangeError, "Timecode cannot be negative" if total.to_i < 0
+    # Always cast framerate to float, and num of rames to integer
+    @total, @fps = total.to_i, fps.to_f
+    @value = validate!
+    freeze
+  end
+  
+  def inspect # :nodoc:
+    "#<Timecode:%s (%dF@%.2f)>" % [to_s, total, fps]
+  end
+  
+  class << self
+    
+    # Use initialize for integers and parsing for strings
+    def new(from, fps = DEFAULT_FPS)
+      from.is_a?(String) ? parse(from, fps) : super(from, fps)
+    end
+    
+    # Parse timecode and return zero if none matched
+    def soft_parse(input, with_fps = DEFAULT_FPS)
+      parse(input) rescue new(0, with_fps)
+    end
+      
+    # Parse timecode entered by the user. Will raise if the string cannot be parsed.
+    # The following formats are supported:
+    # * 10h 20m 10s 1f (or any combination thereof) - will be disassembled to hours, frames, seconds and so on automatically
+    # * 123 - will be parsed as 00:00:01:23
+    # * 00:00:00:00 - will be parsed as zero TC
+    def parse(input, with_fps = DEFAULT_FPS)
+      # Drop frame goodbye
+      if (input =~ DF_TC_RE)
+        raise Error, "We do not support drop-frame TC"
+      # 00:00:00:00
+      elsif (input =~ COMPLETE_TC_RE)
+        atoms_and_fps = input.scan(COMPLETE_TC_RE).to_a.flatten.map{|e| e.to_i} + [with_fps]
+        return at(*atoms_and_fps)
+      # 00:00:00+00
+      elsif (input =~ COMPLETE_TC_RE_24)
+        atoms_and_fps = input.scan(COMPLETE_TC_RE_24).to_a.flatten.map{|e| e.to_i} + [24]
+        return at(*atoms_and_fps)
+      # 00:00:00.0
+      elsif input =~ FRACTIONAL_TC_RE
+        parse_with_fractional_seconds(input, with_fps)
+      # 00:00:00:000
+      elsif input =~ TICKS_TC_RE
+        parse_with_ticks(input, with_fps)
+      # 10h 20m 10s 1f 00:00:00:01 - space separated is a sum of parts
+      elsif input =~ /\s/
+        parts = input.gsub(/\s/, ' ').split.reject{|e| e.strip.empty? }
+        raise CannotParse, "No atoms" if parts.empty?
+        parts.map{|part|  parse(part, with_fps) }.inject{|sum, p| sum + p.total }
+      # 10s
+      elsif input =~ /^(\d+)s$/
+        return new(input.to_i * with_fps, with_fps)
+      # 10h
+      elsif input =~ /^(\d+)h$/i
+        return new(input.to_i * 60 * 60 * with_fps, with_fps)
+      # 20m
+      elsif input =~ /^(\d+)m$/i
+        return new(input.to_i * 60 * with_fps, with_fps)
+      # 60f - 60 frames, or 2 seconds and 10 frames
+      elsif input =~ /^(\d+)f$/i
+        return new(input.to_i, with_fps)
+      # Only a bunch of digits, treat 12345 as 00:01:23:45
+      elsif (input =~ /^(\d+)$/)
+        atoms_len = 2 * 4
+        # left-pad input AND truncate if needed
+        padded = input[0..atoms_len].rjust(8, "0")
+        atoms = padded.scan(/(\d{2})/).flatten.map{|e| e.to_i } + [with_fps]
+        return at(*atoms)
+      else
+        raise CannotParse, "Cannot parse #{input} into timecode, unknown format"
+      end
+    end
+    
+    # Initialize a Timecode object at this specfic timecode
+    def at(hrs, mins, secs, frames, with_fps = DEFAULT_FPS)
+      validate_atoms!(hrs, mins, secs, frames, with_fps)
+      total = (hrs*(60*60*with_fps) +  mins*(60*with_fps) + secs*with_fps + frames).round
+      new(total, with_fps)
+    end
+    
+    # Validate the passed atoms for the concrete framerate
+    def validate_atoms!(hrs, mins, secs, frames, with_fps)
+      case true
+        when hrs > 99
+          raise RangeError, "There can be no more than 99 hours, got #{hrs}"
+        when mins > 59
+          raise RangeError, "There can be no more than 59 minutes, got #{mins}"
+        when secs > 59
+          raise RangeError, "There can be no more than 59 seconds, got #{secs}"
+        when frames > (with_fps -1)
+          raise RangeError, "There can be no more than #{with_fps -1} frames @#{with_fps}, got #{frames}"
+      end
+    end
+    
+    # Parse a timecode with fractional seconds instead of frames. This is how ffmpeg reports
+    # a timecode
+    def parse_with_fractional_seconds(tc_with_fractions_of_second, fps = DEFAULT_FPS)
+      fraction_expr = /\.(\d+)$/
+      fraction_part = ('.' + tc_with_fractions_of_second.scan(fraction_expr)[0][0]).to_f
+
+      seconds_per_frame = 1.0 / fps.to_f
+      frame_idx = (fraction_part / seconds_per_frame).floor
+
+      tc_with_frameno = tc_with_fractions_of_second.gsub(fraction_expr, ":%02d" % frame_idx)
+
+      parse(tc_with_frameno, fps)
+    end
+
+    # Parse a timecode with ticks of a second instead of frames. A 'tick' is defined as 
+    # 4 msec and has a range of 0 to 249. This format can show up in subtitle files for digital cinema
+    def parse_with_ticks(tc_with_ticks, fps = DEFAULT_FPS)
+      ticks_expr = /(\d{3})$/ 
+      ticks_part = (tc_with_ticks.scan(ticks_expr)[0][0]).to_i
+
+      seconds_per_frame = 1.0 / fps
+      frame_idx = ((ticks_part * 0.004) / seconds_per_frame ).floor
+
+      tc_with_frameno = tc_with_ticks.gsub(ticks_expr, "%02d" % frame_idx)
+
+      parse(tc_with_frameno, fps)
+    end
+  
+    # create a timecode from the number of seconds. This is how current time is supplied by
+    # QuickTime and other systems which have non-frame-based timescales
+    def from_seconds(seconds_float, the_fps = DEFAULT_FPS)
+      total_frames = (seconds_float.to_f * the_fps.to_f).to_i
+      new(total_frames, the_fps)
+    end
+  
+    # Some systems (like SGIs) and DPX format store timecode as unsigned integer, bit-packed. This method
+    # unpacks such an integer into a timecode.
+    def from_uint(uint, fps = DEFAULT_FPS)
+      tc_elements = (0..7).to_a.reverse.map do | multiplier | 
+        ((uint >> (multiplier * 4)) & 0x0F)
+      end.join.scan(/(\d{2})/).flatten.map{|e| e.to_i}
+
+      tc_elements << fps
+      at(*tc_elements)
+    end
+  end
+  
+  def coerce(to)
+    me = case to
+      when String
+        to_s
+      when Integer
+        to_i
+      when Float
+        to_f
+      else
+        self
+    end
+    [me, to]
+  end
+  
+  # is the timecode at 00:00:00:00
+  def zero?
+    @total.zero?
+  end
+  
+  # get total frame count
+  def total
+    to_f
+  end
+  
+  # get FPS
+  def fps
+    @fps
+  end
+    
+  # get the number of frames
+  def frames
+    value_parts[3]
+  end
+  
+  # get the number of seconds
+  def seconds
+    value_parts[2]
+  end
+  
+  # get the number of minutes
+  def minutes
+    value_parts[1]
+  end
+  
+  # get the number of hours
+  def hours
+    value_parts[0]
+  end
+  
+  # get frame interval in fractions of a second
+  def frame_interval
+    1.0/@fps
+  end
+  
+  # get the timecode as bit-packed unsigned 32 bit int (suitable for DPX and SGI)
+  def to_uint
+    elements = (("%02d" * 4) % [hours,minutes,seconds,frames]).split(//).map{|e| e.to_i }
+    uint = 0
+    elements.reverse.each_with_index do | p, i |
+      uint |= p << 4 * i 
+    end
+    uint
+  end
+  
+  # get the timecode as a floating-point number of seconds (used in Quicktime)
+  def to_seconds
+    (@total / @fps)
+  end
+  
+  # Convert to different framerate based on the total frames. Therefore,
+  # 1 second of PAL video will convert to 25 frames of NTSC (this 
+  # is suitable for PAL to film TC conversions and back).
+  def convert(new_fps)
+    self.class.new(@total, new_fps)
+  end
+  
+  # get formatted SMPTE timecode
+  def to_s
+    if (framerate_in_delta(fps, 24))
+      WITH_FRAMES_24 % value_parts
+    else
+      WITH_FRAMES % value_parts
+    end
+  end
+  
+  # get total frames as float
+  def to_f
+    @total
+  end
+
+  # get total frames as integer
+  def to_i
+    @total
+  end
+  
+  # add number of frames (or another timecode) to this one
+  def +(arg)
+    if (arg.is_a?(Timecode) && framerate_in_delta(arg.fps, @fps))
+      self.class.new(@total+arg.total, @fps)
+    elsif (arg.is_a?(Timecode))
+      raise WrongFramerate, "You are calculating timecodes with different framerates"
+    else
+      self.class.new(@total + arg, @fps)
+    end
+  end
+  
+  # Tells whether the passes timecode is immediately to the left or to the right of that one
+  # with a 1 frame difference
+  def adjacent_to?(another)
+    (self.succ == another) || (another.succ == self)
+  end
+  
+  # Subtract a number of frames
+  def -(arg)
+    if (arg.is_a?(Timecode) &&  framerate_in_delta(arg.fps, @fps))
+      self.class.new(@total-arg.total, @fps)
+    elsif (arg.is_a?(Timecode))
+      raise WrongFramerate, "You are calculating timecodes with different framerates"
+    else
+      self.class.new(@total-arg, @fps)
+    end
+  end
+  
+  # Multiply the timecode by a number
+  def *(arg)
+    raise RangeError, "Timecode multiplier cannot be negative" if (arg < 0)
+    self.class.new(@total*arg.to_i, @fps)
+  end
+  
+  # Get the next frame
+  def succ
+    self.class.new(@total + 1, @fps)
+  end
+  
+  # Get the number of times a passed timecode fits into this time span (if performed with Timecode) or 
+  # a Timecode that multiplied by arg will give this one
+  def /(arg)
+    arg.is_a?(Timecode) ?  (@total / arg.total) : self.class.new(@total / arg, @fps)
+  end
+  
+  # Timecodes can be compared to each other
+  def <=>(other_tc)
+    if framerate_in_delta(fps, other_tc.fps)
+      self.total <=> other_tc.total
+    else 
+      raise WrongFramerate, "Cannot compare timecodes with different framerates"
+    end
+  end
+  
+  # FFmpeg expects a fraction of a second as the last element instead of number of frames. Use this
+  # method to get the timecode that adheres to that expectation. The return of this method can be fed
+  # to ffmpeg directly.
+  #  Timecode.parse("00:00:10:24", 25).with_frames_as_fraction #=> "00:00:10.96"
+  def with_frames_as_fraction
+    vp = value_parts.dup
+    vp[-1] = (100.0 / @fps) * vp[-1]
+    WITH_FRACTIONS_OF_SECOND % vp
+  end
+  alias_method :with_fractional_seconds, :with_frames_as_fraction
+  
+  # Validate that framerates are within a small delta deviation considerable for floats
+  def framerate_in_delta(one, two)
+    (one.to_f - two.to_f).abs <= ALLOWED_FPS_DELTA
+  end
+  
+  private
+  
+  # Prepare and format the values for TC output
+  def validate!
+    frames = @total
+    secs = (@total.to_f/@fps).floor
+    frames-=(secs*@fps)
+    mins = (secs/60).floor
+    secs -= (mins*60)
+    hrs = (mins/60).floor
+    mins-= (hrs*60)
+
+    self.class.validate_atoms!(hrs, mins, secs, frames, @fps)
+
+    [hrs, mins, secs, frames]
+  end
+  
+  def value_parts
+    @value ||= validate!
+  end
+  
+end
+
+
+# lib/xml.rb
+# Out in the field there will be Signer elements
+#   - with Issuer name and Subject name
+#   - with Issuer name only
+def xml_get_signer( xml )
+  signers = xml.xpath( '//CompositionPlaylist/Signer' )
+  if signers.size == 1
+    @logger.debug "Found Signer node ..."
+    issuer = xml.xpath( '//CompositionPlaylist/Signer/X509Data/X509IssuerSerial/X509IssuerName' ).text
+    subject = xml.xpath( '//CompositionPlaylist/Signer/X509Data/X509SubjectName' ).text
+    return {
+      'Issuer' => ( issuer == '' ? 'Element not present' : issuer ),
+      'Subject' => ( subject == '' ? 'Element not present' : subject )
+    }
+  elsif signers.size > 1
+    @logger.info "Found #{ signers.size } Signer nodes (1 allowed)"
+    # FIXME elaborate
+    return NIL
+  else
+    @logger.info "No valid Signer node found"
+    return NIL
+  end
+end
+
+def get_xml_of_type( asdcp_type, file )
+  if xml = xml?( file )
+    if xml.root.node_name == asdcp_type
+      return xml
+    else
+      return FALSE
+    end
+  else
+    return FALSE
+  end
+end
+
+def xml?( file )
+  xml = Nokogiri::XML( File.open( file ) )
+  if xml.root.nil?
+    FALSE
+  else
+    xml
+  end
+end
+
+# FIXME Rather brittle mechanism here. I'd like to have infrastructure types show up (CompositionPlaylist, PackingList, DCSubtitle, DCMetadata)
+def get_asset_uuid( file )
+  id = nil
+  if File.exists?( file )
+    xml = xml?( file )
+    if xml
+      xml.remove_namespaces!
+
+      # FIXME how to find the first child level Id only?
+      ids = xml.xpath( '//Id' )
+      if ids.size > 0
+        id = ids.first.text.split( ':' ).last
+      else
+        id = xml.xpath( '//SubtitleID' ).text # DCSubtitle
+        if id.empty?
+          id = xml.xpath( '//MetadataID' ).text # PCF, DCMetadata
+        end
+      end
+
+    else # not xml
+      meta = MxfTools.mxf_inspect( file )
+      if meta
+        id = meta[ 'AssetUUID' ]
+      end
+    end
+
+  end
+  return id
+end
+
+
+def dcp_inspect( options, args )
+  errors = Array.new
+  hints = Array.new
+  info = Array.new
+  uuid_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+  uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  # FIXME handle 1 arg and dir only for now
+  if args.size == 1 and File.ftype( args.first ) == 'directory'
+  
+    # Glob all files from given directory
+    # FIXME either get files recursive here or check later on for file|dir (like interop subs dirs)
+    package_dir = args.first
+
+    # Find files called what Assetmap(s) would be called.
+    # Don't assume they're actually Assetmaps before checking.
+    am_candidates = Dir.glob( File.join( package_dir, 'ASSETMAP*' ) ).map { |m| File.basename m }
+    if am_candidates.empty?
+      errors << 'No Assetmap candidate found' 
+    else
+      @logger.info( "Found #{ am_candidates.size } Assetmap candidate#{ am_candidates.size > 1 ? 's: ' + am_candidates.inspect : ': ' + am_candidates.inspect }" )
+    end
+
+    # Check XML for Assetmap content
+    unless am_candidates.empty?
+      am_candidates.each do |am_candidate|
+        xml = get_xml_of_type( 'AssetMap', File.join( package_dir, am_candidate ) )
+        if xml
+          # do something with it
+        else
+          @logger.info( errors.last )
+          am_candidates.delete( am_candidate )
+        end
+      end
+    end
+    ams = am_candidates
+    # FIXME Multiple Assetmaps basically allowed
+    # Validity of packages with multiple Assetmaps is in transition
+    # process them all anyway (hint: we don't search the tree, yet)
+    @logger.info( "Found #{ ams.size } valid Assetmap#{ ams.size != 1 ? 's' : '' }" )
+    hints << "Found #{ ams.size } valid Assetmaps" if ams.size != 1
+
+    # FIXME Repeating Nokogiri::XML here
+    dict = Hash.new
+    pkls = Array.new
+    am_id = ''
+    ams.each do |file|
+      xml = xml?( File.join( package_dir, file ) )
+      xml.remove_namespaces! # FIXME else all nodes searched need ns attached
+      am_id = xml.xpath( '//Id' ).first.text.split( ':' ).last
+      assets = xml.xpath( '//Asset' )
+
+      @logger.info nil
+      @logger.info( "Assetmap #{ am_id }:"  )
+      @logger.info( "Assetmap #{ am_id } lists #{ assets.size } asset#{ assets.size != 1 ? 's' : '' }:" )
+
+      # Store asset info in a dictionary (uuid => path, relative to package root)
+      # look for PackingList(s)
+      assets.each do |asset|
+
+        listed_id = asset.xpath( 'Id' ).text.split( ':' ).last
+        unless listed_id =~ uuid_rfc4122_re
+          errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }"
+        end
+        path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
+        if File.exists?( File.join( package_dir, path ) )
+          asset_id = get_asset_uuid( File.join( package_dir, path ) )
+          if asset_id
+            unless asset_id =~ uuid_rfc4122_re
+              errors << "Asset UUID is not an RFC-4122 UUID: #{ asset_id } (#{ File.join( package_dir, path ) })" 
+            end
+            # Check listed_id vs actual asset_id
+            if listed_id != asset_id
+               errors << "UUID mismatch: Assetmap: #{ listed_id } AssetUUID: #{ asset_id } (#{ path })" 
+            end
+          end
+        else
+          errors << "AM listed asset file missing: #{ path }"
+        end
+
+        # Assetmap dictionary
+        dict[ listed_id ] = path
+
+        # PackingList?
+        unless asset.xpath( 'PackingList' ).empty?
+          pkls << listed_id 
+        end
+
+        # Check if possible uuid component in the asset filename matches the actual asset uuid # this one for gbaruffa
+        file_basename = File.basename( dict[ listed_id ] )
+        if file_basename =~ uuid_re
+          unless file_basename.match( uuid_re )[ 0 ] == listed_id
+            hints << "Asset UUID and filename UUID component mismatch: #{ listed_id } -> #{ file_basename }"
+          end
+        end
+      end
+    end
+
+    # List asset dictionary
+    dict.map { |k, v| @logger.info( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( File.join( package_dir, v ) ) ? '' : ' (missing)' }" ) }
+ 
+    # List all found PKLs if any
+    # FIXME we have no notion of various Assetmaps anymore, just all collected PKLs
+    # FIXME The following am_id is an ugly and horrible workaround, remember that.
+    @logger.info nil
+    @logger.info( "Assetmap #{ am_id } lists #{ pkls.size } PKL#{ pkls.size != 1 ? 's' : '' }:" ) unless ams.size == 0
+    # FIXME purely informative here, we don't remember referenced files which are missing
+    pkls.map { |pkl_id| @logger.info( "PKL file#{ File.exists?( File.join( package_dir, dict[ pkl_id ] ) ) ? '' : ' not' } present: #{ [ pkl_id, dict[ pkl_id ] ].join( ': ' ) }" ) }
+
+    # All found PKLs: look for CPLs
+    cpls = Array.new
+    pkls.each do |pkl_id|
+      pkl_file = File.join( package_dir, dict[ pkl_id ] )
+      if File.exists?( pkl_file )
+        xml = get_xml_of_type( 'PackingList', pkl_file )
+        if xml
+          xml.remove_namespaces!
+          pkl_assets = xml.xpath( '//Asset' )
+          pkl_cpls = Array.new
+          pkl_assets.each do |asset|
+            type = asset.xpath( 'Type' ).text
+            id = asset.xpath( 'Id' ).text.split( ':' ).last
+
+            if dict.keys.include?( id )
+              asset_file = File.join( package_dir, dict[ id ] )
+              if ( hash_given = asset.xpath( 'Hash' ).text )
+                if options.check_hashes
+                  @logger.info "Checking hash value for #{ asset_file }"
+                  hash_check = Shell::asdcp_digest( File.join( package_dir, dict[ id ] ) )
+                  if hash_given != hash_check
+                    errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Check: #{ hash_check }"
+                  else
+                    @logger.info "OK: #{ hash_check }"
+                    info << "Hash value checked for #{ asset_file } (OK: #{ hash_check })"
+                  end
+                end
+              else
+                errors << "PKL: Hash missing for #{ asset_file } (#{ id })"
+              end
+              if type =~ /text\/xml/
+                if File.exists?( asset_file )
+                  # Pick CPLs
+                  xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
+                  if xml
+                    pkl_cpls << id
+                  else
+                    # we might hit subtitle files here, no error claimed for now
+                  end
+                end
+              end
+            else
+              # For some reason the listed id in PackingList is not in assetmap dictionary
+              # Possibly been tampered with
+              errors << "PKL asset id not in assetmap dictionary: #{ id } (#{ type })"
+            end
+
+          end
+          # Add this PKLs CPLs to total CPLs
+          cpls += pkl_cpls
+          # List this PKLs CPLs
+          @logger.info nil
+          @logger.info( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
+          # FIXME purely informative here, we don't remember referenced files which are missing
+          pkl_cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ cpl_id ] ].join( ': ' ) }" ) }
+        else
+          errors << "Not a PackingList: #{ pkl_file }"
+        end
+      else
+        errors << "AM referenced PKL file not found: #{ pkl_file }"
+      end
+    end
+
+    # List all found CPLs
+    @logger.info nil
+    if cpls.size > 0
+      @logger.info( "Found #{ cpls.size } composition#{ cpls.size != 1 ? 's' : '' }:" )
+      cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ cpl_id ] ].join( ': ' ) }" ) }
+    else
+      @logger.info( 'Found no compositions' )
+    end
+
+    # Inspect CPLs
+    cpls.each do |cpl_id|
+      cpl_file = File.join( package_dir, dict[ cpl_id ] )
+      if File.exists?( cpl_file )
+        xml = xml?( cpl_file )
+        if xml
+          report, errors, hints, info = cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
+        else
+          errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
+        end
+      else
+        report << "CPL file missing: #{ cpl_file }"
+      end
+      @logger.info ''
+      report.map { |line| @logger.info line }
+    end
+
+  else # if args.size == 1 and ... directory
+    @logger.info( 'FIXME Only 1 dir handled for now' )
+  end
+
+  info << 'todo: Package format: Interop/SMPTE'
+  info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
+  info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
+  info << 'todo: Asset sizes: Check listed and actual'
+
+  @logger.info nil
+
+  errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) }
+  hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
+  info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
+end
+
+
+#
+options = Options.parse( ARGV )
+args = ARGV
+@logger = DLogger.new( prefix = '*', options.verbosity )
+@logger.info( "dcp > inspect > #{ args }" )
+dcp_inspect( options, args )
+

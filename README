@@ -1,0 +1,16 @@
+dcp_inspect (backport from dietrich codebase) will inspect DCP media and directories.
+
+Usage:  dcp_inspect /path/to/dir
+        dcp_inspect --help
+
+Developed and tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
+
+For convenience this backport carries all required infrastructure,
+among it Julik's Timecode library (https://github.com/guerilla-di/timecode).
+
+The only external requirement so far is Nokogiri.
+See http://nokogiri.org/tutorials/installing_nokogiri.html for a guide on
+how to install Nokogiri in Mac OS X, Ubuntu, Red Hat and Windows
+
+Wolfgang Woehl 2011
+
