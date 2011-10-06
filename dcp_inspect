@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2011.10.05.backport'
+AppVersion = 'v1.2011.10.06.backport'
 #
 # Wolfgang Woehl 2011
 #
@@ -113,10 +113,10 @@ class DLogger
     carriage_return( @color[:info], text ) unless @verbosity == "quiet"
   end
   def carriage_return( color, text )
-    printf "#{ @prefix } #{ text } #{ ' ' * 24 }\r"; STDOUT.flush
+    printf "#{ @prefix.empty? ? '' : @prefix + ' ' }#{ text } #{ ' ' * 24 }\r"; STDOUT.flush
   end
   def to_console( color, text )
-    printf "#{ @prefix } #{ text } #{ ' ' * 24 }\n"
+    printf "#{ @prefix.empty? ? '' : @prefix + ' ' }#{ text } #{ ' ' * 24 }\n"
   end
 end
 
@@ -1031,8 +1031,10 @@ def dcp_inspect( options, args )
       end
     end
 
-  else # if args.size == 1 and ... directory
-    @logger.info( 'FIXME Only 1 dir handled for now' )
+  elsif args.size == 0
+    @logger.info( "No volume/directory given. See #{ AppName } --help" )
+  else # args > 1
+    @logger.info( "Too many arguments. See #{ AppName } --help" )
   end
 
   info << 'todo: Package format: Interop/SMPTE'
@@ -1051,7 +1053,7 @@ end
 #
 options = Options.parse( ARGV )
 args = ARGV
-@logger = DLogger.new( prefix = '*', options.verbosity )
+@logger = DLogger.new( prefix = '', options.verbosity )
 @logger.info( "dcp > inspect > #{ args }" )
 dcp_inspect( options, args )
 
