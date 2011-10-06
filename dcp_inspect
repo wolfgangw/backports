@@ -289,7 +289,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
     end # assets.each
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
-      errors << "Reel #{ index + 1 } duration mismatch"
+      errors << "CPL (#{ content_title_text }): Reel #{ index + 1 }: Duration mismatch"
     end
     report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
     total_duration += durations.min # FIXME ugh
@@ -737,7 +737,6 @@ end
 def xml_get_signer( xml )
   signers = xml.xpath( '//CompositionPlaylist/Signer' )
   if signers.size == 1
-    @logger.debug "Found Signer node ..."
     issuer = xml.xpath( '//CompositionPlaylist/Signer/X509Data/X509IssuerSerial/X509IssuerName' ).text
     subject = xml.xpath( '//CompositionPlaylist/Signer/X509Data/X509SubjectName' ).text
     return {
@@ -749,7 +748,6 @@ def xml_get_signer( xml )
     # FIXME elaborate
     return NIL
   else
-    @logger.info "No valid Signer node found"
     return NIL
   end
 end
@@ -843,23 +841,30 @@ def dcp_inspect( options, args )
     end
     ams = am_candidates
     # FIXME Multiple Assetmaps basically allowed
-    # Validity of packages with multiple Assetmaps is in transition
-    # process them all anyway (hint: we don't search the tree, yet)
+    # hint: we don't search the tree yet, though
     @logger.info( "Found #{ ams.size } valid Assetmap#{ ams.size != 1 ? 's' : '' }" )
     hints << "Found #{ ams.size } valid Assetmaps" if ams.size != 1
 
-    # FIXME Repeating Nokogiri::XML here
-    dict = Hash.new
-    pkls = Array.new
-    am_id = ''
-    ams.each do |file|
+    # Process all Assetmaps
+    dict = Array.new # will be a list of dictionaries/hashes
+    pkls = Array.new # will be a list of lists
+    am_ids = Array.new
+    ams.each_with_index do |file, index|
+      dict << Hash.new
+      pkls << Array.new
       xml = xml?( File.join( package_dir, file ) )
       xml.remove_namespaces! # FIXME else all nodes searched need ns attached
-      am_id = xml.xpath( '//Id' ).first.text.split( ':' ).last
+      am_id = get_asset_uuid( File.join( package_dir, file ) ) # xml.xpath( '//Id' ).first.text.split( ':' ).last
+      if am_id
+        am_ids << am_id
+      else
+        am_ids << NIL
+        errors << "Assetmap '#{ file }' has no Id"
+      end
       assets = xml.xpath( '//Asset' )
 
       @logger.info nil
-      @logger.info( "Assetmap #{ am_id }:"  )
+      @logger.info( "Assetmap #{ am_id }: #{ file }"  )
       @logger.info( "Assetmap #{ am_id } lists #{ assets.size } asset#{ assets.size != 1 ? 's' : '' }:" )
 
       # Store asset info in a dictionary (uuid => path, relative to package root)
@@ -871,110 +876,121 @@ def dcp_inspect( options, args )
           errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }"
         end
         path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
-        if File.exists?( File.join( package_dir, path ) )
-          asset_id = get_asset_uuid( File.join( package_dir, path ) )
-          if asset_id
-            unless asset_id =~ uuid_rfc4122_re
-              errors << "Asset UUID is not an RFC-4122 UUID: #{ asset_id } (#{ File.join( package_dir, path ) })" 
-            end
-            # Check listed_id vs actual asset_id
-            if listed_id != asset_id
-               errors << "UUID mismatch: Assetmap: #{ listed_id } AssetUUID: #{ asset_id } (#{ path })" 
-            end
-          end
+        if path.nil? # example: mc t28 ASSETMAP.xml
+          errors << "#{ file } (#{ am_id }): No path for #{ listed_id }"
         else
-          errors << "AM listed asset file missing: #{ path }"
-        end
 
-        # Assetmap dictionary
-        dict[ listed_id ] = path
+          # Assetmap dictionary
+          dict[ index ][ listed_id ] = path
+
+          if File.exists?( File.join( package_dir, path ) )
+            asset_id = get_asset_uuid( File.join( package_dir, path ) )
+            if asset_id
+              unless asset_id =~ uuid_rfc4122_re
+                errors << "Asset UUID is not an RFC-4122 UUID: #{ asset_id } (#{ File.join( package_dir, path ) })" 
+              end
+              # Check listed_id vs actual asset_id
+              if listed_id != asset_id
+                errors << "#{ file } (#{ am_id }): UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id } (#{ path })" 
+              end
+            end
+          else
+            errors << "#{ file } (#{ am_id }): Listed asset file missing: #{ path }"
+          end
+        end
 
         # PackingList?
         unless asset.xpath( 'PackingList' ).empty?
-          pkls << listed_id 
+          pkls[ index ] << listed_id 
         end
 
         # Check if possible uuid component in the asset filename matches the actual asset uuid # this one for gbaruffa
-        file_basename = File.basename( dict[ listed_id ] )
-        if file_basename =~ uuid_re
-          unless file_basename.match( uuid_re )[ 0 ] == listed_id
-            hints << "Asset UUID and filename UUID component mismatch: #{ listed_id } -> #{ file_basename }"
+        if dict[ index ][ listed_id ] # see above example mc t28
+          file_basename = File.basename( dict[ index ][ listed_id ] )
+          if file_basename =~ uuid_re
+            unless file_basename.match( uuid_re )[ 0 ] == listed_id
+              hints << "Asset UUID and filename UUID component mismatch: #{ listed_id } -> #{ file_basename }"
+            end
           end
         end
-      end
-    end
+        
+      end # assets.each
 
-    # List asset dictionary
-    dict.map { |k, v| @logger.info( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( File.join( package_dir, v ) ) ? '' : ' (missing)' }" ) }
- 
+      # List asset dictionary
+      dict[ index ].map { |k, v| @logger.info( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( File.join( package_dir, v ) ) ? '' : ' (missing)' }" ) }
+
+    end # ams.each
+
     # List all found PKLs if any
-    # FIXME we have no notion of various Assetmaps anymore, just all collected PKLs
-    # FIXME The following am_id is an ugly and horrible workaround, remember that.
     @logger.info nil
-    @logger.info( "Assetmap #{ am_id } lists #{ pkls.size } PKL#{ pkls.size != 1 ? 's' : '' }:" ) unless ams.size == 0
-    # FIXME purely informative here, we don't remember referenced files which are missing
-    pkls.map { |pkl_id| @logger.info( "PKL file#{ File.exists?( File.join( package_dir, dict[ pkl_id ] ) ) ? '' : ' not' } present: #{ [ pkl_id, dict[ pkl_id ] ].join( ': ' ) }" ) }
+    am_ids.each_with_index do |am_id, index|
+      @logger.info( "Assetmap #{ am_id } lists #{ pkls[ index ].size } PKL#{ pkls[ index ].size != 1 ? 's' : '' }:" )
+      # FIXME purely informative here
+      pkls[ index ].map { |pkl_id| @logger.info( "PKL file#{ File.exists?( File.join( package_dir, dict[ index ][ pkl_id ] ) ) ? '' : ' not' } present: #{ [ pkl_id, dict[ index ][ pkl_id ] ].join( ': ' ) }" ) }
+    end
 
     # All found PKLs: look for CPLs
     cpls = Array.new
-    pkls.each do |pkl_id|
-      pkl_file = File.join( package_dir, dict[ pkl_id ] )
-      if File.exists?( pkl_file )
-        xml = get_xml_of_type( 'PackingList', pkl_file )
-        if xml
-          xml.remove_namespaces!
-          pkl_assets = xml.xpath( '//Asset' )
-          pkl_cpls = Array.new
-          pkl_assets.each do |asset|
-            type = asset.xpath( 'Type' ).text
-            id = asset.xpath( 'Id' ).text.split( ':' ).last
+    pkls.each_with_index do |am_pkls, index|
+      am_pkls.each do |pkl_id|
+        pkl_file = File.join( package_dir, dict[ index ][ pkl_id ] )
+        if File.exists?( pkl_file )
+          xml = get_xml_of_type( 'PackingList', pkl_file )
+          if xml
+            xml.remove_namespaces!
+            pkl_assets = xml.xpath( '//Asset' )
+            pkl_cpls = Array.new
+            pkl_assets.each do |asset|
+              type = asset.xpath( 'Type' ).text
+              id = asset.xpath( 'Id' ).text.split( ':' ).last
 
-            if dict.keys.include?( id )
-              asset_file = File.join( package_dir, dict[ id ] )
-              if ( hash_given = asset.xpath( 'Hash' ).text )
-                if options.check_hashes
-                  @logger.info "Checking hash value for #{ asset_file }"
-                  hash_check = Shell::asdcp_digest( File.join( package_dir, dict[ id ] ) )
-                  if hash_given != hash_check
-                    errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Check: #{ hash_check }"
-                  else
-                    @logger.info "OK: #{ hash_check }"
-                    info << "Hash value checked for #{ asset_file } (OK: #{ hash_check })"
+              if dict[ index ].keys.include?( id )
+                asset_file = File.join( package_dir, dict[ index ][ id ] )
+                if ( hash_given = asset.xpath( 'Hash' ).text )
+                  if options.check_hashes
+                    @logger.info "Checking hash value for #{ asset_file }"
+                    hash_check = Shell::asdcp_digest( File.join( package_dir, dict[ index ][ id ] ) )
+                    if hash_given != hash_check
+                      errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Check: #{ hash_check }"
+                    else
+                      @logger.info "OK: #{ hash_check }"
+                      info << "Hash value checked for #{ asset_file } (OK: #{ hash_check })"
+                    end
+                  end
+                else
+                  errors << "PKL: Hash missing for #{ asset_file } (#{ id })"
+                end
+                if type =~ /text\/xml/
+                  if File.exists?( asset_file )
+                    # Pick CPLs
+                    xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
+                    if xml
+                      pkl_cpls << id
+                    else
+                      # we might hit subtitle files here, no error claimed for now
+                    end
                   end
                 end
               else
-                errors << "PKL: Hash missing for #{ asset_file } (#{ id })"
+                # For some reason the listed id in PackingList is not in assetmap dictionary
+                # Possibly been tampered with
+                errors << "PKL (#{ pkl_id }): Asset UUID not in assetmap dictionary: #{ id } (#{ type })"
               end
-              if type =~ /text\/xml/
-                if File.exists?( asset_file )
-                  # Pick CPLs
-                  xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
-                  if xml
-                    pkl_cpls << id
-                  else
-                    # we might hit subtitle files here, no error claimed for now
-                  end
-                end
-              end
-            else
-              # For some reason the listed id in PackingList is not in assetmap dictionary
-              # Possibly been tampered with
-              errors << "PKL asset id not in assetmap dictionary: #{ id } (#{ type })"
-            end
 
+            end
+            # Add this PKLs CPLs to total CPLs
+            cpls += pkl_cpls
+            # List this PKLs CPLs
+            @logger.info nil
+            @logger.info( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
+            # FIXME purely informative here, we don't remember referenced files which are missing
+            pkl_cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ index ][ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
+          else
+            errors << "Not a PackingList: #{ pkl_file }"
           end
-          # Add this PKLs CPLs to total CPLs
-          cpls += pkl_cpls
-          # List this PKLs CPLs
-          @logger.info nil
-          @logger.info( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
-          # FIXME purely informative here, we don't remember referenced files which are missing
-          pkl_cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ cpl_id ] ].join( ': ' ) }" ) }
         else
-          errors << "Not a PackingList: #{ pkl_file }"
+          errors << "AM referenced PKL file not found: #{ pkl_file }"
         end
-      else
-        errors << "AM referenced PKL file not found: #{ pkl_file }"
       end
     end
 
@@ -982,26 +998,37 @@ def dcp_inspect( options, args )
     @logger.info nil
     if cpls.size > 0
       @logger.info( "Found #{ cpls.size } composition#{ cpls.size != 1 ? 's' : '' }:" )
-      cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ cpl_id ] ].join( ': ' ) }" ) }
+      dict.each do |dictionary|
+        cpls.each do |cpl_id|
+          if dictionary.include?( cpl_id )
+            @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dictionary[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dictionary[ cpl_id ] ].join( ': ' ) }" )
+          end
+        end
+      end
     else
       @logger.info( 'Found no compositions' )
     end
 
     # Inspect CPLs
-    cpls.each do |cpl_id|
-      cpl_file = File.join( package_dir, dict[ cpl_id ] )
-      if File.exists?( cpl_file )
-        xml = xml?( cpl_file )
-        if xml
-          report, errors, hints, info = cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
-        else
-          errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
+    # FIXME and all over again ...
+    dict.each do |dictionary|
+      cpls.each do |cpl_id|
+        if dictionary.include?( cpl_id )
+          cpl_file = File.join( package_dir, dictionary[ cpl_id ] )
+          if File.exists?( cpl_file )
+            xml = xml?( cpl_file )
+            if xml
+              report, errors, hints, info = cpl_inspect_xml( xml, dictionary, package_dir, errors, hints, info )
+            else
+              errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
+            end
+          else
+            report << "CPL file missing: #{ cpl_file }"
+          end
+          @logger.info ''
+          report.map { |line| @logger.info line }
         end
-      else
-        report << "CPL file missing: #{ cpl_file }"
       end
-      @logger.info ''
-      report.map { |line| @logger.info line }
     end
 
   else # if args.size == 1 and ... directory
@@ -1017,7 +1044,7 @@ def dcp_inspect( options, args )
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) }
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
-  info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
+  #info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
 end
 
 
