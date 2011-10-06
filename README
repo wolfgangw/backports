@@ -4,11 +4,14 @@ dcp_inspect (backport from dietrich codebase) will inspect DCP volumes and direc
 Usage:  dcp_inspect /path/to/dir
         dcp_inspect --help
 
+Alpha stage so don't expect miracles. But it does bend over backwards to find 
+problems in packages.
+
 For convenience this backport carries all required infrastructure,
 including Julik's Timecode library (https://github.com/guerilla-di/timecode).
 
 2 external requirements:
-  - asdcplib
+  - asdcplib and its cli tools
       http://www.cinecert.com/asdcplib/
   - Nokogiri, a Ruby gem used for XML parsing
       http://nokogiri.org/tutorials/installing_nokogiri.html
@@ -19,8 +22,10 @@ Couple of todo's lurking:
   - Checks and verification of Signature/Certificates
       For now dcp_inspect will just report Signer info
   - Some Assetmap options (Offsets, volume indices) are not handled
+  - Marker lists in CPLs are not handled
+  - Its output is quite chatty and for now there is no way to tame that
 
-Developed and tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
+Tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
 
 
 Wolfgang Woehl 2011
