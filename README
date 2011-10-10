@@ -1,4 +1,4 @@
-dcp_inspect (backport from dietrich codebase) will inspect DCP volumes and directories.
+dcp_inspect will inspect DCP volumes and directories.
 
 
 Usage:  dcp_inspect /path/to/dir
@@ -7,7 +7,7 @@ Usage:  dcp_inspect /path/to/dir
 Alpha stage so don't expect miracles. But it does bend over backwards to find 
 problems in packages.
 
-For convenience this backport carries all required infrastructure,
+For convenience this backport carries almost all required infrastructure,
 including Julik's Timecode library (https://github.com/guerilla-di/timecode).
 
 2 external requirements:
@@ -25,7 +25,7 @@ Couple of todo's lurking:
   - Marker lists in CPLs are not handled
   - Its output is quite chatty and for now there is no way to tame that
 
-Tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
+Tested on linux boxes. Let me know if dcp_inspect actually runs on Mac OS or Windows.
 
 
 Wolfgang Woehl 2011
