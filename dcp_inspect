@@ -1,23 +1,50 @@
 #!/usr/bin/env ruby
 #
+# dcp_inspect will inspect DCP media and directories.
+# Copyright 2011 Wolfgang Woehl
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 AppName = File.basename( $0 )
-AppVersion = 'v1.2011.10.06.backport'
-#
-# Wolfgang Woehl 2011
-#
-# dcp_inspect (backport from dietrich codebase) will inspect DCP media and directories.
+AppVersion = 'v1.2011.10.31.backport'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
 #
-# Developed and tested on linux boxes. Let me know if dcp_inspect actually runs in Windows.
+# Alpha stage so don't expect miracles. But it does bend over backwards to find 
+# problems in packages.
 #
-# For convenience this backport carries all required infrastructure,
-# among it Julik's Timecode library (https://github.com/guerilla-di/timecode).
+# For convenience this backport carries almost all required infrastructure,
+# including Julik's Timecode library (https://github.com/guerilla-di/timecode).
 #
-# The only external requirement so far is Nokogiri.
-# See http://nokogiri.org/tutorials/installing_nokogiri.html for a guide on
-# how to install Nokogiri in Mac OS X, Ubuntu, Red Hat and Windows
+# 2 external requirements:
+#   - asdcplib and its cli tools
+#       http://www.cinecert.com/asdcplib/
+#   - Nokogiri, a Ruby gem used for XML parsing
+#      http://nokogiri.org/tutorials/installing_nokogiri.html
+#
+# Couple of todo's lurking:
+#   - Consistency checks of package formats (Interop/SMPTE)
+#   - Checks of listed and actual asset sizes
+#   - Checks and verification of Signature/Certificates
+#       For now dcp_inspect will just report Signer info
+#   - Some Assetmap options (Offsets, volume indices) are not handled
+#   - Marker lists in CPLs are not handled
+#   - Its output is quite chatty and for now there is no way to tame that
+#
+# Tested on linux boxes. Let me know if dcp_inspect actually runs on Mac OS or Windows.
+#
 require 'nokogiri'
 require 'optparse'
 require 'ostruct'
