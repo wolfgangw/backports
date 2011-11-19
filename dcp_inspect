@@ -184,8 +184,12 @@ include MxfTools
 
 # lib/magic_strings.rb
 module MStr
-  Smpte_am = 'http://www.smpte-ra.org/schemas/429-9/2007/AM'
-  Interop_am = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
+  Smpte_am    = 'http://www.smpte-ra.org/schemas/429-9/2007/AM'
+  Interop_am  = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
+  Smpte_pkl   = 'http://www.smpte-ra.org/schemas/429-8/2007/PKL'
+  Interop_pkl = 'http://www.digicine.com/PROTO-ASDCP-PKL-20040311#'
+  Smpte_cpl   = 'http://www.smpte-ra.org/schemas/429-7/2006/CPL'
+  Interop_cpl = 'http://www.digicine.com/PROTO-ASDCP-CPL-20040511#'
 
   # title_kind_aspect_langaudio-langsubs only
   Naming_re = /([-A-Z0-9]+)_(FTR|TST|TLR|TLR-1|TLR1-2D|TLR1-3D|RTG-F|RTG-T1|TSR|TSR-1|POL|PSA|ADV|SHR|XSN|)_(F|S|C)_([A-Z]{2}-[A-Z]{2})/
@@ -216,14 +220,238 @@ module Shell
   end
 end
 
+# SMPTE 429-7-2006-CPL schema
+XSD_SMPTE_CPL = <<XSD
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema targetNamespace="http://www.smpte-ra.org/schemas/429-7/2006/CPL" xmlns:cpl="http://www.smpte-ra.org/schemas/429-7/2006/CPL" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
+
+  <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="http://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.w3.org/2001/03/xml.xsd"/>
+
+  <!-- CompositionPlaylist -->
+  <xs:element name="CompositionPlaylist" type="cpl:CompositionPlaylistType"/>
+  <xs:complexType name="CompositionPlaylistType">
+    <xs:sequence>
+      <xs:element name="Id" type="cpl:UUID"/>
+      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="IconId" type="cpl:UUID" minOccurs="0"/>
+      <xs:element name="IssueDate" type="xs:dateTime"/>
+      <xs:element name="Issuer" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="Creator" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="ContentTitleText" type="cpl:UserText"/>
+      <xs:element name="ContentKind" type="cpl:ContentKindType"/>
+      <xs:element name="ContentVersion" type="cpl:ContentVersionType"/>
+      <xs:element name="RatingList">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Rating" type="cpl:RatingType" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="ReelList">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Reel" type="cpl:ReelType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="Signer" type="ds:KeyInfoType" minOccurs="0"/>
+      <xs:element ref="ds:Signature" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Marker -->
+  <xs:complexType name="MarkerType">
+    <xs:sequence>
+      <xs:element name="Label">
+        <xs:complexType>
+          <xs:simpleContent>
+            <xs:extension base="xs:string">
+              <xs:attribute name="scope" type="xs:anyURI" use="optional" default="http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-markers"/>
+            </xs:extension>
+          </xs:simpleContent>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="Offset">
+        <xs:simpleType>
+          <xs:restriction base="xs:long">
+            <xs:minInclusive value="0"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Rating -->
+  <xs:complexType name="RatingType">
+    <xs:sequence>
+      <xs:element name="Agency" type="xs:anyURI"/>
+      <xs:element name="Label" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ContentKind -->
+  <xs:complexType name="ContentKindType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="scope" type="xs:anyURI" use="optional" default="http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-content"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- ContentVersion -->
+  <xs:complexType name="ContentVersionType">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:anyURI"/>
+      <xs:element name="LabelText" type="cpl:UserText"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Reel -->
+  <xs:complexType name="ReelType">
+    <xs:sequence>
+      <xs:element name="Id" type="cpl:UUID"/>
+      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="AssetList">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="MainMarkers" type="cpl:MarkerAssetType" minOccurs="0"/>
+            <xs:element name="MainPicture" type="cpl:PictureTrackFileAssetType" minOccurs="0"/>
+            <xs:element name="MainSound" type="cpl:SoundTrackFileAssetType" minOccurs="0"/>
+            <xs:element name="MainSubtitle" type="cpl:SubtitleTrackFileAssetType" minOccurs="0"/>
+            <xs:any namespace="##other" minOccurs="0" maxOccurs="unbounded" processContents="lax" />
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- GenericAssetType -->
+  <xs:complexType name="GenericAssetType" abstract="1">
+    <xs:sequence>
+      <xs:element name="Id" type="cpl:UUID"/>
+      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
+      <xs:element name="EditRate" type="cpl:Rational"/>
+      <xs:element name="IntrinsicDuration" type="xs:long"/>
+      <xs:element name="EntryPoint" type="xs:long" minOccurs="0"/>
+      <xs:element name="Duration" type="xs:long" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- TrackFileAssetType -->
+  <xs:complexType name="TrackFileAssetType" abstract="1">
+    <xs:complexContent>
+      <xs:extension base="cpl:GenericAssetType">
+        <xs:sequence>
+          <xs:element name="KeyId" type="cpl:UUID" minOccurs="0"/>
+          <xs:element name="Hash" type="xs:base64Binary" minOccurs="0"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- SountTrackFileAssetType -->
+  <xs:complexType name="SoundTrackFileAssetType">
+    <xs:complexContent>
+      <xs:extension base="cpl:TrackFileAssetType">
+        <xs:sequence>
+          <xs:element name="Language" type="xs:language" minOccurs="0"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- SubtitleTrackFileAssetType -->
+  <xs:complexType name="SubtitleTrackFileAssetType">
+    <xs:complexContent>
+      <xs:extension base="cpl:TrackFileAssetType">
+        <xs:sequence>
+          <xs:element name="Language" type="xs:language" minOccurs="0"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- PictureTrackFileAssetType -->
+  <xs:complexType name="PictureTrackFileAssetType">
+    <xs:complexContent>
+      <xs:extension base="cpl:TrackFileAssetType">
+        <xs:sequence>
+          <xs:element name="FrameRate" type="cpl:Rational"/>
+          <xs:element name="ScreenAspectRatio" type="cpl:Rational"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- MarkerAssetType -->
+  <xs:complexType name="MarkerAssetType">
+    <xs:complexContent>
+      <xs:extension base="cpl:GenericAssetType">
+        <xs:sequence>
+          <xs:element name="MarkerList">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Marker" type="cpl:MarkerType" minOccurs="0" maxOccurs="unbounded"/>
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- Rational -->
+  <xs:simpleType name="Rational">
+    <xs:restriction>
+      <xs:simpleType>
+        <xs:list itemType="xs:long"/>
+      </xs:simpleType>
+      <xs:length value="2"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- UUID -->
+  <xs:simpleType name="UUID">
+    <xs:restriction base="xs:anyURI">
+      <xs:pattern value="urn:uuid:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- UserText -->
+  <xs:complexType name="UserText">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="language" type="xs:language" use="optional" default="en"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+</xs:schema>
+XSD
+# end SMPTE 429-7-2006-CPL schema
+
 
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
+  ns = xml.namespaces
+  case ns[ 'xmlns' ]
+  when MStr::Smpte_cpl
+    xsd = Nokogiri::XML::Schema XSD_SMPTE_CPL
+    #xsd.validate( xml ).each do |e|
+    #  @logger.info( "Validating: #{ e.inspect }" )
+    #end
+    cpl_type = 'SMPTE'
+  when MStr::Interop_cpl
+    cpl_type = 'Interop'
+  end
   xml.remove_namespaces!
   report = Array.new
   cpl_id = xml.xpath( '//CompositionPlaylist/Id' ).text.split( ':' ).last
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ dict[ cpl_id ] }"
+  report << "CPL type:         #{ cpl_type } (#{ ns[ 'xmlns' ].inspect })"
   content_title_text = xml.xpath( '//CompositionPlaylist/ContentTitleText' ).text
   report << "ContentTitleText: #{ content_title_text }"
   if content_title_text =~ MStr::Naming_re
@@ -759,7 +987,7 @@ end
 
 # lib/xml.rb
 # Out in the field there will be Signer elements
-#   - with Issuer name and Subject name
+#   - with Issuer name and Subject name (SMPTE)
 #   - with Issuer name only
 def xml_get_signer( xml )
   signers = xml.xpath( '//CompositionPlaylist/Signer' )
@@ -793,6 +1021,7 @@ end
 
 def xml?( file )
   xml = Nokogiri::XML( File.open( file ) )
+  @logger.info xml.errors.inspect
   if xml.root.nil?
     FALSE
   else
@@ -851,7 +1080,7 @@ def dcp_inspect( options, args )
     if am_candidates.empty?
       errors << 'No Assetmap candidate found' 
     else
-      @logger.info( "Found #{ am_candidates.size } Assetmap candidate#{ am_candidates.size > 1 ? 's: ' + am_candidates.inspect : ': ' + am_candidates.inspect }" )
+      @logger.debug( "Found #{ am_candidates.size } Assetmap candidate#{ am_candidates.size > 1 ? 's: ' + am_candidates.inspect : ': ' + am_candidates.inspect }" )
     end
 
     # Check XML for Assetmap content
@@ -861,7 +1090,7 @@ def dcp_inspect( options, args )
         if xml
           # do something with it
         else
-          @logger.info( errors.last )
+          @logger.debug( errors.last )
           am_candidates.delete( am_candidate )
         end
       end
@@ -890,9 +1119,9 @@ def dcp_inspect( options, args )
       end
       assets = xml.xpath( '//Asset' )
 
-      @logger.info nil
-      @logger.info( "Assetmap #{ am_id }: #{ file }"  )
-      @logger.info( "Assetmap #{ am_id } lists #{ assets.size } asset#{ assets.size != 1 ? 's' : '' }:" )
+      @logger.debug nil
+      @logger.debug( "Assetmap #{ am_id }: #{ file }"  )
+      @logger.debug( "Assetmap #{ am_id } lists #{ assets.size } asset#{ assets.size != 1 ? 's' : '' }:" )
 
       # Store asset info in a dictionary (uuid => path, relative to package root)
       # look for PackingList(s)
@@ -944,16 +1173,16 @@ def dcp_inspect( options, args )
       end # assets.each
 
       # List asset dictionary
-      dict[ index ].map { |k, v| @logger.info( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( File.join( package_dir, v ) ) ? '' : ' (missing)' }" ) }
+      dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( File.join( package_dir, v ) ) ? '' : ' (missing)' }" ) }
 
     end # ams.each
 
     # List all found PKLs if any
-    @logger.info nil
+    @logger.debug nil
     am_ids.each_with_index do |am_id, index|
-      @logger.info( "Assetmap #{ am_id } lists #{ pkls[ index ].size } PKL#{ pkls[ index ].size != 1 ? 's' : '' }:" )
+      @logger.debug( "Assetmap #{ am_id } lists #{ pkls[ index ].size } PKL#{ pkls[ index ].size != 1 ? 's' : '' }:" )
       # FIXME purely informative here
-      pkls[ index ].map { |pkl_id| @logger.info( "PKL file#{ File.exists?( File.join( package_dir, dict[ index ][ pkl_id ] ) ) ? '' : ' not' } present: #{ [ pkl_id, dict[ index ][ pkl_id ] ].join( ': ' ) }" ) }
+      pkls[ index ].map { |pkl_id| @logger.debug( "PKL file#{ File.exists?( File.join( package_dir, dict[ index ][ pkl_id ] ) ) ? '' : ' not' } present: #{ [ pkl_id, dict[ index ][ pkl_id ] ].join( ': ' ) }" ) }
     end
 
     # All found PKLs: look for CPLs
@@ -975,12 +1204,12 @@ def dcp_inspect( options, args )
                 asset_file = File.join( package_dir, dict[ index ][ id ] )
                 if ( hash_given = asset.xpath( 'Hash' ).text )
                   if options.check_hashes
-                    @logger.info "Checking hash value for #{ asset_file }"
+                    @logger.debug "Checking hash value for #{ asset_file }"
                     hash_check = Shell::asdcp_digest( File.join( package_dir, dict[ index ][ id ] ) )
                     if hash_given != hash_check
                       errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Check: #{ hash_check }"
                     else
-                      @logger.info "OK: #{ hash_check }"
+                      @logger.debug "OK: #{ hash_check }"
                       info << "Hash value checked for #{ asset_file } (OK: #{ hash_check })"
                     end
                   end
@@ -1008,10 +1237,10 @@ def dcp_inspect( options, args )
             # Add this PKLs CPLs to total CPLs
             cpls += pkl_cpls
             # List this PKLs CPLs
-            @logger.info nil
-            @logger.info( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
+            @logger.debug nil
+            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
             # FIXME purely informative here, we don't remember referenced files which are missing
-            pkl_cpls.map { |cpl_id| @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dict[ index ][ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
+            pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( File.join( package_dir, dict[ index ][ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
           else
             errors << "Not a PackingList: #{ pkl_file }"
           end
@@ -1022,13 +1251,13 @@ def dcp_inspect( options, args )
     end
 
     # List all found CPLs
-    @logger.info nil
+    @logger.debug nil
     if cpls.size > 0
-      @logger.info( "Found #{ cpls.size } composition#{ cpls.size != 1 ? 's' : '' }:" )
+      @logger.debug( "Found #{ cpls.size } composition#{ cpls.size != 1 ? 's' : '' }:" )
       dict.each do |dictionary|
         cpls.each do |cpl_id|
           if dictionary.include?( cpl_id )
-            @logger.info( "CPL file#{ File.exists?( File.join( package_dir, dictionary[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dictionary[ cpl_id ] ].join( ': ' ) }" )
+            @logger.debug( "CPL file#{ File.exists?( File.join( package_dir, dictionary[ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dictionary[ cpl_id ] ].join( ': ' ) }" )
           end
         end
       end
