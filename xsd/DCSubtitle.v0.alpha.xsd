@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="DCSubtitle">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="SubtitleID"/>
+        <xs:element ref="MovieTitle"/>
+        <xs:element ref="ReelNumber"/>
+        <xs:element ref="Language"/>
+        <xs:element ref="LoadFont"/>
+        <xs:element ref="Font"/>
+      </xs:sequence>
+      <xs:attribute name="Version" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SubtitleID" type="xs:string"/>
+  <xs:element name="MovieTitle" type="xs:string"/>
+  <xs:element name="ReelNumber" type="xs:integer"/>
+  <xs:element name="Language" type="xs:NMTOKEN"/>
+  <xs:element name="LoadFont">
+    <xs:complexType>
+      <xs:attribute name="Id" use="required" type="xs:NCName"/>
+      <xs:attribute name="URI" use="required" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Font">
+    <xs:complexType mixed="true">
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="Text"/>
+        <xs:element ref="Subtitle"/>
+      </xs:choice>
+      <xs:attribute name="Color" type="xs:NCName"/>
+      <xs:attribute name="Effect" type="xs:NCName"/>
+      <xs:attribute name="EffectColor" type="xs:NCName"/>
+      <xs:attribute name="Id" type="xs:NCName"/>
+      <xs:attribute name="Italic" type="xs:NCName"/>
+      <xs:attribute name="Script" type="xs:NCName"/>
+      <xs:attribute name="Size" type="xs:integer"/>
+      <xs:attribute name="Underlined" type="xs:NCName"/>
+      <xs:attribute name="Weight" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Subtitle">
+    <xs:complexType>
+      <xs:choice>
+        <xs:element maxOccurs="unbounded" ref="Font"/>
+        <xs:element maxOccurs="unbounded" ref="Text"/>
+      </xs:choice>
+      <xs:attribute name="FadeDownTime" type="xs:integer"/>
+      <xs:attribute name="FadeUpTime" type="xs:integer"/>
+      <xs:attribute name="SpotNumber" use="required" type="xs:integer"/>
+      <xs:attribute name="TimeIn" use="required" type="xs:NMTOKEN"/>
+      <xs:attribute name="TimeOut" use="required" type="xs:NMTOKEN"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Text">
+    <xs:complexType mixed="true">
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
+      </xs:sequence>
+      <xs:attribute name="Direction" type="xs:NCName"/>
+      <xs:attribute name="HAlign" type="xs:NCName"/>
+      <xs:attribute name="HPosition" type="xs:decimal"/>
+      <xs:attribute name="VAlign" use="required" type="xs:NCName"/>
+      <xs:attribute name="VPosition" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
