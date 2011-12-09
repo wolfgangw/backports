@@ -31,8 +31,8 @@ AppVersion = 'v1.2011.10.31.backport'
 # 2 external requirements:
 #   - asdcplib and its cli tools
 #       http://www.cinecert.com/asdcplib/
-#   - Nokogiri, a Ruby gem used for XML parsing
-#      http://nokogiri.org/tutorials/installing_nokogiri.html
+#   - Nokogiri, a Ruby gem used for XML parsing and its dependencies
+#       http://nokogiri.org/tutorials/installing_nokogiri.html
 #
 # Couple of todo's lurking:
 #   - Consistency checks of package formats (Interop/SMPTE)
@@ -48,6 +48,32 @@ AppVersion = 'v1.2011.10.31.backport'
 require 'nokogiri'
 require 'optparse'
 require 'ostruct'
+require 'pathname'
+
+
+# set up local XML Catalog and patch its xml:base
+AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
+XSDDir = File.join( AppDir, 'xsd' )
+local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
+if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
+  if File.exists? local_xml_catalog
+    c = File.read local_xml_catalog
+    m = c.match /xml:base="file:\/\/(.+)">/
+    if m[ 1 ] != File.join( XSDDir, '' )
+      File.open( local_xml_catalog, 'w' ) { |f| f.write c.gsub( m[ 1 ], File.join( XSDDir, '' ) ); f.close }
+    end
+  else
+    puts "Local XML Catalog #{ local_xml_catalog } not found"
+    exit
+  end
+else
+  puts "Local XSD store #{ XSDDir } not found"
+  exit
+end
+unless ENV[ 'XML_CATALOG_FILES' ]
+  puts "Export env XML_CATALOG_FILES to point at #{ local_xml_catalog }"
+  exit
+end
 
 
 # lib/options.rb
@@ -56,7 +82,7 @@ class Options
     # defaults
     options = OpenStruct.new
     options.check_hashes = FALSE
-    options.verbosity = 'info'
+    options.verbosity = 'debug'
     options.verbosity_choices = [ 'quiet', 'info', 'debug', 'trace_func' ]
     opts = OptionParser.new do |opts|
       opts.banner = <<BANNER
@@ -88,62 +114,40 @@ BANNER
   end # parse
 end # class
 
-
-# lib/logger.rb
+# * lib/logger.rb
 class DLogger
   attr_accessor :prefix
   def initialize( prefix, verbosity )
     @verbosity = verbosity
-    @critical = TRUE
     case @verbosity
-    when 'quiet'
-      @info = FALSE
-      @warn = FALSE
-      @debug = FALSE
-    when 'info'
-      @info = TRUE
-      @warn = TRUE
-      @debug = FALSE
-    when 'debug'
-      @info = TRUE
-      @warn = TRUE
-      @debug = TRUE
+    when "quiet"
+      @info, @debug = [ FALSE, FALSE ]
+    when "info"
+      @info, @debug = [ TRUE, FALSE ]
+    when "debug"
+      @info, @debug = [ TRUE, TRUE ]
     when 'trace_func'
-      @info = TRUE
-      @warn = TRUE
-      @debug = TRUE
+      @info, @debug = [ TRUE, TRUE ]
       set_trace_func proc { |event, file, line, id, binding, classname|
         printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
       }
     end
     @prefix = prefix
-    @color = Hash.new
-    # these work ok on a black background:
-    @color[:info] = ''
-    @color[:debug] = '32'
-    @color[:warn] = '33'
-    @color[:critical] = '1'
   end
   def info( text )
-    to_console( @color[:info], text ) if @info == TRUE
-  end
-  def warn( text )
-    to_console( @color[:warn], text ) if @warn == TRUE
+    to_console( text ) if @info == TRUE
   end
   def debug( text )
-    to_console( @color[:debug], text ) if @debug == TRUE
-  end
-  def critical( text )
-    to_console( @color[:critical], text ) if @critical == TRUE
+    to_console( text ) if @debug == TRUE
   end
   def cr( text )
-    carriage_return( @color[:info], text ) unless @verbosity == "quiet"
+    carriage_return( text ) unless @verbosity == "quiet"
   end
-  def carriage_return( color, text )
-    printf "#{ @prefix.empty? ? '' : @prefix + ' ' }#{ text } #{ ' ' * 24 }\r"; STDOUT.flush
+  def carriage_return( text )
+    printf "#{ @prefix } #{ text }#{ ' ' * 64 }\r"; STDOUT.flush
   end
-  def to_console( color, text )
-    printf "#{ @prefix.empty? ? '' : @prefix + ' ' }#{ text } #{ ' ' * 24 }\n"
+  def to_console( text )
+    printf "#{ @prefix } #{ text }#{ ' ' * 64 }\n"
   end
 end
 
@@ -185,11 +189,20 @@ include MxfTools
 # lib/magic_strings.rb
 module MStr
   Smpte_am    = 'http://www.smpte-ra.org/schemas/429-9/2007/AM'
-  Interop_am  = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
   Smpte_pkl   = 'http://www.smpte-ra.org/schemas/429-8/2007/PKL'
-  Interop_pkl = 'http://www.digicine.com/PROTO-ASDCP-PKL-20040311#'
   Smpte_cpl   = 'http://www.smpte-ra.org/schemas/429-7/2006/CPL'
+  Interop_am  = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
+  Interop_pkl = 'http://www.digicine.com/PROTO-ASDCP-PKL-20040311#'
   Interop_cpl = 'http://www.digicine.com/PROTO-ASDCP-CPL-20040511#'
+
+  Schemas = {
+    Smpte_am    => 'SMPTE-429-9-2007-AM.xsd',
+    Smpte_pkl   => 'SMPTE-429-8-2006-PKL.xsd',
+    Smpte_cpl   => 'SMPTE-429-7-2006-CPL.xsd',
+    Interop_am  => 'PROTO-ASDCP-AM-20040311.xsd',
+    Interop_pkl => 'PROTO-ASDCP-PKL-20040311.xsd',
+    Interop_cpl => 'PROTO-ASDCP-CPL-20040511.xsd'
+  }
 
   # title_kind_aspect_langaudio-langsubs only
   Naming_re = /([-A-Z0-9]+)_(FTR|TST|TLR|TLR-1|TLR1-2D|TLR1-3D|RTG-F|RTG-T1|TSR|TSR-1|POL|PSA|ADV|SHR|XSN|)_(F|S|C)_([A-Z]{2}-[A-Z]{2})/
@@ -218,343 +231,6 @@ module Shell
       `asdcp-test -t #{ filename }`.chomp.split( ' ' ).first
     end
   end
-end
-
-# SMPTE 429-7-2006-CPL schema
-XSD_SMPTE_CPL = <<XSD
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema targetNamespace="http://www.smpte-ra.org/schemas/429-7/2006/CPL" xmlns:cpl="http://www.smpte-ra.org/schemas/429-7/2006/CPL" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
-
-  <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="http://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema.xsd"/>
-  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.w3.org/2001/03/xml.xsd"/>
-
-  <!-- CompositionPlaylist -->
-  <xs:element name="CompositionPlaylist" type="cpl:CompositionPlaylistType"/>
-  <xs:complexType name="CompositionPlaylistType">
-    <xs:sequence>
-      <xs:element name="Id" type="cpl:UUID"/>
-      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="IconId" type="cpl:UUID" minOccurs="0"/>
-      <xs:element name="IssueDate" type="xs:dateTime"/>
-      <xs:element name="Issuer" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="Creator" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="ContentTitleText" type="cpl:UserText"/>
-      <xs:element name="ContentKind" type="cpl:ContentKindType"/>
-      <xs:element name="ContentVersion" type="cpl:ContentVersionType"/>
-      <xs:element name="RatingList">
-        <xs:complexType>
-          <xs:sequence>
-            <xs:element name="Rating" type="cpl:RatingType" minOccurs="0" maxOccurs="unbounded"/>
-          </xs:sequence>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="ReelList">
-        <xs:complexType>
-          <xs:sequence>
-            <xs:element name="Reel" type="cpl:ReelType" maxOccurs="unbounded"/>
-          </xs:sequence>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="Signer" type="ds:KeyInfoType" minOccurs="0"/>
-      <xs:element ref="ds:Signature" minOccurs="0"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- Marker -->
-  <xs:complexType name="MarkerType">
-    <xs:sequence>
-      <xs:element name="Label">
-        <xs:complexType>
-          <xs:simpleContent>
-            <xs:extension base="xs:string">
-              <xs:attribute name="scope" type="xs:anyURI" use="optional" default="http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-markers"/>
-            </xs:extension>
-          </xs:simpleContent>
-        </xs:complexType>
-      </xs:element>
-      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="Offset">
-        <xs:simpleType>
-          <xs:restriction base="xs:long">
-            <xs:minInclusive value="0"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:element>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- Rating -->
-  <xs:complexType name="RatingType">
-    <xs:sequence>
-      <xs:element name="Agency" type="xs:anyURI"/>
-      <xs:element name="Label" type="xs:string"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- ContentKind -->
-  <xs:complexType name="ContentKindType">
-    <xs:simpleContent>
-      <xs:extension base="xs:string">
-        <xs:attribute name="scope" type="xs:anyURI" use="optional" default="http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-content"/>
-      </xs:extension>
-    </xs:simpleContent>
-  </xs:complexType>
-
-  <!-- ContentVersion -->
-  <xs:complexType name="ContentVersionType">
-    <xs:sequence>
-      <xs:element name="Id" type="xs:anyURI"/>
-      <xs:element name="LabelText" type="cpl:UserText"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- Reel -->
-  <xs:complexType name="ReelType">
-    <xs:sequence>
-      <xs:element name="Id" type="cpl:UUID"/>
-      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="AssetList">
-        <xs:complexType>
-          <xs:sequence>
-            <xs:element name="MainMarkers" type="cpl:MarkerAssetType" minOccurs="0"/>
-            <xs:element name="MainPicture" type="cpl:PictureTrackFileAssetType" minOccurs="0"/>
-            <xs:element name="MainSound" type="cpl:SoundTrackFileAssetType" minOccurs="0"/>
-            <xs:element name="MainSubtitle" type="cpl:SubtitleTrackFileAssetType" minOccurs="0"/>
-            <xs:any namespace="##other" minOccurs="0" maxOccurs="unbounded" processContents="lax" />
-          </xs:sequence>
-        </xs:complexType>
-      </xs:element>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- GenericAssetType -->
-  <xs:complexType name="GenericAssetType" abstract="1">
-    <xs:sequence>
-      <xs:element name="Id" type="cpl:UUID"/>
-      <xs:element name="AnnotationText" type="cpl:UserText" minOccurs="0"/>
-      <xs:element name="EditRate" type="cpl:Rational"/>
-      <xs:element name="IntrinsicDuration" type="xs:long"/>
-      <xs:element name="EntryPoint" type="xs:long" minOccurs="0"/>
-      <xs:element name="Duration" type="xs:long" minOccurs="0"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- TrackFileAssetType -->
-  <xs:complexType name="TrackFileAssetType" abstract="1">
-    <xs:complexContent>
-      <xs:extension base="cpl:GenericAssetType">
-        <xs:sequence>
-          <xs:element name="KeyId" type="cpl:UUID" minOccurs="0"/>
-          <xs:element name="Hash" type="xs:base64Binary" minOccurs="0"/>
-        </xs:sequence>
-      </xs:extension>
-    </xs:complexContent>
-  </xs:complexType>
-
-  <!-- SountTrackFileAssetType -->
-  <xs:complexType name="SoundTrackFileAssetType">
-    <xs:complexContent>
-      <xs:extension base="cpl:TrackFileAssetType">
-        <xs:sequence>
-          <xs:element name="Language" type="xs:language" minOccurs="0"/>
-        </xs:sequence>
-      </xs:extension>
-    </xs:complexContent>
-  </xs:complexType>
-
-  <!-- SubtitleTrackFileAssetType -->
-  <xs:complexType name="SubtitleTrackFileAssetType">
-    <xs:complexContent>
-      <xs:extension base="cpl:TrackFileAssetType">
-        <xs:sequence>
-          <xs:element name="Language" type="xs:language" minOccurs="0"/>
-        </xs:sequence>
-      </xs:extension>
-    </xs:complexContent>
-  </xs:complexType>
-
-  <!-- PictureTrackFileAssetType -->
-  <xs:complexType name="PictureTrackFileAssetType">
-    <xs:complexContent>
-      <xs:extension base="cpl:TrackFileAssetType">
-        <xs:sequence>
-          <xs:element name="FrameRate" type="cpl:Rational"/>
-          <xs:element name="ScreenAspectRatio" type="cpl:Rational"/>
-        </xs:sequence>
-      </xs:extension>
-    </xs:complexContent>
-  </xs:complexType>
-
-  <!-- MarkerAssetType -->
-  <xs:complexType name="MarkerAssetType">
-    <xs:complexContent>
-      <xs:extension base="cpl:GenericAssetType">
-        <xs:sequence>
-          <xs:element name="MarkerList">
-            <xs:complexType>
-              <xs:sequence>
-                <xs:element name="Marker" type="cpl:MarkerType" minOccurs="0" maxOccurs="unbounded"/>
-              </xs:sequence>
-            </xs:complexType>
-          </xs:element>
-        </xs:sequence>
-      </xs:extension>
-    </xs:complexContent>
-  </xs:complexType>
-
-  <!-- Rational -->
-  <xs:simpleType name="Rational">
-    <xs:restriction>
-      <xs:simpleType>
-        <xs:list itemType="xs:long"/>
-      </xs:simpleType>
-      <xs:length value="2"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-  <!-- UUID -->
-  <xs:simpleType name="UUID">
-    <xs:restriction base="xs:anyURI">
-      <xs:pattern value="urn:uuid:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-  <!-- UserText -->
-  <xs:complexType name="UserText">
-    <xs:simpleContent>
-      <xs:extension base="xs:string">
-        <xs:attribute name="language" type="xs:language" use="optional" default="en"/>
-      </xs:extension>
-    </xs:simpleContent>
-  </xs:complexType>
-
-</xs:schema>
-XSD
-# end SMPTE 429-7-2006-CPL schema
-
-
-# lib/cpl.rb
-def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
-  ns = xml.namespaces
-  case ns[ 'xmlns' ]
-  when MStr::Smpte_cpl
-    xsd = Nokogiri::XML::Schema XSD_SMPTE_CPL
-    #xsd.validate( xml ).each do |e|
-    #  @logger.info( "Validating: #{ e.inspect }" )
-    #end
-    cpl_type = 'SMPTE'
-  when MStr::Interop_cpl
-    cpl_type = 'Interop'
-  end
-  xml.remove_namespaces!
-  report = Array.new
-  cpl_id = xml.xpath( '//CompositionPlaylist/Id' ).text.split( ':' ).last
-  report << "CPL Id:           #{ cpl_id }"
-  report << "CPL file:         #{ dict[ cpl_id ] }"
-  report << "CPL type:         #{ cpl_type } (#{ ns[ 'xmlns' ].inspect })"
-  content_title_text = xml.xpath( '//CompositionPlaylist/ContentTitleText' ).text
-  report << "ContentTitleText: #{ content_title_text }"
-  if content_title_text =~ MStr::Naming_re
-    matchdata = content_title_text.match( MStr::Naming_re )
-    if matchdata
-      if matchdata[ 4 ] # langaudio-langsubs
-        report << "\tLanguage audio and subtitles: #{ matchdata[ 4 ] }"
-      end
-    end
-  end
-  report << "AnnotationText:   #{ xml.xpath( '//CompositionPlaylist/AnnotationText' ).text }"
-  report << "ContentKind:      #{ xml.xpath( '//CompositionPlaylist/ContentKind' ).text }"
-  dt = xml.xpath( '//CompositionPlaylist/IssueDate' ).text
-  dt_friendly = datetime_friendly( DateTime.parse dt )
-  report << "IssueDate:        #{ dt } (#{ dt_friendly })"
-  report << "Issuer:           #{ xml.xpath( '//CompositionPlaylist/Issuer' ).text }"
-  report << "Creator:          #{ xml.xpath( '//CompositionPlaylist/Creator' ).text }"
-  signer = xml_get_signer( xml )
-  if signer
-    report << "Signer:           #{ signer.inspect }"
-    info << "CPL #{ cpl_id } signer: #{ signer.inspect }"
-  else
-    report << "Not signed"
-  end
-
-  reels = xml.xpath( '//CompositionPlaylist/ReelList/Reel' )
-  report << "Number of Reels:  #{ reels.size }"
-  total_duration = 0
-  composition_edit_rate = 0
-  reels.each_with_index do |reel, index|
-    report << "Reel #{ index + 1 }"
-    durations = Array.new
-    edit_rates = Array.new
-    assets_labels = Array.new
-    assets = reel.xpath( 'AssetList/*' )
-    assets.each do |asset|
-      duration = asset.xpath( 'Duration' ).text.to_i
-      durations << duration
-      id = asset.xpath( 'Id' ).text.split( ':' ).last
-      edit_rate = asset.xpath( 'EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
-      edit_rates << edit_rate
-
-      # In packages a CPL might reference assets which are not in Assetmap's dictionary
-      # (the asset might already be ingested or could be ingested later)
-      if dict
-        if dict[ id ]
-          file = File.join( package_dir, dict[ id ] )
-
-          if File.exists?( file )
-            # Could be interop subtitle file
-            xml = get_xml_of_type( 'DCSubtitle', file )
-            if xml
-              xml.remove_namespaces!
-              if xml.xpath( '//Subtitle' ).size > 0
-                last_time_out = xml.xpath( '//Subtitle' ).last.attributes[ 'TimeOut' ].value
-                meta_report = "DCSubtitle, last TimeOut #{ Timecode.new( last_time_out, edit_rate ) }"
-              else
-                meta_report = "DCSubtitle, no Subtitle found"
-              end
-              # Check Font attributes and values for case
-              # FIXME this should really be done via schema validation
-              font_elements = xml.xpath( '//Font' )
-              font_elements.each do |e|
-                e.attributes.each do |attr|
-                  if %w( Weight Effect Italic Script Underlined ).include?( attr[ 0 ] ) and attr[ 1 ].value != attr[ 1 ].value.downcase
-                    errors << "Attribute value not lowercase: #{ file } #{ attr.inspect }"
-                  end
-                end
-              end
-            else
-              meta = MxfTools.mxf_inspect( file )
-              if meta
-                meta_report = "#{ meta[ 'Label Set Type' ] }, #{ Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ) }, #{ meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' }#{ asset.node_name =~ /Picture/ ? ', ' + meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '' }, #{ meta[ 'EssenceType' ] }"
-              else
-                meta_report = "Asset file found but not AS-DCP MXF"
-              end
-            end
-          else
-            meta_report = "Asset file missing: #{ dict[ id ] }"
-          end # File.exists?
-
-        else
-          meta_report = "Asset file not listed in Assetmap dictionary"
-          hints << "CPL referenced asset file not listed in Assetmap dictionary: CPL #{ cpl_id }: Asset #{ id } (Reel #{ index + 1 }: #{ asset.node_name })"
-        end # if dict[ id ]
-      end # if dict
-
-      report << "\t#{ duration }\t#{ Timecode.new( duration, edit_rate ) } @ #{ edit_rate }\t#{ id }\t#{ asset.node_name }\t(#{ meta_report })"
-
-    end # assets.each
-    if durations.uniq.size != 1
-      report << "\tDuration mismatch"
-      errors << "CPL (#{ content_title_text }): Reel #{ index + 1 }: Duration mismatch"
-    end
-    report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
-    total_duration += durations.min # FIXME ugh
-    composition_edit_rate = edit_rates.min
-  end # reels.each_with_index
-
-  report << "Total duration:"
-  report << "\t#{ total_duration }\t#{ Timecode.new( total_duration, composition_edit_rate ) }" # FIXME edit_rate
-
-  return report, errors, hints, info
 end
 
 
@@ -1007,23 +683,59 @@ def xml_get_signer( xml )
   end
 end
 
+# returns validated xml or false.
+# in addition to xml all kinds of stuff will be examined here
+# hence the hoopla to skip expected errors from non-xml.
+# still: what an appaling method
 def get_xml_of_type( asdcp_type, file )
-  if xml = xml?( file )
-    if xml.root.node_name == asdcp_type
-      return xml
-    else
-      return FALSE
-    end
-  else
+  begin
+    xml = Nokogiri::XML( open file )
+  rescue Exception => e
+    @logger.info "#{ file }: #{ e.message }"
     return FALSE
   end
+  unless xml.errors.empty?
+    xml.errors.each do |e|
+      next if e.message =~ /Start tag expected/ or e.message =~ /Document is empty/
+      @logger.info "Syntax error: #{ file }: #{ e }"
+    end
+    return FALSE
+  end
+  case xml.root.node_name
+  when asdcp_type
+    case asdcp_type
+    # special handling as DCSubtitle files are not namespaced
+    when 'DCSubtitle'
+      # alpha stage
+      xsd_file = 'DCSubtitle.v0.alpha.xsd'
+    else
+      puts "xml.namespaces: #{ xml.namespaces.inspect }"
+      xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] or Schemas[ xml.namespaces[ 'xmlns:am' ] ] )
+    end
+    xsd = Nokogiri::XML::Schema( open File.join( XSDDir, xsd_file ) )
+    errors = xsd.validate( xml )
+    if errors.empty?
+      @logger.info "Schema check: #{ File.basename xsd_file }: #{ file }: No errors"
+      return xml
+    else
+      errors.each do |e|
+        @logger.info "Schema check: #{ File.basename xsd_file }: Error: #{ file }: #{ e.inspect }"
+        return FALSE
+      end
+    end
+  else # not the type we're looking for
+    return FALSE
+  end # case xml.root.node_name
 end
 
 def xml?( file )
-  xml = Nokogiri::XML( File.open( file ) )
-  @logger.info xml.errors.inspect
+  begin
+    xml = Nokogiri::XML( open file )
+  rescue Exception => e
+    return FALSE
+  end
   if xml.root.nil?
-    FALSE
+    return FALSE
   else
     xml
   end
@@ -1060,6 +772,127 @@ def get_asset_uuid( file )
 end
 
 
+# lib/cpl.rb
+def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
+  ns = xml.namespaces
+  case ns[ 'xmlns' ]
+  when MStr::Smpte_cpl
+    cpl_type = 'SMPTE'
+  when MStr::Interop_cpl
+    cpl_type = 'Interop'
+  end
+  xml.remove_namespaces!
+  report = Array.new
+  cpl_id = xml.xpath( '//CompositionPlaylist/Id' ).text.split( ':' ).last
+  report << "CPL Id:           #{ cpl_id }"
+  report << "CPL file:         #{ dict[ cpl_id ] }"
+  report << "CPL type:         #{ cpl_type } (#{ ns[ 'xmlns' ].inspect })"
+  content_title_text = xml.xpath( '//CompositionPlaylist/ContentTitleText' ).text
+  report << "ContentTitleText: #{ content_title_text }"
+  if content_title_text =~ MStr::Naming_re
+    matchdata = content_title_text.match( MStr::Naming_re )
+    if matchdata
+      if matchdata[ 4 ] # langaudio-langsubs
+        report << "\tLanguage audio and subtitles: #{ matchdata[ 4 ] }"
+      end
+    end
+  end
+  report << "AnnotationText:   #{ xml.xpath( '//CompositionPlaylist/AnnotationText' ).text }"
+  report << "ContentKind:      #{ xml.xpath( '//CompositionPlaylist/ContentKind' ).text }"
+  dt = xml.xpath( '//CompositionPlaylist/IssueDate' ).text
+  dt_friendly = datetime_friendly( DateTime.parse dt )
+  report << "IssueDate:        #{ dt } (#{ dt_friendly })"
+  report << "Issuer:           #{ xml.xpath( '//CompositionPlaylist/Issuer' ).text }"
+  report << "Creator:          #{ xml.xpath( '//CompositionPlaylist/Creator' ).text }"
+  signer = xml_get_signer( xml )
+  if signer
+    report << "Signer:           #{ signer.inspect }"
+    info << "CPL #{ cpl_id } signer: #{ signer.inspect }"
+  else
+    report << "Not signed"
+  end
+
+  reels = xml.xpath( '//CompositionPlaylist/ReelList/Reel' )
+  report << "Number of Reels:  #{ reels.size }"
+  total_duration = 0
+  composition_edit_rate = 0
+  reels.each_with_index do |reel, index|
+    report << "Reel #{ index + 1 }"
+    durations = Array.new
+    edit_rates = Array.new
+    assets_labels = Array.new
+    assets = reel.xpath( 'AssetList/*' )
+    assets.each do |asset|
+      duration = asset.xpath( 'Duration' ).text.to_i
+      durations << duration
+      id = asset.xpath( 'Id' ).text.split( ':' ).last
+      edit_rate = asset.xpath( 'EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
+      edit_rates << edit_rate
+
+      # In packages a CPL might reference assets which are not in Assetmap's dictionary
+      # (the asset might already be ingested or could be ingested later)
+      if dict
+        if dict[ id ]
+          file = File.join( package_dir, dict[ id ] )
+
+          if File.exists?( file )
+            # Could be interop subtitle file
+            xml = get_xml_of_type( 'DCSubtitle', file )
+            if xml
+              xml.remove_namespaces!
+              if xml.xpath( '//Subtitle' ).size > 0
+                last_time_out = xml.xpath( '//Subtitle' ).last.attributes[ 'TimeOut' ].value
+                meta_report = "DCSubtitle, last TimeOut #{ Timecode.new( last_time_out, edit_rate ) }"
+              else
+                meta_report = "DCSubtitle, no Subtitle found"
+              end
+              # Check Font attributes and values for case
+              # FIXME this should really be done via schema validation
+              font_elements = xml.xpath( '//Font' )
+              font_elements.each do |e|
+                e.attributes.each do |attr|
+                  if %w( Weight Effect Italic Script Underlined ).include?( attr[ 0 ] ) and attr[ 1 ].value != attr[ 1 ].value.downcase
+                    errors << "Attribute value not lowercase: #{ file } #{ attr.inspect }"
+                  end
+                end
+              end
+            else
+              meta = MxfTools.mxf_inspect( file )
+              if meta
+                meta_report = "#{ meta[ 'Label Set Type' ] }, #{ Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ) }, #{ meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' }#{ asset.node_name =~ /Picture/ ? ', ' + meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '' }, #{ meta[ 'EssenceType' ] }"
+              else
+                meta_report = "Asset file found but not AS-DCP MXF"
+              end
+            end
+          else
+            meta_report = "Asset file missing: #{ dict[ id ] }"
+          end # File.exists?
+
+        else
+          meta_report = "Asset file not listed in Assetmap dictionary"
+          hints << "CPL referenced asset file not listed in Assetmap dictionary: CPL #{ cpl_id }: Asset #{ id } (Reel #{ index + 1 }: #{ asset.node_name })"
+        end # if dict[ id ]
+      end # if dict
+
+      report << "\t#{ "%6s" % duration }\t#{ Timecode.new( duration, edit_rate ) } @ #{ edit_rate }\t#{ id }\t#{ asset.node_name }\t(#{ meta_report })"
+
+    end # assets.each
+    if durations.uniq.size != 1
+      report << "\tDuration mismatch"
+      errors << "CPL (#{ content_title_text }): Reel #{ index + 1 }: Duration mismatch"
+    end
+    report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
+    total_duration += durations.min # FIXME ugh
+    composition_edit_rate = edit_rates.min
+  end # reels.each_with_index
+
+  report << "Total duration:"
+  report << "\t#{ "%6s" % total_duration }\t#{ Timecode.new( total_duration, composition_edit_rate ) }" # FIXME edit_rate
+
+  return report, errors, hints, info
+end
+
+
 def dcp_inspect( options, args )
   errors = Array.new
   hints = Array.new
@@ -1078,7 +911,7 @@ def dcp_inspect( options, args )
     # Don't assume they're actually Assetmaps before checking.
     am_candidates = Dir.glob( File.join( package_dir, 'ASSETMAP*' ) ).map { |m| File.basename m }
     if am_candidates.empty?
-      errors << 'No Assetmap candidate found' 
+      errors << 'No Assetmap candidates found' 
     else
       @logger.debug( "Found #{ am_candidates.size } Assetmap candidate#{ am_candidates.size > 1 ? 's: ' + am_candidates.inspect : ': ' + am_candidates.inspect }" )
     end
@@ -1110,7 +943,7 @@ def dcp_inspect( options, args )
       pkls << Array.new
       xml = xml?( File.join( package_dir, file ) )
       xml.remove_namespaces! # FIXME else all nodes searched need ns attached
-      am_id = get_asset_uuid( File.join( package_dir, file ) ) # xml.xpath( '//Id' ).first.text.split( ':' ).last
+      am_id = get_asset_uuid( File.join( package_dir, file ) )
       if am_id
         am_ids << am_id
       else
@@ -1160,8 +993,9 @@ def dcp_inspect( options, args )
           pkls[ index ] << listed_id 
         end
 
-        # Check if possible uuid component in the asset filename matches the actual asset uuid # this one for gbaruffa
-        if dict[ index ][ listed_id ] # see above example mc t28
+        # Check if possible uuid component in the asset filename matches the actual asset uuid
+        # this one for dcpbuilder
+        if dict[ index ][ listed_id ]
           file_basename = File.basename( dict[ index ][ listed_id ] )
           if file_basename =~ uuid_re
             unless file_basename.match( uuid_re )[ 0 ] == listed_id
@@ -1238,7 +1072,7 @@ def dcp_inspect( options, args )
             cpls += pkl_cpls
             # List this PKLs CPLs
             @logger.debug nil
-            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
+            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size } valid composition#{ pkl_cpls.size != 1 ? 's' : '' }" )
             # FIXME purely informative here, we don't remember referenced files which are missing
             pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( File.join( package_dir, dict[ index ][ cpl_id ] ) ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
           else
@@ -1262,7 +1096,7 @@ def dcp_inspect( options, args )
         end
       end
     else
-      @logger.info( 'Found no compositions' )
+      @logger.info( 'Found no valid compositions' )
     end
 
     # Inspect CPLs
@@ -1302,7 +1136,7 @@ def dcp_inspect( options, args )
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) }
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
-  #info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
+  # info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
 end
 
 
