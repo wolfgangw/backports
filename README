@@ -15,6 +15,15 @@ including Julik's Timecode library (https://github.com/guerilla-di/timecode).
       http://www.cinecert.com/asdcplib/
   - Nokogiri, a Ruby gem used for XML parsing
       http://nokogiri.org/tutorials/installing_nokogiri.html
+    Nokogiri implies the presence of libxml2
+
+Schema validation: As of v1.2011.12.10.backport dcp_inspect will require
+xsd/ next to it. If you git clone git://github.com/wolfgangw/backports.git
+everything will be in place.
+
+Export env XML_CATALOG_FILES=/path/to/backports/xsd/catalog.xml
+to make use of local catalog lookup. Actually dcp_inspect will bail out
+if XML_CATALOG_FILES is not set.
 
 Couple of todo's lurking:
   - Consistency checks of package formats (Interop/SMPTE)
