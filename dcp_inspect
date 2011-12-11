@@ -990,8 +990,9 @@ def dcp_inspect( options, args )
       assets.each do |asset|
 
         listed_id = asset.xpath( 'Id' ).text.split( ':' ).last
-        errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }" unless listed_id =~ uuid_rfc4122_re
         path = File.join( am_base, asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last )
+        # using AM listed path for listing message, not package path, because this is what we're looking at right now:
+        errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }" unless listed_id =~ uuid_rfc4122_re
         if path.nil? # example: mc t28 ASSETMAP.xml
           errors << "#{ am_file } (#{ am_id }): No path for #{ listed_id }"
         else
@@ -1003,7 +1004,7 @@ def dcp_inspect( options, args )
             asset_id = get_asset_uuid( package path )
             if asset_id
               unless asset_id =~ uuid_rfc4122_re
-                errors << "Asset UUID is not an RFC-4122 UUID: #{ asset_id } (#{ package path })" 
+                errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ package path }"
               end
               # Check listed_id vs actual asset_id
               if listed_id != asset_id
