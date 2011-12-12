@@ -83,6 +83,7 @@ class Options
     # defaults
     options = OpenStruct.new
     options.check_hashes = FALSE
+    options.validate = TRUE
     options.verbosity = 'debug'
     options.verbosity_choices = [ 'quiet', 'info', 'debug', 'trace_func' ]
     opts = OptionParser.new do |opts|
@@ -92,6 +93,9 @@ class Options
 BANNER
       opts.on( '-c', '--check-hashes', 'Compare listed and actual hash values of assets' ) do
         options.check_hashes = TRUE
+      end
+      opts.on( '--no-schema-checks', 'Skip schema checks' ) do
+        options.validate = FALSE
       end
       opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
         if options.verbosity_choices.include?( p )
@@ -106,12 +110,13 @@ BANNER
       end
     end
     begin
-      opts.parse!(args)
-      options
-    rescue OptionParser::ParseError
-      $stderr.print "Error: " + $! + "\n"
+      opts.parse!( args )
+    rescue Exception => e
+      exit if e.class == SystemExit
+      puts "Options error: #{ e.message }"
       exit
     end
+    options
   end # parse
 end # class
 
@@ -699,7 +704,7 @@ end
 # in addition to xml all kinds of stuff will be examined here
 # hence the hoopla to skip expected errors from non-xml.
 # still: what an appaling method
-def get_xml_of_type( asdcp_type, file )
+def get_xml_of_type( asdcp_type, file, validate = TRUE )
   begin
     xml = Nokogiri::XML( open file )
   rescue Exception => e
@@ -714,8 +719,13 @@ def get_xml_of_type( asdcp_type, file )
     end
     return FALSE
   end
+
   case xml.root.node_name
   when asdcp_type
+
+    # skip validation
+    return xml unless validate
+
     case asdcp_type
     # special handling as DCSubtitle files are not namespaced
     when 'DCSubtitle'
@@ -786,7 +796,7 @@ end
 
 
 # lib/cpl.rb
-def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
+def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   ns = xml.namespaces
   case ns[ 'xmlns' ]
   when MStr::Smpte_cpl
@@ -850,7 +860,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info )
 
           if File.exists?( asset_file )
             # Could be interop subtitle file
-            xml = get_xml_of_type( 'DCSubtitle', asset_file )
+            xml = get_xml_of_type( 'DCSubtitle', asset_file, options.validate )
             if xml
               xml.remove_namespaces!
               if xml.xpath( '//Subtitle' ).size > 0
@@ -923,6 +933,7 @@ end
 def dcp_inspect( options, args )
   errors = Array.new
   hints = Array.new
+  hints << 'Schema checks were skipped' unless options.validate
   info = Array.new
   uuid_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
   uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -948,7 +959,7 @@ def dcp_inspect( options, args )
     # Check XML for Assetmap content
     unless am_candidates.empty?
       am_candidates.each do |am_candidate|
-        xml = get_xml_of_type( 'AssetMap', package( am_candidate ) )
+        xml = get_xml_of_type( 'AssetMap', package( am_candidate ), options.validate )
         if ! xml
           @logger.debug( errors.last )
           am_candidates.delete( am_candidate )
@@ -956,9 +967,9 @@ def dcp_inspect( options, args )
       end
     end
     ams = am_candidates
-    @logger.debug( "Found #{ ams.size } valid Assetmap#{ pl ams }" )
+    @logger.debug( "Found #{ ams.size }#{ options.validate ? ' valid' : '' } Assetmap#{ pl ams }" )
     # hint at multiple Assetmaps found
-    hints << "Found #{ ams.size } valid Assetmaps" unless ams.size == 1
+    hints << "Found #{ ams.size }#{ options.validate ? ' valid' : '' } Assetmaps" unless ams.size == 1
 
     # Process all Assetmaps
     dict = Array.new # will be a list of dictionaries/hashes
@@ -1053,7 +1064,7 @@ def dcp_inspect( options, args )
       am_pkls.each do |pkl_id|
         pkl_file = package dict[ index ][ pkl_id ]
         if File.exists?( pkl_file )
-          xml = get_xml_of_type( 'PackingList', pkl_file )
+          xml = get_xml_of_type( 'PackingList', pkl_file, options.validate )
           if xml
             xml.remove_namespaces!
             pkl_assets = xml.xpath( '//Asset' )
@@ -1081,7 +1092,7 @@ def dcp_inspect( options, args )
                 if type =~ /text\/xml/
                   if File.exists?( asset_file )
                     # Pick CPLs
-                    xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
+                    xml = get_xml_of_type( 'CompositionPlaylist', asset_file, options.validate )
                     if xml
                       pkl_cpls << id
                     else
@@ -1100,7 +1111,7 @@ def dcp_inspect( options, args )
             cpls += pkl_cpls
             # List this PKLs CPLs
             @logger.debug nil
-            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size } valid composition#{ pl pkl_cpls }" )
+            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size }#{ options.validate ? 'valid' : '' } composition#{ pl pkl_cpls }" )
             # FIXME purely informative here, we don't remember referenced files which are missing
             pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
           else
@@ -1115,7 +1126,7 @@ def dcp_inspect( options, args )
     # List all found CPLs
     @logger.debug nil
     if cpls.size > 0
-      @logger.debug( "Found #{ cpls.size } valid composition#{ pl cpls }:" )
+      @logger.debug( "Found #{ cpls.size }#{ options.validate ? ' valid' : '' } composition#{ pl cpls }:" )
       dict.each do |dictionary|
         cpls.each do |cpl_id|
           if dictionary.include?( cpl_id )
@@ -1124,7 +1135,7 @@ def dcp_inspect( options, args )
         end
       end
     else
-      @logger.info( 'Found no valid compositions' )
+      @logger.info( "Found no#{ options.validate ? ' valid' : '' } compositions" )
     end
 
     # Inspect CPLs
@@ -1136,7 +1147,7 @@ def dcp_inspect( options, args )
           if File.exists?( cpl_file )
             xml = xml?( cpl_file )
             if xml
-              report, errors, hints, info = cpl_inspect_xml( xml, dictionary, @package_dir, errors, hints, info )
+              report, errors, hints, info = cpl_inspect_xml( xml, dictionary, @package_dir, errors, hints, info, options )
             else
               errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
             end
@@ -1170,6 +1181,6 @@ end
 options = Options.parse( ARGV )
 args = ARGV
 @logger = DLogger.new( prefix = '', options.verbosity )
-@logger.debug( "dcp > inspect > #{ args }" )
+@logger.debug( "dcp > inspect > #{ args } #{ options.validate ? '' : '> Schema checks will be skipped' }" )
 dcp_inspect( options, args )
 
