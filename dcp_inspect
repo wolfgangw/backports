@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2011.12.11.backport'
+AppVersion = 'v1.2011.12.13.backport'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
