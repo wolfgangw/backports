@@ -1111,7 +1111,7 @@ def dcp_inspect( options, args )
             cpls += pkl_cpls
             # List this PKLs CPLs
             @logger.debug nil
-            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size }#{ options.validate ? 'valid' : '' } composition#{ pl pkl_cpls }" )
+            @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size }#{ options.validate ? ' valid' : '' } composition#{ pl pkl_cpls }" )
             # FIXME purely informative here, we don't remember referenced files which are missing
             pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
           else
@@ -1161,9 +1161,11 @@ def dcp_inspect( options, args )
     end
 
   elsif args.size == 0
-    @logger.info( "No volume/directory given. See #{ AppName } --help" )
-  else # args > 1
+    @logger.info( "No volume or directory given. See #{ AppName } --help" )
+  elsif args.size > 1
     @logger.info( "Too many arguments. See #{ AppName } --help" )
+  else
+    @logger.info( "Not a volume or directory. See #{ AppName } --help" )
   end
 
   info << 'todo: Package format: Interop/SMPTE'
@@ -1181,6 +1183,6 @@ end
 options = Options.parse( ARGV )
 args = ARGV
 @logger = DLogger.new( prefix = '', options.verbosity )
-@logger.debug( "dcp > inspect > #{ args } #{ options.validate ? '' : '> Schema checks will be skipped' }" )
+@logger.debug( "#{ AppName }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 dcp_inspect( options, args )
 
