@@ -153,7 +153,7 @@ class DLogger
     printf "#{ @prefix } #{ text }#{ ' ' * 64 }\r"; STDOUT.flush
   end
   def to_console( text )
-    printf "#{ @prefix } #{ text }#{ ' ' * 64 }\n"
+    printf "#{ @prefix } #{ text }\n"
   end
 end
 
@@ -726,14 +726,20 @@ def get_xml_of_type( asdcp_type, file, validate = TRUE )
     # skip validation
     return xml unless validate
 
+    # find schema match
     case asdcp_type
     # special handling as DCSubtitle files are not namespaced
     when 'DCSubtitle'
       # alpha stage
       xsd_file = 'DCSubtitle.v0.alpha.xsd'
     else
-       # @logger.debug "xml.namespaces: #{ xml.namespaces.inspect }"
-      xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] ) # FIXME look at fhg's 1.4.1 Assetmaps: Schemas[ xml.namespaces[ 'xmlns:am' ] ] )
+      case asdcp_type
+      when 'AssetMap'
+        # fhg output will be prefixed
+        xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] or Schemas[ xml.namespaces[ 'xmlns:am' ] ] )
+      else
+        xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] )
+      end
     end
     xsd = Nokogiri::XML::Schema( open File.join( XSDDir, xsd_file ) )
     validation_errors = xsd.validate( xml )
@@ -1051,7 +1057,7 @@ def dcp_inspect( options, args )
     end # ams.each
 
     # List all found PKLs if any
-    @logger.debug nil
+    @logger.debug nil unless ams.empty?
     am_ids.each_with_index do |am_id, index|
       @logger.debug( "Assetmap #{ am_id } lists #{ pkls[ index ].size } PKL#{ pl pkls[ index ] }:" )
       # FIXME purely informative here
