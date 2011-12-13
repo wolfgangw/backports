@@ -1017,13 +1017,13 @@ def dcp_inspect( options, args )
           # Assetmap dictionary
           dict[ index ][ listed_id ] = path
 
+          # Check listed_id vs actual asset_id
           if File.exists?( package path )
             asset_id = get_asset_uuid( package path )
             if asset_id
               unless asset_id =~ uuid_rfc4122_re
                 errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ package path }"
               end
-              # Check listed_id vs actual asset_id
               if listed_id != asset_id
                 errors << "#{ am_file } (#{ am_id }): UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id } (#{ path })" 
               end
@@ -1076,36 +1076,55 @@ def dcp_inspect( options, args )
             pkl_assets = xml.xpath( '//Asset' )
             pkl_cpls = Array.new
             pkl_assets.each do |asset|
-              type = asset.xpath( 'Type' ).text
               id = asset.xpath( 'Id' ).text.split( ':' ).last
+              type = asset.xpath( 'Type' ).text
+              
 
               if dict[ index ].keys.include?( id )
                 asset_file = package dict[ index ][ id ]
-                if ( hash_given = asset.xpath( 'Hash' ).text )
-                  if options.check_hashes
-                    @logger.debug "Checking hash value for #{ asset_file }"
-                    hash_check = Shell::asdcp_digest( package dict[ index ][ id ] )
-                    if hash_given != hash_check
-                      errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Check: #{ hash_check }"
-                    else
-                      @logger.debug "OK: #{ hash_check }"
-                      info << "Hash value checked for #{ asset_file } (OK: #{ hash_check })"
-                    end
+
+                if File.exists?( asset_file )
+                  # Plug in checks here. we might be skipping validation hence the tag test
+                  #
+                  # Check listed and actual asset size
+                  if ( size_given = asset.xpath( 'Size' ).text.to_i )
+                    size_asset = File.size( asset_file )
+                    errors << "Size mismatch: #{ asset_file }: PKL: #{ size_given } Asset: #{ size_asset }" unless size_given == size_asset
+                  else
+                    errors << "PKL: Size tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
                   end
-                else
-                  errors << "PKL: Hash missing for #{ asset_file } (#{ id })"
-                end
-                if type =~ /text\/xml/
-                  if File.exists?( asset_file )
-                    # Pick CPLs
+
+                  # Check listed and actual digests
+                  if ( hash_given = asset.xpath( 'Hash' ).text )
+                    if options.check_hashes
+                      @logger.debug "Checking hash value for #{ asset_file }"
+                      hash_check = Shell::asdcp_digest( asset_file )
+                      if hash_given != hash_check
+                        errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Asset: #{ hash_check }"
+                      else
+                        @logger.debug "OK: #{ hash_check }"
+                        info << "Hash value checked: #{ asset_file }: OK: #{ hash_check }"
+                      end
+                    end
+                  else
+                    errors << "PKL: Hash tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
+                  end
+
+                  # Pick CPLs
+                  if type =~ /text\/xml/
                     xml = get_xml_of_type( 'CompositionPlaylist', asset_file, options.validate )
                     if xml
                       pkl_cpls << id
                     else
-                      # we might hit subtitle files here, no error claimed for now
+                      # we might hit subtitle files here
                     end
                   end
+                  #
+                  #
+                else
+                  # asset_file does not exist
                 end
+
               else
                 # For some reason the listed id in PackingList is not in assetmap dictionary
                 # Possibly been tampered with
