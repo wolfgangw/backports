@@ -16,15 +16,17 @@
 
     <public publicId="http://www.w3.org/XML/1998/namespace" uri="xml.xsd"/>
     <system systemId="http://www.w3.org/2001/03/xml.xsd" uri="xml.xsd"/>
+    <system systemId="http://www.w3.org/2001/xml.xsd" uri="xml.xsd"/>
 
     <public publicId="http://www.w3.org/2001/XMLSchema" uri="XMLSchema.xsd"/>
     <public publicId="http://www.w3.org/2001/XMLSchema-instance" uri="XMLSchema.xsd"/>
+    <system systemId="http://www.w3.org/2001/XMLSchema.xsd" uri="XMLSchema.xsd"/>
 
     <public publicId="http://www.w3.org/2001/04/xmlenc#" uri="xenc-schema.xsd"/>
     <system systemId="http://www.w3.org/TR/2002/REC-xmlenc-core-20021210/xenc-schema.xsd" uri="xenc-schema.xsd"/>
 
     <public publicId="http://www.w3.org/2000/09/xmldsig#" uri="xmldsig-core-schema.xsd"/>
-    <public systemId="http://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema" uri="xmldsig-core-schema.xsd"/>
+    <public publicId="http://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema" uri="xmldsig-core-schema.xsd"/>
     <system systemId="http://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema.xsd" uri="xmldsig-core-schema.xsd"/>
 
   </group>
