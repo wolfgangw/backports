@@ -804,19 +804,21 @@ end
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   ns = xml.namespaces
+  cpl_id = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Id' ).text.split( ':' ).last
   case ns[ 'xmlns' ]
   when MStr::Smpte_cpl
     cpl_type = 'SMPTE'
   when MStr::Interop_cpl
     cpl_type = 'Interop'
+  else
+    cpl_type = 'Unknown'
+    errors << "CPL type unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }"
   end
-  xml.remove_namespaces!
   report = Array.new
-  cpl_id = xml.xpath( '//CompositionPlaylist/Id' ).text.split( ':' ).last
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ dict[ cpl_id ] }"
   report << "CPL type:         #{ cpl_type } (#{ ns[ 'xmlns' ].inspect })"
-  content_title_text = xml.xpath( '//CompositionPlaylist/ContentTitleText' ).text
+  content_title_text = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ContentTitleText' ).text
   report << "ContentTitleText: #{ content_title_text }"
   if content_title_text =~ MStr::Naming_re
     matchdata = content_title_text.match( MStr::Naming_re )
@@ -826,13 +828,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       end
     end
   end
-  report << "AnnotationText:   #{ xml.xpath( '//CompositionPlaylist/AnnotationText' ).text }"
-  report << "ContentKind:      #{ xml.xpath( '//CompositionPlaylist/ContentKind' ).text }"
-  dt = xml.xpath( '//CompositionPlaylist/IssueDate' ).text
+  report << "AnnotationText:   #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:AnnotationText' ).text }"
+  report << "ContentKind:      #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ContentKind' ).text }"
+  dt = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:IssueDate' ).text
   dt_friendly = datetime_friendly( DateTime.parse dt )
   report << "IssueDate:        #{ dt } (#{ dt_friendly })"
-  report << "Issuer:           #{ xml.xpath( '//CompositionPlaylist/Issuer' ).text }"
-  report << "Creator:          #{ xml.xpath( '//CompositionPlaylist/Creator' ).text }"
+  report << "Issuer:           #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' ).text }"
+  report << "Creator:          #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Creator' ).text }"
   signer = xml_get_signer( xml )
   if signer
     report << "Signer:           #{ signer.inspect }"
@@ -841,7 +843,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     report << "Not signed"
   end
 
-  reels = xml.xpath( '//CompositionPlaylist/ReelList/Reel' )
+  reels = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ReelList/xmlns:Reel' )
   report << "Number of Reels:  #{ reels.size }"
   total_duration = 0
   composition_edit_rate = 0
@@ -850,12 +852,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     durations = Array.new
     edit_rates = Array.new
     assets_labels = Array.new
-    assets = reel.xpath( 'AssetList/*' )
+    assets = reel.xpath( 'xmlns:AssetList/*' )
+
     assets.each do |asset|
-      duration = asset.xpath( 'Duration' ).text.to_i
+      duration = asset.xpath( 'xmlns:Duration' ).text.to_i
       durations << duration
-      asset_id = asset.xpath( 'Id' ).text.split( ':' ).last
-      edit_rate = asset.xpath( 'EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
+      asset_id = asset.xpath( 'xmlns:Id' ).text.split( ':' ).last
+      edit_rate = asset.xpath( 'xmlns:EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
       edit_rates << edit_rate
 
       # In packages a CPL might reference assets which are not in Assetmap's dictionary
@@ -869,9 +872,20 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
             xml = get_xml_of_type( 'DCSubtitle', asset_file, options.validate )
             if xml
               xml.remove_namespaces!
-              if xml.xpath( '//Subtitle' ).size > 0
-                first_time_in = Timecode.new( xml.xpath( '//Subtitle' ).first.attributes[ 'TimeIn' ].value, edit_rate )
-                last_time_out = Timecode.new( xml.xpath( '//Subtitle' ).last.attributes[ 'TimeOut' ].value, edit_rate )
+              if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
+                # scan all subtitles to find actual first_time_in and last_time_out
+                # last subtitle is not necessarily the last displayed
+                # not entirely sure that this might apply to first TimeIn as well
+                first_time_in = '00:00:00:000'
+                last_time_out = '00:00:00:000'
+                subtitles.each do |sub|
+                  time_in = sub.attributes[ 'TimeIn' ].value
+                  time_out = sub.attributes[ 'TimeOut' ].value
+                  first_time_in = time_in if first_time_in > time_in
+                  last_time_out = time_out if last_time_out < time_out
+                end
+                first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
+                last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
                 meta_report = "DCSubtitle, #{ first_time_in } - #{ last_time_out }"
               else
                 meta_report = "DCSubtitle, no Subtitle found"
@@ -886,7 +900,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   end
                 end
               end
-            else
+            else # not xml
               meta = MxfTools.mxf_inspect( asset_file )
               if meta
                 meta_report = [
@@ -904,6 +918,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
             meta_report = "Asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
+        elsif nil
         else
           meta_report = "Referenced asset file not listed in Assetmap dictionary"
           hint_info = [
