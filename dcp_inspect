@@ -812,7 +812,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     cpl_type = 'Interop'
   else
     cpl_type = 'Unknown'
-    errors << "CPL type unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }"
+    errors << "CPL main namespace unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }: #{ ns[ 'xmlns' ] }"
   end
   report = Array.new
   report << "CPL Id:           #{ cpl_id }"
@@ -909,7 +909,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted',
                   asset.node_name =~ /Picture/ ? meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '',
                   meta[ 'EssenceType' ]
-                ].reject { |e| e.empty? }.join( ', ' )
+                ].reject { |e| e.nil? or e.empty? }.join( ', ' )
               else
                 meta_report = "Asset file found but not AS-DCP MXF"
               end
@@ -932,7 +932,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
         end # if dict[ asset_id ]
       end # if dict
 
-      report << "#{ "%6s" % duration }  #{ Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id }  #{ asset.node_name }\t(#{ meta_report })"
+      report << "#{ "%6s" % duration }  #{ edit_rate == 0 ? 'NS Scope problem' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id }  #{ asset.node_name }\t(#{ meta_report })"
 
     end # assets.each
     if durations.uniq.size != 1
@@ -945,7 +945,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   end # reels.each_with_index
 
   report << "Total duration:"
-  report << "#{ "%6s" % total_duration }  #{ Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
+  report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'NS Scope problem' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
 
   return report, errors, hints, info
 end
@@ -1022,7 +1022,7 @@ def dcp_inspect( options, args )
       assets.each do |asset|
 
         listed_id = asset.xpath( 'Id' ).text.split( ':' ).last
-        path = File.join( am_base, asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last )
+        path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
         # using AM listed path for listing message, not package path, because this is what we're looking at right now:
         errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }" unless listed_id =~ uuid_rfc4122_re
         if path.nil? # example: mc t28 ASSETMAP.xml
@@ -1030,7 +1030,7 @@ def dcp_inspect( options, args )
         else
 
           # Assetmap dictionary
-          dict[ index ][ listed_id ] = path
+          dict[ index ][ listed_id ] = File.join( am_base, path )
 
           # Check listed_id vs actual asset_id
           if File.exists?( package path )
@@ -1104,7 +1104,7 @@ def dcp_inspect( options, args )
                   # Check listed and actual asset size
                   if ( size_given = asset.xpath( 'Size' ).text.to_i )
                     size_asset = File.size( asset_file )
-                    errors << "Size mismatch: #{ asset_file }: PKL: #{ size_given } Asset: #{ size_asset }" unless size_given == size_asset
+                    errors << "Size mismatch: #{ asset_file }: PKL / Asset: #{ size_given } / #{ size_asset }" unless size_given == size_asset
                   else
                     errors << "PKL: Size tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
                   end
