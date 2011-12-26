@@ -970,7 +970,7 @@ def dcp_inspect( options, args )
     
     # Find files called what Assetmap(s) would be called.
     # Don't assume they're actually Assetmaps before checking.
-    am_candidates = package_dir_tree.select { |e| e =~ /ASSETMAP/ }
+    am_candidates = package_dir_tree.select { |e| e =~ /ASSETMAP|ASSETMAP.xml/ }
     if am_candidates.empty?
       errors << 'No Assetmap candidates found' 
     else
@@ -1208,14 +1208,14 @@ def dcp_inspect( options, args )
     @logger.info( "Not a volume or directory. See #{ AppName } --help" )
   end
 
-  info << 'todo: Package format: Interop/SMPTE'
-  info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
-  info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
-  info << 'todo: Asset sizes: Check listed and actual'
+  # info << 'todo: Package format: Interop/SMPTE'
+  # info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
+  # info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
+  info << "Found #{ ams.size } Assetmap#{ pl ams }, #{ pkls.size } PKL#{ pl pkls } and #{ cpls.size } CPL#{ pl cpls }"
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) } unless errors.empty?
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) } unless hints.empty?
-  # info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) } unless info.empty?
+  info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) } unless info.empty?
 end
 
 
