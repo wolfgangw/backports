@@ -683,6 +683,9 @@ end
 #   - with Issuer name and Subject name (SMPTE)
 #   - with Issuer name only
 def xml_get_signer( xml )
+  # FIXME
+  xml = xml.dup
+  xml.remove_namespaces!
   signers = xml.xpath( '//CompositionPlaylist/Signer' )
   if signers.size == 1
     issuer = xml.xpath( '//CompositionPlaylist/Signer/X509Data/X509IssuerSerial/X509IssuerName' ).text
