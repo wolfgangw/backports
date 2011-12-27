@@ -1015,13 +1015,13 @@ def dcp_inspect( options, args )
 
       @logger.debug nil
       @logger.debug( "Assetmap #{ am_id }: #{ am_file }"  )
-      @logger.debug( "Assetmap #{ am_id } lists #{ assets.size } asset#{ pl assets }:" )
 
       # Store asset info in a dictionary (uuid => path, relative to package root)
       # look for PackingList(s)
       assets.each do |asset|
 
         listed_id = asset.xpath( 'Id' ).text.split( ':' ).last
+        # FIXME ChunkList.size == 1 is an assumption and wrong at that. Could be > 1
         path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
         # using AM listed path for listing message, not package path, because this is what we're looking at right now:
         errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }" unless listed_id =~ uuid_rfc4122_re
@@ -1033,18 +1033,18 @@ def dcp_inspect( options, args )
           dict[ index ][ listed_id ] = File.join( am_base, path )
 
           # Check listed_id vs actual asset_id
-          if File.exists?( package path )
-            asset_id = get_asset_uuid( package path )
+          if File.exists?( dict[ index ][ listed_id ] )
+            asset_id = get_asset_uuid( dict[ index ][ listed_id ] )
             if asset_id
               unless asset_id =~ uuid_rfc4122_re
-                errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ package path }"
+                errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ dict[ index ][ listed_id ] }"
               end
               if listed_id != asset_id
-                errors << "#{ am_file } (#{ am_id }): UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id } (#{ path })" 
+                errors << "#{ am_file } #{ am_id }: UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id }: #{ dict[ index ][ listed_id ] }" 
               end
             end
           else
-            errors << "#{ am_file } (#{ am_id }): Listed asset file missing: #{ path }"
+            errors << "#{ am_file } #{ am_id }: Listed asset file missing: #{ path }: #{ dict[ index ][ listed_id ] }"
           end
         end
 
@@ -1054,7 +1054,6 @@ def dcp_inspect( options, args )
         end
 
         # Check if possible uuid component in the asset filename matches the actual asset uuid
-        # this one for dcpbuilder
         if dict[ index ][ listed_id ]
           file_basename = File.basename( dict[ index ][ listed_id ] )
           if file_basename =~ uuid_re
@@ -1067,6 +1066,7 @@ def dcp_inspect( options, args )
       end # assets.each
 
       # List asset dictionary
+      @logger.debug( "Assetmap #{ am_id } lists #{ assets.size } asset#{ pl assets }:" )
       dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
 
     end # ams.each
