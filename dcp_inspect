@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2011.12.24.backport'
+AppVersion = 'v1.2011.12.30.backport'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -893,16 +893,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
               else
                 meta_report = "DCSubtitle, no Subtitle found"
               end
-              # Check Font attributes and values for case
-              # FIXME this should really be done via schema validation
-              font_elements = xml.xpath( '//Font' )
-              font_elements.each do |e|
-                e.attributes.each do |attr|
-                  if %w( Weight Effect Italic Script Underlined ).include?( attr[ 0 ] ) and attr[ 1 ].value != attr[ 1 ].value.downcase
-                    errors << "Attribute value not lowercase: #{ asset_file } #{ attr.inspect }"
-                  end
-                end
-              end
             else # not xml
               meta = MxfTools.mxf_inspect( asset_file )
               if meta
@@ -930,7 +920,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
             'Reel ' + ( index + 1 ).to_s,
             asset.node_name
           ].join( ': ' )
-          #hints << "Referenced asset file not listed in Assetmap dictionary: CPL #{ cpl_id }: #{ id } (Reel #{ index + 1 }: #{ asset.node_name })"
           hints << "Referenced asset file not listed in Assetmap dictionary: #{ hint_info }"
         end # if dict[ asset_id ]
       end # if dict
@@ -1033,7 +1022,7 @@ def dcp_inspect( options, args )
         else
 
           # Assetmap dictionary
-          dict[ index ][ listed_id ] = File.join( am_base, path )
+          dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
 
           # Check listed_id vs actual asset_id
           if File.exists?( package dict[ index ][ listed_id ] )
@@ -1105,9 +1094,9 @@ def dcp_inspect( options, args )
                   # Plug in checks here. we might be skipping validation hence the tag test
                   #
                   # Check listed and actual asset size
-                  if ( size_given = asset.xpath( 'Size' ).text.to_i )
+                  if ( size_listed = asset.xpath( 'Size' ).text.to_i )
                     size_asset = File.size( asset_file )
-                    errors << "Size mismatch: #{ asset_file }: PKL / Asset: #{ size_given } / #{ size_asset }" unless size_given == size_asset
+                    errors << "Size mismatch: #{ asset_file }: #{ size_listed } / #{ size_asset } (PKL/Actual size)" unless size_listed == size_asset
                   else
                     errors << "PKL: Size tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
                   end
