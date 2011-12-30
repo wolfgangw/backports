@@ -37,7 +37,14 @@
       <xs:attribute name="Script" type="xs:NCName"/>
       <xs:attribute name="Size" type="xs:integer"/>
       <xs:attribute name="Underlined" type="xs:NCName"/>
-      <xs:attribute name="Weight" type="xs:NCName"/>
+      <xs:attribute name="Weight" use="optional" default="normal">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="bold"/>
+            <xs:enumeration value="normal"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
   <xs:element name="Subtitle">
