@@ -50,6 +50,7 @@ require 'optparse'
 require 'ostruct'
 require 'pathname'
 require 'pp'
+require 'shellwords'
 
 
 # set up local XML Catalog and patch its xml:base
@@ -841,7 +842,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   signer = xml_get_signer( xml )
   if signer
     report << "Signer:           #{ signer.inspect }"
-    info << "CPL #{ cpl_id } signer: #{ signer.inspect }"
+    info << "Signer: CPL #{ cpl_id }: #{ signer.inspect }"
   else
     report << "Not signed"
   end
@@ -985,8 +986,8 @@ def dcp_inspect( options, args )
     hints << "Found #{ ams.size }#{ options.validate ? ' valid' : '' } Assetmaps" unless ams.size == 1
 
     # Process all Assetmaps
-    dict = Array.new # will be a list of dictionaries/hashes
-    pkls = Array.new # will be a list of lists
+    dict = Array.new # list of dictionaries/hashes
+    pkls = Array.new
     am_ids = Array.new
     ams.each_with_index do |am_file, index|
       dict << Hash.new
@@ -1096,21 +1097,20 @@ def dcp_inspect( options, args )
                   # Check listed and actual asset size
                   if ( size_listed = asset.xpath( 'Size' ).text.to_i )
                     size_asset = File.size( asset_file )
-                    errors << "Size mismatch: #{ asset_file }: #{ size_listed } / #{ size_asset } (PKL/Actual size)" unless size_listed == size_asset
+                    errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
                   else
-                    errors << "PKL: Size tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
+                    errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type }"
                   end
 
                   # Check listed and actual digests
-                  if ( hash_given = asset.xpath( 'Hash' ).text )
+                  if ( hash_listed = asset.xpath( 'Hash' ).text )
                     if options.check_hashes
-                      @logger.debug "Checking hash value for #{ asset_file }"
-                      hash_check = Shell::asdcp_digest( asset_file )
-                      if hash_given != hash_check
-                        errors << "Hash mismatch for #{ asset_file }: PKL: #{ hash_given } Asset: #{ hash_check }"
+                      @logger.debug "Checking hash value: #{ id }: #{ asset_file }"
+                      hash_check = Shell::asdcp_digest( Shellwords.shellescape asset_file )
+                      if hash_listed != hash_check
+                        errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                       else
-                        @logger.debug "OK: #{ hash_check }"
-                        info << "Hash value checked: #{ asset_file }: OK: #{ hash_check }"
+                        info << "Hash value checked OK: #{ id } #{ asset_file }: #{ hash_check }"
                       end
                     end
                   else
@@ -1203,7 +1203,7 @@ def dcp_inspect( options, args )
   # info << 'todo: Package format: Interop/SMPTE'
   # info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
   # info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
-  info << "Found #{ ams.size } Assetmap#{ pl ams }, #{ pkls.size } PKL#{ pl pkls } and #{ cpls.size } CPL#{ pl cpls }"
+  info << "#{ options.validate ? 'Validated' : 'Not validated' }: #{ ams.size } Assetmap#{ pl ams }, #{ pkls.size } PKL#{ pl pkls }, #{ cpls.size } CPL#{ pl cpls }"
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) } unless errors.empty?
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) } unless hints.empty?
