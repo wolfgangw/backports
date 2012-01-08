@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.01.02.backport'
+AppVersion = 'v1.2012.01.08.backport'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -839,6 +839,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   report << "IssueDate:        #{ dt } (#{ dt_friendly })"
   report << "Issuer:           #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' ).text }"
   report << "Creator:          #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Creator' ).text }"
+
+  # Metadata
+  if xml.collect_namespaces.keys.include?( 'xmlns:meta' )
+    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', 'meta' => xml.collect_namespaces[ 'xmlns:meta' ] )
+    if cma
+      report << "CompositionMetadataAsset:"
+      cma.each do |e|
+        report << "\t#{ e.node_name }: #{ e.text }"
+      end
+    end
+  end
+
   signer = xml_get_signer( xml )
   if signer
     report << "Signer:           #{ signer.inspect }"
@@ -865,8 +877,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       edit_rate = asset.xpath( 'xmlns:EditRate' ).text.split( ' ' ).first.to_i # FIXME ugh
       edit_rates << edit_rate
 
-      # In packages a CPL might reference assets which are not in Assetmap's dictionary
+      # A CPL might reference assets which are not in Assetmap's dictionary
       # (the asset might already be ingested or could be ingested later)
+      #
+      # A CPL might list metadata (current draft puts this into reel 1) with its
+      # own asset id which will, again, not be part of Assetmap's dictionary.
+      # Breaks reel durations (as of v1.2012.01.08.backport) for now. Not in
+      # the wild yet.
       if dict
         if dict[ asset_id ]
           asset_file = package dict[ asset_id ]
@@ -912,7 +929,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
             meta_report = "Asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
-        elsif nil
         else
           meta_report = "Referenced asset file not listed in Assetmap dictionary"
           hint_info = [
