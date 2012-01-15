@@ -735,7 +735,7 @@ def get_xml_of_type( asdcp_type, file, validate = TRUE )
     # special handling as DCSubtitle files are not namespaced
     when 'DCSubtitle'
       # alpha stage
-      xsd_file = 'DCSubtitle.v0.alpha.xsd'
+      xsd_file = 'DCSubtitle.v1.mattsson.xsd'
     else
       case asdcp_type
       when 'AssetMap'
