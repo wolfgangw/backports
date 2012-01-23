@@ -707,7 +707,7 @@ end
 # returns validated xml or false.
 # in addition to xml all kinds of stuff will be examined here
 # hence the hoopla to skip expected errors from non-xml.
-# still: what an appaling method
+# still: what an appalling method
 def get_xml_of_type( asdcp_type, file, validate = TRUE )
   begin
     xml = Nokogiri::XML( open file )
@@ -842,7 +842,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
   # Metadata
   if xml.collect_namespaces.keys.include?( 'xmlns:meta' )
-    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', 'meta' => xml.collect_namespaces[ 'xmlns:meta' ] )
+    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', xml.collect_namespaces )
     if cma
       report << "CompositionMetadataAsset:"
       cma.each do |e|
@@ -854,7 +854,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   signer = xml_get_signer( xml )
   if signer
     report << "Signer:           #{ signer.inspect }"
-    info << "Signer: CPL #{ cpl_id }: #{ signer.inspect }"
+    info << "Signer: CPL #{ cpl_id }: Issuer:  #{ signer[ 'Issuer' ] }"
+    info << "Signer: CPL #{ cpl_id }: Subject: #{ signer[ 'Subject' ] }"
   else
     report << "Not signed"
   end
