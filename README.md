@@ -7,9 +7,18 @@ Usage:
 
 dcp_inspect
 
-- checks all packages under the location given
-- runs schema validation on all infrastructure files
+- checks all packages under a given location
+
+    You can either specify a directory with 1 DCP in it or let dcp_inspect walk through a collection of packages.
+
+- runs schema validation on all infrastructure files and DCSubtitle
+
+    Validation errors will be reported but dcp_inspect will still try to inspect the contents of non-validated files.
+
 - checks and verifies signatures
+
+    Signature verification requires a recent Nokogiri version with C14N support (See Requirements). If the installed version of Nokogiri does not support C14N dcp_inspect will skip signature verification and print a hint about it.
+
 - deep-inspects compositions
 - reports in detail all errors encountered
 
