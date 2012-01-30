@@ -19,7 +19,7 @@ Requirements:
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
 
-    For verification of signatures dcp_inspect requires a recent Nokogiri version with C14N support. See https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC for notes on how to install Nokogiri with C14N support from current git (https://github.com/tenderlove/nokogiri)
+    For verification of signatures dcp_inspect requires a recent Nokogiri version with C14N support. See [MISC on Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC) for notes on how to install Nokogiri with C14N support from [current git](https://github.com/tenderlove/nokogiri)
 
 - dcp_inspect requires xsd/ next to it.
 
