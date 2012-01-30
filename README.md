@@ -1,6 +1,8 @@
 dcp_inspect inspects and checks DCP media and directories
 
-Usage:  dcp_inspect /path/to/dir
+Usage:
+
+        dcp_inspect /path/to/dir
         dcp_inspect --help
 
 dcp_inspect
@@ -32,16 +34,18 @@ Requirements:
     Or add the equivalent export/setenv statements to .bashrc/.tcshrc
 
 Run
+
     $ git pull
+
 in backports to keep up-to-date.
 
 Couple of todos:
-  - Package format consistency checks (Interop/SMPTE)
-  - Some Assetmap options (Offsets, volume indices) are not handled
-  - Marker lists are not handled
-  - Its output is quite chatty and for now there is no way to tame that
-    other than "--verbosity info" which is chatty too
-  - A re-write to, again, tame the threads
+
+- Package format consistency checks (Interop/SMPTE)
+- Some Assetmap options (Offsets, volume indices) are not handled
+- Marker lists are not handled
+- Its output is quite chatty and for now there is no way to tame that other than `--verbosity info` which is chatty too
+- A re-write to, again, tame the threads
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 
