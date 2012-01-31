@@ -21,7 +21,7 @@ Usage:
 
 - reports in detail all errors encountered
 
-### Requirements:
+### Requirements
 
 - [asdcplib and its cli tools](http://www.cinecert.com/asdcplib/)
 
@@ -47,7 +47,7 @@ Run
 
 in backports to keep up-to-date.
 
-### Couple of todos:
+### Couple of todos
 
 - Package format consistency checks (Interop/SMPTE)
 - Some Assetmap options (Offsets, volume indices) are not handled
