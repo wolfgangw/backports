@@ -1,25 +1,25 @@
 ## dcp_inspect inspects and checks DCP media and directories
 
-Usage:
+### Usage
 
         dcp_inspect /path/to/dir
         dcp_inspect --help
 
 ### Features
 
-- checks all packages under a given location
+- Checks all packages under a given location
 
-- runs schema validation on all infrastructure files and DCSubtitle
+- Runs schema validation on all infrastructure files and DCSubtitle
 
     Validation errors will be reported but dcp_inspect will still try to inspect the contents of non-valid files.
 
-- checks and verifies signatures
+- Checks and verifies signatures
 
     Signature verification requires a recent Nokogiri version with C14N support (See Requirements). If the installed version of Nokogiri does not support C14N dcp_inspect will skip signature verification and let you know.
 
-- deep-inspects compositions
+- Deep-inspects compositions
 
-- reports in detail all errors encountered
+- Reports in detail all errors encountered
 
 ### Requirements
 
