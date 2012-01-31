@@ -1199,11 +1199,11 @@ class DC_Signature_Verification
         # List those errors but then try to continue anyway,
         # thus allowing for inspection of compliance issues and signature in context.
         @crypto.messages.each do |e|
-          messages << e
+          @messages << e
         end
       end
     else # cc is valid
-      messages << "Certificate chain is complete and compliant (#{ @crypto.type })"
+      @messages << "Certificate chain is complete and compliant (#{ @crypto.type })"
     end
 
     # 3.a Might check here whether the signer chain is known, trustworthy etc.
@@ -1473,6 +1473,11 @@ def errors_signature_verification( errors, signature_result, asset, file )
     return errors
   end
   if signature_result.verified?
+    # While the signature might verify there could be problems
+    # with dc specific certificate properties. Report those.
+    if ! signature_result.crypto.errors[ :context ].values.flatten.empty?
+      errors << "Signature: #{ asset }: #{ file }: #{ signature_result.crypto.errors[ :context ].inspect }"
+    end
   else
     signature_result.messages.each do |message|
       errors << "Signature: #{ asset }: #{ file }: #{ message }"
