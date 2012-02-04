@@ -262,13 +262,13 @@ module Shell
       `kmuuidgen -n`
     end
     def asdcp_mxf_info( filename )
-      `asdcp-test -v -i #{ filename } 2>&1`.chomp
+      `asdcp-test -v -i #{ Shellwords.shellescape filename } 2>&1`.chomp
     end
     def asdcp_mxf_interop_stereoscopic_info( filename )
-      `asdcp-test -3 -v -i #{ filename } 2>&1`.chomp
+      `asdcp-test -3 -v -i #{ Shellwords.shellescape filename } 2>&1`.chomp
     end
     def asdcp_digest( filename )
-      `asdcp-test -t #{ filename }`.chomp.split( ' ' ).first
+      `asdcp-test -t #{ Shellwords.shellescape filename }`.chomp.split( ' ' ).first
     end
   end
 end
@@ -1529,7 +1529,7 @@ end
 
 # FIXME Rather brittle mechanism here. I'd like to have infrastructure types show up (CompositionPlaylist, PackingList, DCSubtitle, DCMetadata)
 def get_asset_uuid( file )
-  id = nil
+  id = NIL
   if File.exists?( file )
     xml = xml?( file )
     if xml
@@ -1767,17 +1767,17 @@ def dcp_inspect( options, arg )
       end
     end
   end
-  ams = am_candidates
+  am_files = am_candidates
   puts
   # hint at multiple Assetmaps found
-  hints << "Found #{ ams.size } Assetmaps" unless ams.size == 1
+  hints << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
   # Process all Assetmaps
-  @logger.info( "Found #{ ams.size } Assetmap#{ pl ams }" )
+  @logger.info( "Found #{ am_files.size } Assetmap#{ pl am_files }" )
   dict = Array.new # list of dictionaries/hashes
   pkls = Array.new
-  am_ids = Array.new
-  ams.each_with_index do |am_file, index|
+  ams = Array.new
+  am_files.each_with_index do |am_file, index|
     dict << Hash.new
     pkls << Array.new
     am_base = File.dirname am_file
@@ -1786,9 +1786,9 @@ def dcp_inspect( options, arg )
     xml.remove_namespaces!
     am_id = get_asset_uuid( package am_file )
     if am_id
-      am_ids << am_id
+      ams << am_id
     else
-      am_ids << NIL
+      ams << NIL
       errors << "Assetmap '#{ am_file }' has no Id"
     end
     # collect all asset nodes
@@ -1852,7 +1852,7 @@ def dcp_inspect( options, arg )
     pkls[ index ].map { |pkl_id| @logger.debug( "PKL #{ pkl_id }: file#{ File.exists?( package dict[ index ][ pkl_id ] ) ? '' : ' not' } present: #{ dict[ index ][ pkl_id ] }" ) }
     @logger.debug nil
 
-  end # ams.each
+  end # am_files.each
 
   # All found PKLs: look for CPLs
   @logger.info( "Found #{ pkls.flatten.size } packing list#{ pl pkls.flatten }" )
@@ -1901,7 +1901,7 @@ def dcp_inspect( options, arg )
                 if ( hash_listed = asset.xpath( 'Hash' ).text )
                   if options.check_hashes
                     @logger.debug "Checking hash value: #{ id }: #{ asset_file }"
-                    hash_check = Shell::asdcp_digest( Shellwords.shellescape asset_file )
+                    hash_check = Shell::asdcp_digest( asset_file )
                     if hash_listed != hash_check
                       errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                     else
@@ -2003,11 +2003,12 @@ def dcp_inspect( options, arg )
   # info << 'todo: Package format: Interop/SMPTE'
   # info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
   # info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
-  info << "#{ options.validate ? 'Validated' : 'Not validated' }: #{ ams.size } Assetmap#{ pl ams }, #{ pkls.size } PKL#{ pl pkls }, #{ cpls.size } CPL#{ pl cpls }"
+  info << "#{ options.validate ? 'Validated' : 'Not validated' }: #{ am_files.size } Assetmap#{ pl am_files }, #{ pkls.size } PKL#{ pl pkls }, #{ cpls.size } CPL#{ pl cpls }"
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) } unless errors.empty?
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) } unless hints.empty?
   info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) } unless info.empty?
+  
 end
 
 
