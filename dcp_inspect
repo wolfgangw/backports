@@ -1886,7 +1886,7 @@ def dcp_inspect( options, arg )
             id = asset.xpath( 'Id' ).text.split( ':' ).last
             type = asset.xpath( 'Type' ).text
             # List all PKL listed assets and report AM mapping status
-            @logger.info( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( package dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
+            @logger.info( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
 
             if dict[ index ].keys.include?( id )
               asset_file = package dict[ index ][ id ]
