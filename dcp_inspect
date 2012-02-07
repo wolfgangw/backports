@@ -1742,7 +1742,7 @@ def dcp_inspect( options, arg )
 
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
-  am_candidates = package_dir_tree.select { |e| File.basename( e ) =~ /^ASSETMAP$/ or File.basename( e ) =~ /^ASSETMAP.xml$/ }
+  am_candidates = package_dir_tree.select { |e| File.basename( e ) =~ /^ASSETMAP$/ or File.basename( e ) =~ /^ASSETMAP.xml$/ }.sort
   if am_candidates.empty?
     errors << 'No Assetmap candidates found' 
   else
