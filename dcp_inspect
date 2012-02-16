@@ -1149,10 +1149,10 @@ class DC_Signature_Verification
 
       if @reference_digests_check and @signature_value_check
         @verified = true
-        @messages << "OK"
+        @messages << "Signature check: OK"
       else
         @verified = false
-        @messages << "Verification failure"
+        @messages << "Signature check: Verification failure"
       end
     end
   end
@@ -1375,15 +1375,11 @@ class DC_Signature_Verification
   end
 
   def pemify( string )
-    # Sanitize b64 encoded string: Remove cr, newlines and whitespace and split into chunks of 64 chars plus a remainder chunk
-    chunks = string.gsub( /[\r ]+/, '' ).split( "\n" ).join.split( /(.{64})/ ).reject { |e| e.empty? }
-    pem_lines = Array.new
-    pem_lines << '-----BEGIN CERTIFICATE-----'
-    chunks.each do |chunk|
-      pem_lines << chunk
-    end
-    pem_lines << '-----END CERTIFICATE-----'
-    pem_lines.join( "\n" )
+    [
+      '-----BEGIN CERTIFICATE-----',
+      string.gsub( /[\r ]+/, '' ).split( "\n" ).join.split( /(.{64})/ ).reject { |e| e.empty? },
+      '-----END CERTIFICATE-----'
+    ].flatten.join( "\n" )
   end
 
   def decode_sig_value( value, sig_digest_algo, pub_k )
@@ -1830,7 +1826,7 @@ def dcp_inspect( options, arg )
 
       # PackingList?
       unless asset.xpath( 'PackingList' ).empty?
-        pkls[ index ] << listed_id 
+        pkls[ index ] << listed_id
       end
 
       # Check if possible uuid component in the asset filename matches the actual asset uuid
@@ -1866,13 +1862,13 @@ def dcp_inspect( options, arg )
 
           if options.validate
             valid, errors = validation( errors, xml, pkl_file )
-            @logger.info( "PKL #{ pkl_id } Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+            @logger.info( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
           end
 
           if @c14n_available
             signature_result = check_signature( xml )
             errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
-            @logger.info( "PKL #{ pkl_id } Signature check: #{ signature_result.messages.last }" )
+            @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
           end
 
           # FIXME
@@ -1980,13 +1976,13 @@ def dcp_inspect( options, arg )
 
             if options.validate
               valid, errors = validation( errors, xml, cpl_file )
-              @logger.info( "CPL #{ cpl_id } Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+              @logger.info( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
             end
 
             if @c14n_available
               signature_result = check_signature( xml )
               errors = errors_signature_verification( errors, signature_result, cpl_id, cpl_file )
-              @logger.info( "CPL #{ cpl_id } Signature check: #{ signature_result.messages.last }" )
+              @logger.info( "CPL #{ cpl_id }: #{ signature_result.messages.last }" )
             else
               signature_result = nil
             end
