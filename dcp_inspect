@@ -1177,7 +1177,9 @@ class DC_Signature_Verification
     # 1. Figure out signature namespace prefix
     sig_ns, prefix = signature_namespace_and_prefix( doc )
 
-    # 2. Signature present?
+    # 2.a Signer present?
+
+    # 2.b Signature present?
     @signature_node = doc.xpath( "//#{ prefix }:Signature", sig_ns )
     if @signature_node.size != 1
       @messages << "#{ @signature_node.size == 0 ? 'No' : @signature_node.size } signature node#{ @signature_node.size > 1 ? 's' : '' } found"
@@ -1815,8 +1817,12 @@ def dcp_inspect( options, arg )
             unless asset_id =~ uuid_rfc4122_re
               errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ dict[ index ][ listed_id ] }"
             end
-            if listed_id != asset_id
+            if listed_id.downcase != asset_id.downcase
               errors << "#{ am_file } #{ am_id }: UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id }: #{ package dict[ index ][ listed_id ] }" 
+            else
+              if listed_id != asset_id
+                hints << "#{ am_file } #{ am_id }: case mismatch: Listed: #{ listed_id } Asset: #{ asset_id }: #{ package dict[ index ][ listed_id ] }"
+              end
             end
           end
         else
