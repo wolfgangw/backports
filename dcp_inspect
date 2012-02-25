@@ -251,6 +251,8 @@ module MStr
   Mpeg2 = 'MPEG2 video'
   Audio = 'audio'
   Timed_text = 'timed text'
+
+  Tkr_attr = 'x-TKR'
 end # module MStr
 include MStr
 
@@ -1594,7 +1596,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   dt = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:IssueDate' ).text
   dt_friendly = datetime_friendly( DateTime.parse dt )
   report << "IssueDate:        #{ dt } (#{ dt_friendly })"
-  report << "Issuer:           #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' ).text }"
+  # TKR? (Todo: Check URL scheme)
+  issuer = xml.at_xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' )
+  if issuer.attributes[ 'language' ] and issuer.attributes[ 'language' ].value == MStr::Tkr_attr
+    report << "TKR Base URL:     #{ issuer.text }"
+  else
+    report << "Issuer:           #{ issuer.text }"
+  end
   report << "Creator:          #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Creator' ).text }"
 
   # Metadata
