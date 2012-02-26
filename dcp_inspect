@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.01.29.backport'
+AppVersion = 'v1.2012.02.26'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -121,6 +121,7 @@ class Options
     opts = OptionParser.new do |opts|
       opts.banner = <<BANNER
 #{ AppName } #{ AppVersion }
+Usage: #{ AppName } [options] <location>
 
 BANNER
       opts.on( '-c', '--check-hashes', 'Compare listed and actual hash values of assets' ) do
