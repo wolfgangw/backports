@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.02.26'
+AppVersion = 'v1.2012.02.28'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -1424,6 +1424,87 @@ class DC_Signature_Verification
 
 end # DC_Signature_Verification
 
+class Eta
+  attr_reader :percentage, :eta, :elapsed
+  def initialize( title = '', width = 50, looks_like = '[= ]' )
+    @title = title
+    @total = 100
+    @scaling = width.to_f / @total
+    @left, @major, @fill, @right = looks_like.scan( /./ )
+    @start = Time.now
+  end
+
+  def update( percentage )
+    @percentage = percentage
+    eta
+  end
+
+  def eta
+    return if @percentage == 0
+    @elapsed = Time.now - @start
+    @eta = @elapsed * @total / @percentage - @elapsed
+  end
+
+  def update_terminal( percentage )
+    update( percentage )
+    printf "%s\r", bar
+  end
+
+  def clear_terminal
+    printf "%s\r", ' ' * bar.size
+  end
+
+  def preserve_terminal
+    puts
+  end
+
+  private
+
+  def bar
+    [ '', @title, percentage_pad, inner_bar, tail ].join( ' ' )
+  end
+
+  def percentage_pad
+    "%3s%" % @percentage
+  end
+
+  def inner_bar
+    @left + @major * ( @percentage * @scaling ).ceil + @fill * ( ( @total - @percentage ) * @scaling ).floor + @right
+  end
+
+  def tail
+    [ time_string( 'ETA', @eta ), time_string( 'Elapsed', @elapsed ) ].join( ' ' )
+  end
+
+  def time_string( head, t )
+    return "%s --:--:--" % head if t.nil?
+    t = t.to_i; s = t % 60; m  = ( t / 60 ) % 60; h = t / 3600
+    "%s %02d:%02d:%02d" % [ head, h, m, s ]
+  end
+end # Eta
+
+
+def digest_with_etabar( digest_algorithm, title, file, pbar_width = 50, looks_like = '[= ]' )
+  size = File.size file
+  chunksize = 4096
+  chunks = size / chunksize + ( size % chunksize > 0 ? 1 : 0 )
+  chunks_per_percent = chunks / 100 + 1
+
+  dgst = OpenSSL::Digest.new( digest_algorithm )
+  io = File.open file
+  eta = Eta.new( title, pbar_width, looks_like )
+
+  ( 0 .. 100 ).each do |percentage|
+    # read 1 % of chunks
+    chunks_per_percent.times do
+      chunk = io.read( chunksize )
+      dgst.update chunk if chunk
+    end
+    eta.update_terminal percentage
+  end
+
+  return dgst.digest, eta
+end
 
 # lib/xml.rb
 def validate_xml( xml, file )
@@ -1916,8 +1997,10 @@ def dcp_inspect( options, arg )
                 # Check listed and actual digests
                 if ( hash_listed = asset.xpath( 'Hash' ).text )
                   if options.check_hashes
-                    @logger.debug "Checking hash value: #{ id }: #{ asset_file }"
-                    hash_check = Shell::asdcp_digest( asset_file )
+                    etabar_title = "Checking hash value: #{ id }: #{ asset_file }"
+                    hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]' )
+                    hash_check = Base64.encode64( hash_check ).chomp
+                    eta.preserve_terminal
                     if hash_listed != hash_check
                       errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                     else
