@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.02.29'
+AppVersion = 'v1.2012.03.01'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -97,16 +97,13 @@ if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
     end
   else
     puts "Local XML Catalog #{ local_xml_catalog } not found"
-    exit
+    exit 1
   end
 else
   puts "Local XSD store #{ XSDDir } not found"
-  exit
+  exit 1
 end
-unless ENV[ 'XML_CATALOG_FILES' ]
-  puts "Export env XML_CATALOG_FILES to point at #{ local_xml_catalog }"
-  exit
-end
+ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 
 
 # lib/options.rb
@@ -1158,14 +1155,23 @@ class DC_Signature_Verification
   end
 
   def signature_namespace_and_prefix( doc )
+    # If Signature's namespace is not in doc's namespace collection then it will be either
+    #   * in Ns_Xmldsig declared as default namespace for Signature scope
+    #   * or whacked beyond recognition
     doc_ns = doc.collect_namespaces
-    if doc_ns.key( MStr::Ns_Xmldsig )
-      prefix = doc_ns.key( MStr::Ns_Xmldsig ).split( 'xmlns:' ).last
+    if RUBY_VERSION < '1.9'
+      # Hash#index will be deprecated in the ruby 1.9.x series. Is in here for 1.8.x
+      if doc_ns.index( MStr::Ns_Xmldsig )
+        prefix = doc_ns.index( MStr::Ns_Xmldsig ).split( 'xmlns:' ).last
+      else
+        prefix = 'xmlns'
+      end
     else
-      # If Signature's namespace is not in doc's namespace collection then it will be either
-      #   * in Ns_Xmldsig declared as default namespace for Signature scope
-      #   * or whacked beyond recognition
-      prefix = 'xmlns'
+      if doc_ns.key( MStr::Ns_Xmldsig )
+        prefix = doc_ns.key( MStr::Ns_Xmldsig ).split( 'xmlns:' ).last
+      else
+        prefix = 'xmlns'
+      end
     end
     sig_ns = { prefix => MStr::Ns_Xmldsig }
     return sig_ns, prefix
@@ -1342,7 +1348,10 @@ class DC_Signature_Verification
         buffer << b
       end
       s = buffer.string
-      s.force_encoding( Encoding::BINARY ) if s.respond_to?( :force_encoding )
+      # FIXME
+      if s.respond_to?( :force_encoding )
+        s.force_encoding( Encoding::BINARY )
+      end
       s.reverse!
       s = len ? s.rjust( len, "\0" ) : s
     end
@@ -1423,7 +1432,7 @@ end # DC_Signature_Verification
 
 class Eta
   attr_reader :percentage, :eta, :elapsed
-  def initialize( title = '', width = 50, looks_like = '[= ]', terminal_size )
+  def initialize( title = '', width = 50, looks_like = '[= ]', terminal_size = nil )
     @title = title
     @total = 100
     @scaling = width.to_f / @total
@@ -1698,10 +1707,12 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report << "IssueDate:        #{ dt } (#{ dt_friendly })"
   # TKR? (Todo: Check URL scheme)
   issuer = xml.at_xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' )
-  if issuer.attributes[ 'language' ] and issuer.attributes[ 'language' ].value == MStr::Tkr_attr
-    report << "TKR Base URL:     #{ issuer.text }"
-  else
-    report << "Issuer:           #{ issuer.text }"
+  if issuer
+    if issuer.attributes[ 'language' ] and issuer.attributes[ 'language' ].value == MStr::Tkr_attr
+      report << "TKR Base URL:     #{ issuer.text }"
+    else
+      report << "Issuer:           #{ issuer.text }"
+    end
   end
   report << "Creator:          #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Creator' ).text }"
 
@@ -1848,7 +1859,7 @@ def dcp_inspect( options, arg )
 
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
-  am_candidates = package_dir_tree.select { |e| File.basename( e.force_encoding( "BINARY" ) ) =~ /^ASSETMAP$/ or File.basename( e.force_encoding( "BINARY" ) ) =~ /^ASSETMAP.xml$/ }.sort
+  am_candidates = package_dir_tree.select { |e| File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ }.sort
   if am_candidates.empty?
     errors << 'No Assetmap candidates found' 
   else
