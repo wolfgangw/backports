@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.02.28'
+AppVersion = 'v1.2012.02.29'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -269,9 +269,6 @@ module Shell
     end
     def asdcp_mxf_interop_stereoscopic_info( filename )
       `asdcp-test -3 -v -i #{ Shellwords.shellescape filename } 2>&1`.chomp
-    end
-    def asdcp_digest( filename )
-      `asdcp-test -t #{ Shellwords.shellescape filename }`.chomp.split( ' ' ).first
     end
   end
 end
@@ -1426,11 +1423,12 @@ end # DC_Signature_Verification
 
 class Eta
   attr_reader :percentage, :eta, :elapsed
-  def initialize( title = '', width = 50, looks_like = '[= ]' )
+  def initialize( title = '', width = 50, looks_like = '[= ]', terminal_size )
     @title = title
     @total = 100
     @scaling = width.to_f / @total
     @left, @major, @fill, @right = looks_like.scan( /./ )
+    @terminal_size = terminal_size
     @start = Time.now
   end
 
@@ -1447,7 +1445,11 @@ class Eta
 
   def update_terminal( percentage )
     update( percentage )
-    printf "%s\r", bar
+    line = bar
+    if @terminal_size and line.length > @terminal_size[ :columns ]
+      line = ' [...] ' + line[ line.length - @terminal_size[ :columns ] + 7 .. -1 ]
+    end
+    printf "%s\r", line
   end
 
   def clear_terminal
@@ -1456,6 +1458,11 @@ class Eta
 
   def preserve_terminal
     puts
+  end
+
+  def preserve_terminal_title_with_message( message )
+    clear_terminal
+    puts [ '', @title, message ].join( ' ' )
   end
 
   private
@@ -1483,6 +1490,17 @@ class Eta
   end
 end # Eta
 
+def command_exists?(command)
+  ENV[ 'PATH' ].split( File::PATH_SEPARATOR ).any? { |d| File.exists? File.join( d, command ) }
+end
+
+def detect_terminal_size
+  if command_exists?( 'tput' )
+    { :columns => `tput cols`.to_i, :lines => `tput lines`.to_i }
+  else
+    nil
+  end
+end
 
 def digest_with_etabar( digest_algorithm, title, file, pbar_width = 50, looks_like = '[= ]' )
   size = File.size file
@@ -1492,7 +1510,7 @@ def digest_with_etabar( digest_algorithm, title, file, pbar_width = 50, looks_li
 
   dgst = OpenSSL::Digest.new( digest_algorithm )
   io = File.open file
-  eta = Eta.new( title, pbar_width, looks_like )
+  eta = Eta.new( title, pbar_width, looks_like, detect_terminal_size )
 
   ( 0 .. 100 ).each do |percentage|
     # read 1 % of chunks
@@ -1997,14 +2015,15 @@ def dcp_inspect( options, arg )
                 # Check listed and actual digests
                 if ( hash_listed = asset.xpath( 'Hash' ).text )
                   if options.check_hashes
-                    etabar_title = "Checking hash value: #{ id }: #{ asset_file }"
+                    etabar_title = "#{ id }: Checking hash value:"
                     hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]' )
                     hash_check = Base64.encode64( hash_check ).chomp
-                    eta.preserve_terminal
                     if hash_listed != hash_check
+                      eta.preserve_terminal_title_with_message( 'Mismatch' )
                       errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                     else
-                      info << "Hash value checked OK: #{ id } #{ asset_file }: #{ hash_check }"
+                      eta.preserve_terminal_title_with_message( 'OK' )
+                      info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
                     end
                   end
                 else
