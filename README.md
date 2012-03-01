@@ -35,12 +35,6 @@
 
         $ git clone git://github.com/wolfgangw/backports.git
 
-- Set the environment variable XML_CATALOG_FILES to include the location of xsd/catalog.xml:
-
-        $ export XML_CATALOG_FILES=[/path/to/]backports/xsd/catalog.xml
-
-    Or add the equivalent export/setenv statements to .bashrc/.tcshrc
-
 Run
 
     $ git pull
@@ -52,12 +46,13 @@ in backports to keep up-to-date.
 - Package format consistency checks (Interop/SMPTE)
 - Some Assetmap options (Offsets, volume indices) are not handled
 - Marker lists are not handled
-- Its output is quite chatty and for now there is no way to tame that other than `--verbosity info` which is chatty too
-- A re-write to, again, tame the threads
+- Check Signer.X509IssuerSerial info
+- Sound present in SMPTE DCP reels?
+- Verbosity levels
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 
-Tested on linux boxes. Let me know if dcp_inspect actually runs on Mac OS or Windows.
+Tested on linux and Mac OS boxes. Let me know if dcp_inspect actually runs on Windows.
 
 Copyright 2011-2012 Wolfgang Woehl
 
