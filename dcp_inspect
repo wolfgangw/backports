@@ -153,9 +153,8 @@ end # Options
 
 # * lib/logger.rb
 class DLogger
-  attr_accessor :prefix
-  def initialize( prefix, verbosity )
-    @verbosity = verbosity
+  def initialize( prefix, options )
+    @verbosity = options.verbosity
     case @verbosity
     when "quiet"
       @info, @debug = [ FALSE, FALSE ]
@@ -172,19 +171,19 @@ class DLogger
     @prefix = prefix
   end
   def info( text )
-    to_console( text ) if @info == TRUE
+    to_console( text ) if @info
   end
   def debug( text )
-    to_console( text ) if @debug == TRUE
+    to_console( text ) if @debug
   end
   def cr( text )
     carriage_return( text ) unless @verbosity == "quiet"
   end
   def carriage_return( text )
-    printf "#{ @prefix } #{ text }#{ ' ' * 64 }\r"; STDOUT.flush
+    printf "%s %s\r", @prefix, text
   end
   def to_console( text )
-    printf "#{ @prefix } #{ text }\n"
+    printf "%s %s\n", @prefix, text
   end
 end
 
@@ -1432,12 +1431,13 @@ end # DC_Signature_Verification
 
 class Eta
   attr_reader :percentage, :eta, :elapsed
-  def initialize( title = '', width = 50, looks_like = '[= ]', terminal_size = nil )
+  def initialize( title, width, looks_like, terminal_size, options )
     @title = title
     @total = 100
     @scaling = width.to_f / @total
     @left, @major, @fill, @right = looks_like.scan( /./ )
     @terminal_size = terminal_size
+    @logger = DLogger.new( '', options )
     @start = Time.now
   end
 
@@ -1458,26 +1458,26 @@ class Eta
     if @terminal_size and line.length > @terminal_size[ :columns ]
       line = ' [...] ' + line[ line.length - @terminal_size[ :columns ] + 7 .. -1 ]
     end
-    printf "%s\r", line
+    @logger.cr( "%s\r" % line )
   end
 
   def clear_terminal
-    printf "%s\r", ' ' * bar.size
+    @logger.cr( "%s\r" % ( ' ' * bar.size ) )
   end
 
   def preserve_terminal
-    puts
+    @logger.info ''
   end
 
   def preserve_terminal_title_with_message( message )
     clear_terminal
-    puts [ '', @title, message ].join( ' ' )
+    @logger.info [ @title, message ].join( ' ' )
   end
 
   private
 
   def bar
-    [ '', @title, percentage_pad, inner_bar, tail ].join( ' ' )
+    [ @title, percentage_pad, inner_bar, tail ].join( ' ' )
   end
 
   def percentage_pad
@@ -1499,7 +1499,7 @@ class Eta
   end
 end # Eta
 
-def command_exists?(command)
+def command_exists?( command )
   ENV[ 'PATH' ].split( File::PATH_SEPARATOR ).any? { |d| File.exists? File.join( d, command ) }
 end
 
@@ -1511,7 +1511,7 @@ def detect_terminal_size
   end
 end
 
-def digest_with_etabar( digest_algorithm, title, file, pbar_width = 50, looks_like = '[= ]' )
+def digest_with_etabar( digest_algorithm, title, file, pbar_width, looks_like, options )
   size = File.size file
   chunksize = 4096
   chunks = size / chunksize + ( size % chunksize > 0 ? 1 : 0 )
@@ -1519,7 +1519,7 @@ def digest_with_etabar( digest_algorithm, title, file, pbar_width = 50, looks_li
 
   dgst = OpenSSL::Digest.new( digest_algorithm )
   io = File.open file
-  eta = Eta.new( title, pbar_width, looks_like, detect_terminal_size )
+  eta = Eta.new( title, pbar_width, looks_like, detect_terminal_size, options )
 
   ( 0 .. 100 ).each do |percentage|
     # read 1 % of chunks
@@ -1885,7 +1885,7 @@ def dcp_inspect( options, arg )
     end
   end
   am_files = am_candidates
-  puts
+  @logger.info ''
   # hint at multiple Assetmaps found
   hints << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
@@ -2027,7 +2027,7 @@ def dcp_inspect( options, arg )
                 if ( hash_listed = asset.xpath( 'Hash' ).text )
                   if options.check_hashes
                     etabar_title = "#{ id }: Checking hash value:"
-                    hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]' )
+                    hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options )
                     hash_check = Base64.encode64( hash_check ).chomp
                     if hash_listed != hash_check
                       eta.preserve_terminal_title_with_message( 'Mismatch' )
@@ -2070,7 +2070,7 @@ def dcp_inspect( options, arg )
         else
           errors << "Not a PackingList: #{ pkl_file }"
         end
-        puts
+        @logger.info ''
       else
         errors << "AM referenced PKL file not found: #{ pkl_file }"
       end
@@ -2090,7 +2090,7 @@ def dcp_inspect( options, arg )
   else
     @logger.info( "Found no compositions" )
   end
-  puts
+  @logger.info ''
 
   # Inspect CPLs
   # FIXME and all over again ...
@@ -2144,7 +2144,7 @@ end
 #
 options = Options.parse( ARGV )
 args = ARGV
-@logger = DLogger.new( prefix = '', options.verbosity )
+@logger = DLogger.new( prefix = '', options )
 @logger.debug( "#{ AppName }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 
 # FIXME handle 1 arg and dir only for now
