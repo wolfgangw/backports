@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.01'
+AppVersion = 'v1.2012.03.02'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -243,15 +243,20 @@ module MStr
 
   # title_kind_aspect_langaudio-langsubs only
   Naming_re = /([-A-Z0-9]+)_(FTR|FTR-1|FTR-2|TST|TLR|TLR-1|TLR1-2D|TLR1-3D|RTG-F|RTG-T1|TSR|TSR-1|POL|PSA|ADV|SHR|XSN|)_(F|S|C)_([A-Z]{2}-[A-Z]{2})/
+
+  # asdcp-test answers include
   Stereoscopic_pictures = 'stereoscopic pictures'
-  Pictures = 'pictures'
-  Mpeg2 = 'MPEG2 video'
-  Audio = 'audio'
-  Timed_text = 'timed text'
+  Pictures              = 'pictures'
+  Mpeg2                 = 'MPEG2 video'
+  Audio                 = 'audio'
+  Timed_text            = 'timed text'
 
   Tkr_attr = 'x-TKR'
+
+  AssetTypeInterop  = 'Interop'
+  AssetTypeSmpte    = 'SMPTE'
+  AssetTypeUnknown  = 'Unknown'
 end # module MStr
-include MStr
 
 
 # lib/shell_tools.rb
@@ -1546,9 +1551,9 @@ def validate_xml( xml, file )
     case asdcp_type
     when 'AssetMap'
       # see fhg
-      xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] or Schemas[ xml.namespaces[ 'xmlns:am' ] ] )
+      xsd_file = ( MStr::Schemas[ xml.namespaces[ 'xmlns' ] ] or MStr::Schemas[ xml.namespaces[ 'xmlns:am' ] ] )
     else
-      xsd_file = ( Schemas[ xml.namespaces[ 'xmlns' ] ] )
+      xsd_file = ( MStr::Schemas[ xml.namespaces[ 'xmlns' ] ] )
     end
   end
   xsd = Nokogiri::XML::Schema( open File.join( XSDDir, xsd_file ) )
@@ -1670,6 +1675,10 @@ end
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signature_result )
   ns = xml.namespaces
+  report = Array.new
+  cpl_referenced_assets = Array.new
+  cpl_referenced_assets_types = Array.new
+
   cpl_id = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Id' ).text.split( ':' ).last
   case ns[ 'xmlns' ]
   when MStr::Smpte_cpl
@@ -1680,7 +1689,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     cpl_type = 'Unknown'
     errors << "CPL main namespace unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }: #{ ns[ 'xmlns' ] }"
   end
-  report = Array.new
+  cpl_referenced_assets_types << cpl_type
+
   if signature_result
     if ! signature_result.signature_node.empty?
       report << "Signer:           #{ signature_result.signer_name }"
@@ -1727,7 +1737,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     end
   end
 
-  reels = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ReelList/xmlns:Reel' )
+  reels = xml.xpath( '/xmlns:CompositionPlaylist/xmlns:ReelList/xmlns:Reel' )
   report << "Number of Reels:  #{ reels.size }"
   total_duration = 0
   composition_edit_rate = 0
@@ -1753,9 +1763,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
           asset_file = package dict[ asset_id ]
 
           if File.exists?( asset_file )
-            # Could be interop subtitle file
+
+            # DCSubtitle?
             xml = get_xml_of_type( 'DCSubtitle', asset_file )
             if xml
+
+              cpl_referenced_assets << { asset_id => TRUE }
+              cpl_referenced_assets_types << MStr::AssetTypeInterop
 
               if options.validate
                 valid, errors = validation( errors, xml, asset_file )
@@ -1785,25 +1799,42 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
               else
                 meta_report = "DCSubtitle, no Subtitle found"
               end
-            else # not xml
+
+            else # MXF?
               meta = MxfTools.mxf_inspect( asset_file )
               if meta
+
+                cpl_referenced_assets << { asset_id => TRUE }
+
+                case meta[ 'Label Set Type' ]
+                when 'MXF Interop'
+                  cpl_referenced_assets_types << MStr::AssetTypeInterop
+                when 'SMPTE'
+                  cpl_referenced_assets_types << MStr::AssetTypeSmpte
+                else
+                  cpl_referenced_assets_types << MStr::AssetTypeUnknown
+                end
+
                 meta_report = [
-                  meta[ 'Label Set Type' ],
-                  Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ).to_s,
-                  meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted',
+                  meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
+                  meta[ 'ContainerDuration' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ).to_s : 'ContainerDuration:' + MStr::AssetTypeUnknown,
+                  meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
                   asset.node_name =~ /Picture/ ? meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '',
-                  meta[ 'EssenceType' ]
+                  meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
                 ].reject { |e| e.nil? or e.empty? }.join( ', ' )
               else
+                cpl_referenced_assets << { asset_id => FALSE }
+                cpl_referenced_assets_types << MStr::AssetTypeUnknown
                 meta_report = "Asset file found but not AS-DCP MXF"
               end
             end
           else
+            cpl_referenced_assets << { asset_id => FALSE }
             meta_report = "Asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
         else
+          cpl_referenced_assets << { asset_id => FALSE }
           meta_report = "Referenced asset file not listed in Assetmap dictionary"
           hint_info = [
             'CPL ' + cpl_id,
@@ -1829,6 +1860,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
   report << "Total duration:"
   report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
+
+  if cpl_referenced_assets_types.uniq.size == 1
+    report << "Composition type: #{ cpl_referenced_assets_types.uniq.first }"
+  else
+    stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : 'Mixed' )
+    # FIXME Composition type Mixed error or hint?
+    report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
+    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
+  end
 
   return report, errors, hints, info
 end
@@ -2148,7 +2188,7 @@ args = ARGV
 @logger.debug( "#{ AppName }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 
 # FIXME handle 1 arg and dir only for now
-if args.size == 1 and File.exists?( args[ 0 ] ) and File.ftype( Pathname( args[ 0 ] ).realpath ) == 'directory'
+if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
   dcp_inspect( options, args[ 0 ] )
 elsif args.size == 0
   @logger.info( "No volume or directory given. See #{ AppName } --help" )
