@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.02'
+AppVersion = 'v1.2012.03.03'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -317,6 +317,9 @@ end
 # misc helpers
 #
 # plural helper english
+def amount( item, list )
+  "#{ list.size } #{ item }#{ pl list }"
+end
 def pl( list )
   list.size != 1 ? 's' : ''
 end
@@ -1804,14 +1807,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
               meta = MxfTools.mxf_inspect( asset_file )
               if meta
 
-                cpl_referenced_assets << { asset_id => TRUE }
-
                 case meta[ 'Label Set Type' ]
                 when 'MXF Interop'
+                  cpl_referenced_assets << { asset_id => TRUE }
                   cpl_referenced_assets_types << MStr::AssetTypeInterop
                 when 'SMPTE'
+                  cpl_referenced_assets << { asset_id => TRUE }
                   cpl_referenced_assets_types << MStr::AssetTypeSmpte
                 else
+                  cpl_referenced_assets << { asset_id => FALSE }
                   cpl_referenced_assets_types << MStr::AssetTypeUnknown
                 end
 
@@ -1822,6 +1826,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                   asset.node_name =~ /Picture/ ? meta[ 'StoredWidth' ] + 'x' + meta[ 'StoredHeight' ]  : '',
                   meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
                 ].reject { |e| e.nil? or e.empty? }.join( ', ' )
+
               else
                 cpl_referenced_assets << { asset_id => FALSE }
                 cpl_referenced_assets_types << MStr::AssetTypeUnknown
@@ -1830,11 +1835,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
             end
           else
             cpl_referenced_assets << { asset_id => FALSE }
+            cpl_referenced_assets_types << MStr::AssetTypeUnknown
             meta_report = "Asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
         else
           cpl_referenced_assets << { asset_id => FALSE }
+          cpl_referenced_assets_types << MStr::AssetTypeUnknown
           meta_report = "Referenced asset file not listed in Assetmap dictionary"
           hint_info = [
             'CPL ' + cpl_id,
@@ -1861,13 +1868,22 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report << "Total duration:"
   report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
 
-  if cpl_referenced_assets_types.uniq.size == 1
+  # Composition type
+  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == true
     report << "Composition type: #{ cpl_referenced_assets_types.uniq.first }"
   else
-    stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : 'Mixed' )
+    stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     # FIXME Composition type Mixed error or hint?
-    report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
-    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
+    report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types }"
+    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types }"
+  end
+  # Composition completeness
+  if assets_status_list.include?( FALSE )
+    report << "Composition incomplete"
+    errors << "CPL #{ cpl_id }: Composition incomplete"
+  else
+    report << 'Composition complete'
   end
 
   return report, errors, hints, info
@@ -1903,7 +1919,7 @@ def dcp_inspect( options, arg )
   if am_candidates.empty?
     errors << 'No Assetmap candidates found' 
   else
-    @logger.debug( "Found #{ am_candidates.size } Assetmap candidate#{ pl am_candidates }: #{ am_candidates.inspect }" )
+    @logger.debug( "Found #{ amount( 'Assetmap candidate', am_candidates ) }: #{ am_candidates.inspect }" )
   end
 
   # Check XML for Assetmap content
@@ -1930,7 +1946,7 @@ def dcp_inspect( options, arg )
   hints << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
   # Process all Assetmaps
-  @logger.info( "Found #{ am_files.size } Assetmap#{ pl am_files }" )
+  @logger.info( "Found #{ amount( 'Assetmap', am_files ) }" )
   dict = Array.new # list of dictionaries/hashes
   pkls = Array.new
   ams = Array.new
@@ -2007,16 +2023,16 @@ def dcp_inspect( options, arg )
     end # assets.each
 
     # List asset dictionary
-    @logger.debug( "Assetmap #{ am_id } lists #{ assets.size } asset#{ pl assets }:" )
+    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
     dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
-    @logger.debug( "Assetmap #{ am_id } lists #{ pkls[ index ].size } PKL#{ pl pkls[ index ] }:" )
+    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
     pkls[ index ].map { |pkl_id| @logger.debug( "PKL #{ pkl_id }: file#{ File.exists?( package dict[ index ][ pkl_id ] ) ? '' : ' not' } present: #{ dict[ index ][ pkl_id ] }" ) }
     @logger.debug nil
 
   end # am_files.each
 
   # All found PKLs: look for CPLs
-  @logger.info( "Found #{ pkls.flatten.size } packing list#{ pl pkls.flatten }" )
+  @logger.info( "Found #{ amount( 'packing list', pkls.flatten ) }" )
   cpls = Array.new
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
@@ -2041,7 +2057,7 @@ def dcp_inspect( options, arg )
           pkl_assets = xml.xpath( '//Asset' )
           pkl_cpls = Array.new
 
-          @logger.info( "PKL #{ pkl_id } lists #{ pkl_assets.size } asset#{ pl pkl_assets }" )
+          @logger.info( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
 
           pkl_assets.each do |asset|
             id = asset.xpath( 'Id' ).text.split( ':' ).last
@@ -2104,7 +2120,7 @@ def dcp_inspect( options, arg )
           # Add this PKLs CPLs to total CPLs
           cpls += pkl_cpls
           # List this PKLs CPLs
-          @logger.debug( "PKL #{ pkl_id } lists #{ pkl_cpls.size } composition#{ pl pkl_cpls }" )
+          @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }" )
           # FIXME purely informative here, we don't remember referenced files which are missing
           pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
         else
@@ -2119,7 +2135,7 @@ def dcp_inspect( options, arg )
 
   # List all found CPLs
   if cpls.size > 0
-    @logger.info( "Found #{ cpls.size } composition#{ pl cpls }" )
+    @logger.info( "Found #{ amount( 'composition', cpls ) }" )
     dict.each do |dictionary|
       cpls.each do |cpl_id|
         if dictionary.include?( cpl_id )
@@ -2172,7 +2188,8 @@ def dcp_inspect( options, arg )
   # info << 'todo: Package format: Interop/SMPTE'
   # info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
   # info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
-  info << "#{ options.validate ? 'Validated' : 'Not validated' }: #{ am_files.size } Assetmap#{ pl am_files }, #{ pkls.size } PKL#{ pl pkls }, #{ cpls.size } CPL#{ pl cpls }"
+  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) }, #{ amount( 'Composition', cpls ) }"
+  info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
   errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) } unless errors.empty?
   hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) } unless hints.empty?
@@ -2180,12 +2197,11 @@ def dcp_inspect( options, arg )
   
 end
 
-
 #
 options = Options.parse( ARGV )
 args = ARGV
 @logger = DLogger.new( prefix = '', options )
-@logger.debug( "#{ AppName }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
+@logger.debug( "#{ AppName } #{ AppVersion }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 
 # FIXME handle 1 arg and dir only for now
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
