@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.03'
+AppVersion = 'v1.2012.03.04'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -1462,7 +1462,7 @@ class Eta
     @scaling = width.to_f / @total
     @left, @major, @fill, @right = looks_like.scan( /./ )
     @terminal_size = terminal_size
-    @logger = DLogger.new( '', options )
+    @output = DLogger.new( prefix = '', options )
     @start = Time.now
   end
 
@@ -1483,20 +1483,20 @@ class Eta
     if @terminal_size and line.length > @terminal_size[ :columns ]
       line = ' [...] ' + line[ line.length - @terminal_size[ :columns ] + 7 .. -1 ]
     end
-    @logger.cr( "%s\r" % line )
+    @output.cr( "%s\r" % line )
   end
 
   def clear_terminal
-    @logger.cr( "%s\r" % ( ' ' * bar.size ) )
+    @output.cr( "%s\r" % ( ' ' * bar.size ) )
   end
 
   def preserve_terminal
-    @logger.info ''
+    @output.info ''
   end
 
   def preserve_terminal_title_with_message( message )
     clear_terminal
-    @logger.info [ @title, message ].join( ' ' )
+    @output.info [ @title, message ].join( ' ' )
   end
 
   private
@@ -1761,6 +1761,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report << "Number of Reels:  #{ reels.size }"
   total_duration = 0
   composition_edit_rate = 0
+  #
+  # A composition can be "incomplete" in different ways:
+  #   - referenced assets can exist outside of a given package (ok case)
+  #   - referenced assets can be invalid/damaged/missing (fail case)
+  # Collecting fail case id's in broken_assets to later on figure out
+  # which case we're looking at.
+  #
+  broken_assets = Array.new
+
   reels.each_with_index do |reel, index|
     report << "Reel #{ index + 1 }:"
     durations = Array.new
@@ -1776,8 +1785,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       durations << duration
       edit_rates << edit_rate
 
-      # A CPL might reference assets which are not in Assetmap's dictionary
-      # (the asset might already be ingested or could be ingested later)
       if dict
         if dict[ asset_id ]
           asset_file = package dict[ asset_id ]
@@ -1832,6 +1839,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                   cpl_referenced_assets << { asset_id => TRUE }
                   cpl_referenced_assets_types << MStr::AssetTypeSmpte
                 else
+                  broken_assets << asset_id
                   cpl_referenced_assets << { asset_id => FALSE }
                   cpl_referenced_assets_types << MStr::AssetTypeUnknown
                 end
@@ -1845,18 +1853,20 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
               else
+                broken_assets << asset_id
                 cpl_referenced_assets << { asset_id => FALSE }
                 cpl_referenced_assets_types << MStr::AssetTypeUnknown
                 meta_report = "Asset file found but not AS-DCP MXF"
               end
             end
           else
+            broken_assets << asset_id
             cpl_referenced_assets << { asset_id => FALSE }
             cpl_referenced_assets_types << MStr::AssetTypeUnknown
             meta_report = "Asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
-        else
+        else # ok case: Supplemental/VF/External
           cpl_referenced_assets << { asset_id => FALSE }
           cpl_referenced_assets_types << MStr::AssetTypeUnknown
           meta_report = "Referenced asset file not listed in Assetmap dictionary"
@@ -1897,8 +1907,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   end
   # Composition completeness
   if assets_status_list.include?( FALSE )
-    report << "Composition incomplete"
-    errors << "CPL #{ cpl_id }: Composition incomplete"
+    if broken_assets.size != 0
+      report << "Composition incomplete: Broken assets: #{ broken_assets }"
+      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets }"
+    else
+      report << "Composition incomplete: Supplemental/VF/External"
+      hints << "CPL #{ cpl_id }: Composition incomplete: Supplemental/VF/External"
+    end
   else
     report << 'Composition complete'
   end
@@ -2043,7 +2058,7 @@ def dcp_inspect( options, arg )
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
     dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
-    pkls[ index ].map { |pkl_id| @logger.debug( "PKL #{ pkl_id }: file#{ File.exists?( package dict[ index ][ pkl_id ] ) ? '' : ' not' } present: #{ dict[ index ][ pkl_id ] }" ) }
+    pkls[ index ].map { |pkl_id| @logger.debug( "PKL file#{ File.exists?( package dict[ index ][ pkl_id ] ) ? '' : ' not' } present: #{ pkl_id }: #{ dict[ index ][ pkl_id ] }" ) }
     @logger.debug nil
 
   end # am_files.each
