@@ -1106,10 +1106,11 @@ class DC_Signer_Crypto_Compliance
 end # DC_Signer_Crypto_Compliance
 
 class DC_Signature_Verification
-  attr_reader :messages, :signature_node, :crypto, :reference_digests_check, :signature_value_check
+  attr_reader :messages, :signer_node, :signature_node, :crypto, :reference_digests_check, :signature_value_check
 
   def initialize( doc )
     @messages = Array.new
+    @signer_node = nil
     @signature_node = nil
     @crypto = nil
     @reference_digests_check = false
@@ -1191,13 +1192,19 @@ class DC_Signature_Verification
     sig_ns, prefix = signature_namespace_and_prefix( doc )
 
     # 2.a Signer present?
+    @signer_node = doc.xpath( "//xmlns:Signer" )
+    if @signer_node.size != 1
+      @messages << "#{ @signer_node.size == 0 ? 'No' : @signer_node.size } Signer node#{ @signer_node.size > 1 ? 's' : '' } found"
+    end
 
     # 2.b Signature present?
     @signature_node = doc.xpath( "//#{ prefix }:Signature", sig_ns )
     if @signature_node.size != 1
-      @messages << "#{ @signature_node.size == 0 ? 'No' : @signature_node.size } signature node#{ @signature_node.size > 1 ? 's' : '' } found"
-      return FALSE
+      @messages << "#{ @signature_node.size == 0 ? 'No' : @signature_node.size } Signature node#{ @signature_node.size > 1 ? 's' : '' } found"
     end
+
+    # 2.c Abort if none or more than 1 Signer or Signature node
+    return FALSE if ( @signer_node.size != 1 or @signature_node.size != 1 )
 
     # 3. Extract and check signer certs
     certs = extract_certs( doc, sig_ns, prefix )
@@ -1558,6 +1565,24 @@ def digest_with_etabar( digest_algorithm, title, file, pbar_width, looks_like, o
   return dgst.digest, eta
 end
 
+def namespace_prefix( doc, ns )
+  doc_ns = doc.collect_namespaces
+  if RUBY_VERSION < '1.9'
+    if doc_ns.index( ns )
+      prefix = doc_ns.index( ns ).split( 'xmlns:' ).last
+    else
+      prefix = 'xmlns'
+    end
+  else
+    if doc_ns.key( ns )
+      prefix = doc_ns.key( ns ).split( 'xmlns:' ).last
+    else
+      prefix = 'xmlns'
+    end
+  end
+  return prefix
+end
+
 # lib/xml.rb
 def validate_xml( xml, file )
   errors = Array.new
@@ -1699,15 +1724,16 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   cpl_referenced_assets = Array.new
   cpl_referenced_assets_types = Array.new
 
-  cpl_id = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Id' ).text.split( ':' ).last
-  case ns[ 'xmlns' ]
+  cpl_ns_prefix = namespace_prefix( xml, MStr::Smpte_cpl )
+  cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
+  case ns[ cpl_ns_prefix ]
   when MStr::Smpte_cpl
     cpl_type = 'SMPTE'
   when MStr::Interop_cpl
     cpl_type = 'Interop'
   else
     cpl_type = 'Unknown'
-    errors << "CPL main namespace unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }: #{ ns[ 'xmlns' ] }"
+    errors << "CPL main namespace unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }: #{ ns[ cpl_ns_prefix ] }"
   end
   cpl_referenced_assets_types << cpl_type
 
@@ -1715,12 +1741,14 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     if ! signature_result.signature_node.empty?
       report << "Signer:           #{ signature_result.signer_name }"
       report << "Signer issuer:    #{ signature_result.signer_issuer }"
+      # Todo: Check Signer.X509Data.X509IssuerSerial info vs signer certificate
+      # See e.g. dcp_2/V174* for a serial mismatch
     end
   end
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ dict[ cpl_id ] }"
-  report << "CPL type:         #{ cpl_type } (#{ ns[ 'xmlns' ].inspect })"
-  content_title_text = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ContentTitleText' ).text
+  report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ].inspect })"
+  content_title_text = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentTitleText" ).text
   report << "ContentTitleText: #{ content_title_text }"
   if content_title_text =~ MStr::Naming_re
     matchdata = content_title_text.match( MStr::Naming_re )
@@ -1730,13 +1758,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       end
     end
   end
-  report << "AnnotationText:   #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:AnnotationText' ).text }"
-  report << "ContentKind:      #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:ContentKind' ).text }"
-  dt = xml.xpath( '//xmlns:CompositionPlaylist/xmlns:IssueDate' ).text
+  report << "AnnotationText:   #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:AnnotationText" ).text }"
+  report << "ContentKind:      #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" ).text }"
+  dt = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:IssueDate" ).text
   dt_friendly = datetime_friendly( DateTime.parse dt )
   report << "IssueDate:        #{ dt } (#{ dt_friendly })"
   # TKR? (Todo: Check URL scheme)
-  issuer = xml.at_xpath( '//xmlns:CompositionPlaylist/xmlns:Issuer' )
+  issuer = xml.at_xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Issuer" )
   if issuer
     if issuer.attributes[ 'language' ] and issuer.attributes[ 'language' ].value == MStr::Tkr_attr
       report << "TKR Base URL:     #{ issuer.text }"
@@ -1744,7 +1772,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       report << "Issuer:           #{ issuer.text }"
     end
   end
-  report << "Creator:          #{ xml.xpath( '//xmlns:CompositionPlaylist/xmlns:Creator' ).text }"
+  report << "Creator:          #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Creator" ).text }"
 
   # Metadata
   if xml.collect_namespaces.keys.include?( 'xmlns:meta' )
@@ -1757,7 +1785,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     end
   end
 
-  reels = xml.xpath( '/xmlns:CompositionPlaylist/xmlns:ReelList/xmlns:Reel' )
+  reels = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ReelList/#{ cpl_ns_prefix }:Reel" )
   report << "Number of Reels:  #{ reels.size }"
   total_duration = 0
   composition_edit_rate = 0
@@ -1775,13 +1803,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     durations = Array.new
     edit_rates = Array.new
     assets_labels = Array.new
-    assets = reel.xpath( 'xmlns:AssetList/*' )
+    assets = reel.xpath( "#{ cpl_ns_prefix }:AssetList/*" )
 
     assets.each do |asset|
       next if asset.node_name == 'CompositionMetadataAsset'
-      asset_id = asset.xpath( 'xmlns:Id', asset.namespaces ).text.split( ':' ).last
-      duration = asset.xpath( 'xmlns:Duration', asset.namespaces ).text.to_i
-      edit_rate = asset.xpath( 'xmlns:EditRate', asset.namespaces ).text.split( ' ' ).first.to_i # FIXME ugh
+      asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset.namespaces ).text.split( ':' ).last
+      duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset.namespaces ).text.to_i
+      edit_rate = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset.namespaces ).text.split( ' ' ).first.to_i # FIXME ugh
       durations << duration
       edit_rates << edit_rate
 
