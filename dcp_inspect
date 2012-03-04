@@ -2058,7 +2058,15 @@ def dcp_inspect( options, arg )
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
     dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
-    pkls[ index ].map { |pkl_id| @logger.debug( "PKL file#{ File.exists?( package dict[ index ][ pkl_id ] ) ? '' : ' not' } present: #{ pkl_id }: #{ dict[ index ][ pkl_id ] }" ) }
+    pkls[ index ].map { |pkl_id|
+      pkl_file = package dict[ index ][ pkl_id ]
+      if File.exists?( pkl_file )
+        @logger.debug "PKL file present: #{ pkl_id }: #{ pkl_file }"
+      else
+        pkls[ index ].delete pkl_id
+        @logger.debug "PKL file not present: #{ pkl_id }: #{ pkl_file }"
+      end
+    }
     @logger.debug nil
 
   end # am_files.each
@@ -2069,101 +2077,97 @@ def dcp_inspect( options, arg )
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
-      if File.exists?( pkl_file )
-        xml = get_xml_of_type( 'PackingList', pkl_file )
-        if xml
+      xml = get_xml_of_type( 'PackingList', pkl_file )
+      if xml
 
-          if options.validate
-            valid, errors = validation( errors, xml, pkl_file )
-            @logger.info( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
-          end
+        if options.validate
+          valid, errors = validation( errors, xml, pkl_file )
+          @logger.info( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+        end
 
-          if @c14n_available
-            signature_result = check_signature( xml )
-            errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
-            @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
-          end
+        if @c14n_available
+          signature_result = check_signature( xml )
+          errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
+          @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
+        end
 
-          # FIXME
-          xml.remove_namespaces!
-          pkl_assets = xml.xpath( '//Asset' )
-          pkl_cpls = Array.new
+        # FIXME
+        xml.remove_namespaces!
+        pkl_assets = xml.xpath( '//Asset' )
+        pkl_cpls = Array.new
 
-          @logger.info( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
+        @logger.info( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
 
-          pkl_assets.each do |asset|
-            id = asset.xpath( 'Id' ).text.split( ':' ).last
-            type = asset.xpath( 'Type' ).text
-            # List all PKL listed assets and report AM mapping status
-            @logger.info( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
+        pkl_assets.each do |asset|
+          id = asset.xpath( 'Id' ).text.split( ':' ).last
+          type = asset.xpath( 'Type' ).text
+          # List all PKL listed assets and report AM mapping status
+          @logger.info( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
 
-            if dict[ index ].keys.include?( id )
-              asset_file = package dict[ index ][ id ]
+          if dict[ index ].keys.include?( id )
+            asset_file = package dict[ index ][ id ]
 
-              if File.exists?( asset_file )
-                # Plug in checks here. we might be skipping validation hence the tag test
-                #
-                # Check listed and actual asset size
-                if ( size_listed = asset.xpath( 'Size' ).text.to_i )
-                  size_asset = File.size( asset_file )
-                  errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
-                else
-                  errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type }"
-                end
-
-                # Check listed and actual digests
-                if ( hash_listed = asset.xpath( 'Hash' ).text )
-                  if options.check_hashes
-                    etabar_title = "#{ id }: Checking hash value:"
-                    hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options )
-                    hash_check = Base64.encode64( hash_check ).chomp
-                    if hash_listed != hash_check
-                      eta.preserve_terminal_title_with_message( 'Mismatch' )
-                      errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
-                    else
-                      eta.preserve_terminal_title_with_message( 'OK' )
-                      info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
-                    end
-                  end
-                else
-                  errors << "PKL: Hash tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
-                end
-
-                # Pick CPLs
-                if type =~ /text\/xml/
-                  xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
-                  if xml
-                    pkl_cpls << id
-                  end
-                end
-                #
-                #
+            if File.exists?( asset_file )
+              # Plug in checks here. we might be skipping validation hence the tag test
+              #
+              # Check listed and actual asset size
+              if ( size_listed = asset.xpath( 'Size' ).text.to_i )
+                size_asset = File.size( asset_file )
+                errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
               else
-                # asset_file does not exist
+                errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type }"
               end
 
+              # Check listed and actual digests
+              if ( hash_listed = asset.xpath( 'Hash' ).text )
+                if options.check_hashes
+                  etabar_title = "#{ id }: Checking hash value:"
+                  hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options )
+                  hash_check = Base64.encode64( hash_check ).chomp
+                  if hash_listed != hash_check
+                    eta.preserve_terminal_title_with_message( 'Mismatch' )
+                    errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                  else
+                    eta.preserve_terminal_title_with_message( 'OK' )
+                    info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
+                  end
+                end
+              else
+                errors << "PKL: Hash tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
+              end
+
+              # Pick CPLs
+              if type =~ /text\/xml/
+                xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
+                if xml
+                  pkl_cpls << id
+                end
+              end
+              #
+              #
             else
-              # For some reason the listed id in PackingList is not in assetmap dictionary
-              # Possibly been tampered with
-              errors << "PKL #{ pkl_id }: Asset UUID not in assetmap dictionary: #{ id } (#{ type })"
+              # asset_file does not exist
             end
 
+          else
+            # For some reason the listed id in PackingList is not in assetmap dictionary
+            # Possibly been tampered with
+            errors << "PKL #{ pkl_id }: Asset UUID not in assetmap dictionary: #{ id } (#{ type })"
           end
-          # Add this PKLs CPLs to total CPLs
-          cpls += pkl_cpls
-          # List this PKLs CPLs
-          @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }" )
-          # FIXME purely informative here, we don't remember referenced files which are missing
-          pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
-        else
-          errors << "Not a PackingList: #{ pkl_file }"
+
         end
-        @logger.info ''
+        # Add this PKLs CPLs to total CPLs
+        cpls += pkl_cpls
+        # List this PKLs CPLs
+        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }" )
+        # FIXME purely informative here, we don't remember referenced files which are missing
+        pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
       else
-        errors << "AM referenced PKL file not found: #{ pkl_file }"
+        errors << "Not a PackingList: #{ pkl_file }"
       end
-    end
-  end # pkls.each...
+      @logger.info ''
+    end # am_pkls.each
+  end # pkls.each
 
   # List all found CPLs
   if cpls.size > 0
