@@ -1718,17 +1718,17 @@ end
 
 # Returns subject, issuer and serial (from signing certificate) and x509serialnumber (from Signer..X509SerialNumber)
 def signer_info( xml, sig )
-  signer_info = Hash.new
+  sig_info = Hash.new
   if ! sig.signature_node.empty?
-    signer_info[ :signer_name ] = sig.signer_name
-    signer_info[ :signer_issuer_name ] = sig.signer_issuer
+    sig_info[ :signer_name ] = sig.signer_name
+    sig_info[ :signer_issuer_name ] = sig.signer_issuer
     if ! sig.signer_node.empty?
       signer_ns_prefix = namespace_prefix( xml, MStr::Ns_Xmldsig )
-      signer_info[ :x509serialnumber ] = sig.signer_node.first.xpath( "//#{ signer_ns_prefix }:X509SerialNumber", signer_ns_prefix => MStr::Ns_Xmldsig ).first.text.to_i
-      signer_info[ :cert_serial ] = sig.crypto.context.first.serial.to_i
+      sig_info[ :x509serialnumber ] = sig.signer_node.first.xpath( "//#{ signer_ns_prefix }:X509SerialNumber", signer_ns_prefix => MStr::Ns_Xmldsig ).first.text.to_i
+      sig_info[ :cert_serial ] = sig.crypto.context.first.serial.to_i
     end
-  return signer_info
   end
+  return sig_info
 end
 
 # lib/cpl.rb
@@ -1751,7 +1751,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   end
   cpl_referenced_assets_types << cpl_type
 
-  if signature_result
+  if signature_result and ! signature_result.signature_node.empty?
     sig_info = signer_info( xml, signature_result )
     report << "Signer:           #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
     report << "Signer issuer:    #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
@@ -1761,7 +1761,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
     # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
     # See e.g. dcp_2/V174* for a serial mismatch
-    if sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
+    if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
       if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
         report << "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
         errors << "CPL #{ cpl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
@@ -2146,7 +2146,7 @@ def dcp_inspect( options, arg )
           signature_result = check_signature( xml )
           errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
           @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
-          if signature_result
+          if ! signature_result.signature_node.empty?
             sig_info = signer_info( xml, signature_result )
             @logger.debug "Signer:        #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
             @logger.debug "Signer issuer: #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
@@ -2156,13 +2156,13 @@ def dcp_inspect( options, arg )
 
             # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
             # See e.g. dcp_2/V174* for a serial mismatch
-            if sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
+            if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
               if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
                 @logger.debug "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
                 errors << "PKL #{ pkl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
               end
             else
-              report << "Signer info :x509serialnumber or :cert_serial could not be retrieved"
+              @logger.debug 'Signer info :x509serialnumber or :cert_serial could not be retrieved'
               errors << "PKL #{ pkl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
             end
           end
