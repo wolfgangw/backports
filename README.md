@@ -19,6 +19,8 @@
 
 - Deep-inspects compositions
 
+    This includes composition type consistency and completeness checks.
+
 - Reports in detail all errors encountered
 
 ### Requirements
@@ -43,10 +45,9 @@ in backports to keep up-to-date.
 
 ### Couple of todos
 
-- Package format consistency checks (Interop/SMPTE)
 - Some Assetmap options (Offsets, volume indices) are not handled
 - Marker lists are not handled
-- Check Signer.X509IssuerSerial info
+- Check Signer.X509IssuerSerial info (names tbd)
 - Sound present in SMPTE DCP reels?
 - Verbosity levels
 
