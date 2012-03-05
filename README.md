@@ -2,8 +2,9 @@
 
 ### Usage
 
-        dcp_inspect /path/to/dir
         dcp_inspect --help
+        dcp_inspect /path/to/dir
+        dcp_inspect /path/to/dir --check-hashes
 
 ### Features
 
