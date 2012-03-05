@@ -221,6 +221,15 @@ end
 include MxfTools
 
 
+module Exit
+  DCP_OK = 0
+  DCP_ERROR = 1
+  NO_ARG = 2
+  TOO_MANY_ARGS = 3
+  ARG_NOT_A_DIR = 4
+end
+
+
 # lib/magic_strings.rb
 module MStr
   Smpte_am    = 'http://www.smpte-ra.org/schemas/429-9/2007/AM'
@@ -326,6 +335,11 @@ end
 # package path helper
 def package( relative_path )
   File.join( @package_dir, relative_path )
+end
+def print_inspection_messages( inspection )
+  inspection[ :errors ].map { |e| @logger.info [ 'Error', e ].join( ': ' ) }
+  inspection[ :hints ].map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
+  inspection[ :info ].map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
 end
 
 
@@ -1105,6 +1119,7 @@ class DC_Signer_Crypto_Compliance
   end
 end # DC_Signer_Crypto_Compliance
 
+
 class DC_Signature_Verification
   attr_reader :messages, :signer_node, :signature_node, :crypto, :reference_digests_check, :signature_value_check
 
@@ -1444,6 +1459,7 @@ class DC_Signature_Verification
 
 end # DC_Signature_Verification
 
+
 class Numeric
   TERA = 1099511627776.0
   GIGA = 1073741824.0
@@ -1460,6 +1476,7 @@ class Numeric
     end
   end
 end
+
 
 class Eta
   attr_reader :percentage, :eta, :elapsed
@@ -1530,6 +1547,7 @@ class Eta
     "%s %02d:%02d:%02d" % [ head, h, m, s ]
   end
 end # Eta
+
 
 def command_exists?( command )
   ENV[ 'PATH' ].split( File::PATH_SEPARATOR ).any? { |d| File.exists? File.join( d, command ) }
@@ -1976,7 +1994,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   return report, errors, hints, info
 end
 
-
 def dcp_inspect( options, arg )
   errors = Array.new
   hints = Array.new
@@ -2298,18 +2315,12 @@ def dcp_inspect( options, arg )
     end
   end
 
-
-  # info << 'todo: Package format: Interop/SMPTE'
-  # info << 'todo: Assetmap: Offsets, Lengths, VolumeIndex'
-  # info << 'todo: Signature/Certificates: Check and verify (See PLATES for some invalid ones)'
-  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) }, #{ amount( 'Composition', cpls ) }"
+  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) }, #{ amount( 'Composition', cpls ) }"
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
-  errors.map { |e| @logger.info [ 'Error', e ].join( ': ' ) } unless errors.empty?
-  hints.map { |e| @logger.info [ 'Hint', e ].join( ': ' ) } unless hints.empty?
-  info.map { |e| @logger.info [ 'Info', e ].join( ': ' ) } unless info.empty?
-  
+  return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls }
 end
+
 
 #
 options = Options.parse( ARGV )
@@ -2317,14 +2328,23 @@ args = ARGV
 @logger = DLogger.new( prefix = '', options )
 @logger.debug( "#{ AppName } #{ AppVersion }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 
-# FIXME handle 1 arg and dir only for now
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
-  dcp_inspect( options, args[ 0 ] )
+  inspection = dcp_inspect( options, args[ 0 ] )
+  print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+  case inspection[ :errors ].size
+  when 0
+    exit Exit::DCP_OK
+  else
+    exit Exit::DCP_ERROR
+  end
 elsif args.size == 0
   @logger.info( "No volume or directory given. See #{ AppName } --help" )
+  exit Exit::NO_ARG
 elsif args.size > 1
   @logger.info( "Too many arguments. See #{ AppName } --help" )
+  exit Exit::TOO_MANY_ARGS
 else
   @logger.info( "Not a volume or directory. See #{ AppName } --help" )
+  exit Exit::ARG_NOT_A_DIR
 end
 
