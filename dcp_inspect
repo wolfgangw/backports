@@ -91,7 +91,7 @@ local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
 if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
   if File.exists? local_xml_catalog
     c = File.read local_xml_catalog
-    m = c.match /xml:base="file:\/\/(.+)">/
+    m = c.match( /xml:base="file:\/\/(.+)">/ )
     if m[ 1 ] != File.join( XSDDir, '' )
       File.open( local_xml_catalog, 'w' ) { |f| f.write c.gsub( m[ 1 ], File.join( XSDDir, '' ) ); f.close }
     end
@@ -114,7 +114,7 @@ class Options
     options.check_hashes = FALSE
     options.validate = TRUE
     options.verbosity = 'debug'
-    options.verbosity_choices = [ 'quiet', 'info', 'debug', 'trace_func' ]
+    options.verbosity_choices = [ 'quiet', 'errors', 'info', 'debug', 'trace_func' ]
     opts = OptionParser.new do |opts|
       opts.banner = <<BANNER
 #{ AppName } #{ AppVersion }
@@ -127,7 +127,7 @@ BANNER
       opts.on( '--no-schema-checks', 'Skip schema checks' ) do
         options.validate = FALSE
       end
-      opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
+      opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'errors', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
         if options.verbosity_choices.include?( p )
           options.verbosity = p
         else
@@ -154,37 +154,26 @@ end # Options
 # * lib/logger.rb
 class DLogger
   def initialize( prefix, options )
+    @prefix = prefix
     @verbosity = options.verbosity
     case @verbosity
-    when "quiet"
-      @info, @debug = [ FALSE, FALSE ]
-    when "info"
-      @info, @debug = [ TRUE, FALSE ]
-    when "debug"
-      @info, @debug = [ TRUE, TRUE ]
+    when 'quiet'  then @errors, @info, @debug, @cr = [ FALSE, FALSE, FALSE, FALSE ]
+    when 'errors' then @errors, @info, @debug, @cr = [ TRUE, FALSE, FALSE, FALSE ]
+    when 'info'   then @errors, @info, @debug, @cr = [ TRUE, TRUE, FALSE, TRUE ]
+    when 'debug'  then @errors, @info, @debug, @cr = [ TRUE, TRUE, TRUE, TRUE ]
     when 'trace_func'
-      @info, @debug = [ TRUE, TRUE ]
+                       @errors, @info, @debug, @cr = [ FALSE, FALSE, FALSE, FALSE ]
       set_trace_func proc { |event, file, line, id, binding, classname|
         printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
       }
     end
-    @prefix = prefix
   end
-  def info( text )
-    to_console( text ) if @info
-  end
-  def debug( text )
-    to_console( text ) if @debug
-  end
-  def cr( text )
-    carriage_return( text ) unless @verbosity == "quiet"
-  end
-  def carriage_return( text )
-    printf "%s %s\r", @prefix, text
-  end
-  def to_console( text )
-    printf "%s %s\n", @prefix, text
-  end
+  def errors( text ); to_console( text ) if @errors; end
+  def info( text ); to_console( text ) if @info; end
+  def debug( text ); to_console( text ) if @debug; end
+  def cr( text ); carriage_return( text ) if @cr; end
+  def to_console( text ); printf "%s %s\n", @prefix, text; end
+  def carriage_return( text ); printf "%s %s\r", @prefix, text; end
 end
 
 
@@ -337,7 +326,7 @@ def package( relative_path )
   File.join( @package_dir, relative_path )
 end
 def print_inspection_messages( inspection )
-  inspection[ :errors ].map { |e| @logger.info [ 'Error', e ].join( ': ' ) }
+  inspection[ :errors ].map { |e| @logger.errors [ 'Error', e ].join( ': ' ) }
   inspection[ :hints ].map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
   inspection[ :info ].map { |e| @logger.info [ 'Info', e ].join( ': ' ) }
 end
@@ -490,8 +479,8 @@ class Timecode
           raise RangeError, "There can be no more than 59 minutes, got #{mins}"
         when secs > 59
           raise RangeError, "There can be no more than 59 seconds, got #{secs}"
-        when frames > (with_fps -1)
-          raise RangeError, "There can be no more than #{with_fps -1} frames @#{with_fps}, got #{frames}"
+        when frames > (with_fps - 1)
+          raise RangeError, "There can be no more than #{with_fps - 1} frames @#{with_fps}, got #{frames}"
       end
     end
 
@@ -1492,10 +1481,10 @@ class Eta
 
   def update( percentage )
     @percentage = percentage
-    eta
+    update_eta
   end
 
-  def eta
+  def update_eta
     return if @percentage == 0
     @elapsed = Time.now - @start
     @eta = @elapsed * @total / @percentage - @elapsed
@@ -1675,10 +1664,10 @@ def get_xml_of_type( asdcp_type, file )
     return FALSE
   end
   unless xml.errors.empty?
-    xml.errors.each do |e|
+    xml.errors.each do |error|
       # expected errors from non-xml
-      next if e.message =~ /Start tag expected/ or e.message =~ /Document is empty/
-      @logger.info "Syntax error: #{ file }: #{ e }"
+      next if error.message =~ /Start tag expected/ or error.message =~ /Document is empty/
+      @logger.info "Syntax error: #{ file }: #{ error }"
     end
     return FALSE
   end
@@ -1873,7 +1862,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
               if options.validate
                 valid, errors = validation( errors, xml, asset_file )
-                @logger.info( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
+                @logger.debug( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
               end
 
               xml.remove_namespaces!
@@ -2035,7 +2024,7 @@ def dcp_inspect( options, arg )
 
         if options.validate
           valid, errors = validation( errors, xml, am_file )
-          @logger.info( "AM Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ am_file }" )
+          @logger.debug( "AM Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ am_file }" )
         end
 
       else
@@ -2045,7 +2034,7 @@ def dcp_inspect( options, arg )
     end
   end
   am_files = am_candidates
-  @logger.info ''
+  @logger.debug ''
   # hint at multiple Assetmaps found
   hints << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
@@ -2156,13 +2145,13 @@ def dcp_inspect( options, arg )
 
         if options.validate
           valid, errors = validation( errors, xml, pkl_file )
-          @logger.info( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+          @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
         end
 
         if @c14n_available
           signature_result = check_signature( xml )
           errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
-          @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
+          @logger.debug( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
           if ! signature_result.signature_node.empty?
             sig_info = signer_info( xml, signature_result )
             @logger.debug "Signer:        #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
@@ -2191,13 +2180,13 @@ def dcp_inspect( options, arg )
         pkl_assets = xml.xpath( '//Asset' )
         pkl_cpls = Array.new
 
-        @logger.info( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
+        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
 
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
           type = asset.xpath( 'Type' ).text
           # List all PKL listed assets and report AM mapping status
-          @logger.info( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
+          @logger.debug( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
@@ -2260,7 +2249,7 @@ def dcp_inspect( options, arg )
       else
         errors << "Not a PackingList: #{ pkl_file }"
       end
-      @logger.info ''
+      @logger.debug ''
     end # am_pkls.each
   end # pkls.each
 
@@ -2277,7 +2266,7 @@ def dcp_inspect( options, arg )
   else
     @logger.info( "Found no compositions" )
   end
-  @logger.info ''
+  @logger.debug ''
 
   # Inspect CPLs
   # FIXME and all over again ...
@@ -2291,13 +2280,13 @@ def dcp_inspect( options, arg )
 
             if options.validate
               valid, errors = validation( errors, xml, cpl_file )
-              @logger.info( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+              @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
             end
 
             if @c14n_available
               signature_result = check_signature( xml )
               errors = errors_signature_verification( errors, signature_result, cpl_id, cpl_file )
-              @logger.info( "CPL #{ cpl_id }: #{ signature_result.messages.last }" )
+              @logger.debug( "CPL #{ cpl_id }: #{ signature_result.messages.last }" )
             else
               signature_result = nil
             end
@@ -2309,8 +2298,8 @@ def dcp_inspect( options, arg )
         else
           report << "CPL file missing: #{ cpl_file }"
         end
-        report.map { |line| @logger.info line }
-        @logger.info ''
+        report.map { |line| @logger.debug line }
+        @logger.debug ''
       end
     end
   end
