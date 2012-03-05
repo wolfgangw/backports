@@ -1957,14 +1957,14 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   else
     stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     # FIXME Composition type Mixed error or hint?
-    report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types }"
-    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types }"
+    report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
+    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
   end
   # Composition completeness
   if assets_status_list.include?( FALSE )
     if broken_assets.size != 0
-      report << "Composition incomplete: Broken assets: #{ broken_assets }"
-      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets }"
+      report << "Composition incomplete: Broken assets: #{ broken_assets.inspect }"
+      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets.inspect }"
     else
       report << "Composition incomplete: Supplemental/VF/External"
       hints << "CPL #{ cpl_id }: Composition incomplete: Supplemental/VF/External"
