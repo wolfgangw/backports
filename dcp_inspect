@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.04'
+AppVersion = 'v1.2012.03.05'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -1192,7 +1192,7 @@ class DC_Signature_Verification
     sig_ns, prefix = signature_namespace_and_prefix( doc )
 
     # 2.a Signer present?
-    @signer_node = doc.xpath( "//xmlns:Signer" )
+    @signer_node = doc.xpath( "//xmlns:Signer" ) # FIXME prefix naivete
     if @signer_node.size != 1
       @messages << "#{ @signer_node.size == 0 ? 'No' : @signer_node.size } Signer node#{ @signer_node.size > 1 ? 's' : '' } found"
     end
@@ -1716,6 +1716,20 @@ def get_asset_uuid( file )
   return id
 end
 
+# Returns subject, issuer and serial (from signing certificate) and x509serialnumber (from Signer..X509SerialNumber)
+def signer_info( xml, sig )
+  signer_info = Hash.new
+  if ! sig.signature_node.empty?
+    signer_info[ :signer_name ] = sig.signer_name
+    signer_info[ :signer_issuer_name ] = sig.signer_issuer
+    if ! sig.signer_node.empty?
+      signer_ns_prefix = namespace_prefix( xml, MStr::Ns_Xmldsig )
+      signer_info[ :x509serialnumber ] = sig.signer_node.first.xpath( "//#{ signer_ns_prefix }:X509SerialNumber", signer_ns_prefix => MStr::Ns_Xmldsig ).first.text.to_i
+      signer_info[ :cert_serial ] = sig.crypto.context.first.serial.to_i
+    end
+  return signer_info
+  end
+end
 
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signature_result )
@@ -1733,18 +1747,31 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     cpl_type = 'Interop'
   else
     cpl_type = 'Unknown'
-    errors << "CPL main namespace unknown: #{ package dict[ cpl_id ] }: #{ cpl_id }: #{ ns[ cpl_ns_prefix ] }"
+    errors << "CPL #{ cpl_id }: Default namespace unknown: #{ ns[ cpl_ns_prefix ] }: #{ package dict[ cpl_id ] }"
   end
   cpl_referenced_assets_types << cpl_type
 
   if signature_result
-    if ! signature_result.signature_node.empty?
-      report << "Signer:           #{ signature_result.signer_name }"
-      report << "Signer issuer:    #{ signature_result.signer_issuer }"
-      # Todo: Check Signer.X509Data.X509IssuerSerial info vs signer certificate
-      # See e.g. dcp_2/V174* for a serial mismatch
+    sig_info = signer_info( xml, signature_result )
+    report << "Signer:           #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
+    report << "Signer issuer:    #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
+
+    # Todo: Compare names in Signer and certificate
+    #
+
+    # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
+    # See e.g. dcp_2/V174* for a serial mismatch
+    if sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
+      if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
+        report << "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+        errors << "CPL #{ cpl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+      end
+    else
+      report << "Signer info :x509serialnumber or :cert_serial could not be retrieved"
+      errors << "CPL #{ cpl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
     end
   end
+
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ dict[ cpl_id ] }"
   report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ].inspect })"
@@ -2086,15 +2113,17 @@ def dcp_inspect( options, arg )
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
     dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
+    pkls_missing = Array.new
     pkls[ index ].map { |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
       if File.exists?( pkl_file )
         @logger.debug "PKL file present: #{ pkl_id }: #{ pkl_file }"
       else
-        pkls[ index ].delete pkl_id
+        pkls_missing << pkl_id
         @logger.debug "PKL file not present: #{ pkl_id }: #{ pkl_file }"
       end
     }
+    pkls_missing.map { |pkl_id| pkls[ index ].delete pkl_id }
     @logger.debug nil
 
   end # am_files.each
@@ -2117,6 +2146,27 @@ def dcp_inspect( options, arg )
           signature_result = check_signature( xml )
           errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
           @logger.info( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
+          if signature_result
+            sig_info = signer_info( xml, signature_result )
+            @logger.debug "Signer:        #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
+            @logger.debug "Signer issuer: #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
+
+            # Todo: Compare names in Signer and certificate
+            #
+
+            # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
+            # See e.g. dcp_2/V174* for a serial mismatch
+            if sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
+              if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
+                @logger.debug "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                errors << "PKL #{ pkl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+              end
+            else
+              report << "Signer info :x509serialnumber or :cert_serial could not be retrieved"
+              errors << "PKL #{ pkl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
+            end
+          end
+
         end
 
         # FIXME
