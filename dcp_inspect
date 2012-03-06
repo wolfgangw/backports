@@ -1964,10 +1964,14 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == true
     report << "Composition type: #{ cpl_referenced_assets_types.uniq.first }"
   else
-    stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     # FIXME Composition type Mixed error or hint?
+    stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
-    errors << "Composition type: #{ stab }: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
+    if broken_assets.size != 0
+      errors << "Composition type: #{ stab }: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
+    else
+      hints << "Composition type: #{ stab }: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
+    end
   end
   # Composition completeness
   if assets_status_list.include?( FALSE )
