@@ -1747,6 +1747,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
   cpl_ns_prefix = namespace_prefix( xml, MStr::Smpte_cpl )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
+  cpl_file = dict[ cpl_id ]
   case ns[ cpl_ns_prefix ]
   when MStr::Smpte_cpl
     cpl_type = 'SMPTE'
@@ -1780,7 +1781,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   end
 
   report << "CPL Id:           #{ cpl_id }"
-  report << "CPL file:         #{ dict[ cpl_id ] }"
+  report << "CPL file:         #{ cpl_file }"
   report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ].inspect })"
   content_title_text = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentTitleText" ).text
   report << "ContentTitleText: #{ content_title_text }"
@@ -1926,20 +1927,20 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
             broken_assets << asset_id
             cpl_referenced_assets << { asset_id => FALSE }
             cpl_referenced_assets_types << MStr::AssetTypeUnknown
-            meta_report = "Asset file missing: #{ dict[ asset_id ] }"
+            meta_report = "Referenced asset file missing: #{ dict[ asset_id ] }"
           end # File.exists?
 
         else # ok case: Supplemental/VF/External
           cpl_referenced_assets << { asset_id => FALSE }
           cpl_referenced_assets_types << MStr::AssetTypeUnknown
-          meta_report = "Referenced asset file not listed in Assetmap dictionary"
+          meta_report = "Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
           hint_info = [
             'CPL ' + cpl_id,
             asset_id,
             'Reel ' + ( index + 1 ).to_s,
             asset.node_name
           ].join( ': ' )
-          hints << "Referenced asset file not listed in Assetmap dictionary: #{ hint_info }"
+          hints << "Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External: #{ hint_info }"
         end # if dict[ asset_id ]
       end # if dict
 
@@ -1948,7 +1949,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     end # assets.each
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
-      errors << "CPL #{ cpl_id } (#{ content_title_text }): Reel #{ index + 1 }: Duration mismatch"
+      errors << "Duration mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
     end
     report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
     total_duration += durations.min # FIXME ugh
@@ -1966,16 +1967,16 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     # FIXME Composition type Mixed error or hint?
     report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
-    errors << "CPL #{ cpl_id }: Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
+    errors << "Composition type: #{ stab }: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
   end
   # Composition completeness
   if assets_status_list.include?( FALSE )
     if broken_assets.size != 0
       report << "Composition incomplete: Broken assets: #{ broken_assets.inspect }"
-      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets.inspect }"
+      errors << "Composition incomplete: Broken assets: CPL #{ cpl_id }: #{ cpl_file }: #{ broken_assets.inspect }"
     else
       report << "Composition incomplete: Supplemental/VF/External"
-      hints << "CPL #{ cpl_id }: Composition incomplete: Supplemental/VF/External"
+      hints << "Composition incomplete: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }"
     end
   else
     report << 'Composition complete'
@@ -2073,29 +2074,30 @@ def dcp_inspect( options, arg )
       # using AM listed path for listing message, not package path, because this is what we're looking at right now:
       errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }" unless listed_id =~ uuid_rfc4122_re
       if path.nil? # example: mc t28 ASSETMAP.xml
-        errors << "#{ am_file } (#{ am_id }): No path for #{ listed_id }"
+        errors << "No path for asset: #{ listed_id }: AM #{ am_id }: #{ am_file }"
       else
 
         # Assetmap dictionary
         dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
 
         # Check listed_id vs actual asset_id
-        if File.exists?( package dict[ index ][ listed_id ] )
-          asset_id = get_asset_uuid( package dict[ index ][ listed_id ] )
+        asset_file = package dict[ index ][ listed_id ]
+        if File.exists?( asset_file )
+          asset_id = get_asset_uuid( asset_file )
           if asset_id
             unless asset_id =~ uuid_rfc4122_re
-              errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_id }: #{ dict[ index ][ listed_id ] }"
+              errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_file }: #{ asset_id }"
             end
             if listed_id.downcase != asset_id.downcase
-              errors << "#{ am_file } #{ am_id }: UUID mismatch: Listed: #{ listed_id } Asset: #{ asset_id }: #{ package dict[ index ][ listed_id ] }" 
+              errors << "UUID mismatch: AM #{ am_id } #{ am_file }: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }" 
             else
               if listed_id != asset_id
-                hints << "#{ am_file } #{ am_id }: case mismatch: Listed: #{ listed_id } Asset: #{ asset_id }: #{ package dict[ index ][ listed_id ] }"
+                hints << "UUID case mismatch: AM #{ am_id } #{ am_file }: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }"
               end
             end
           end
         else
-          errors << "Listed asset file missing: #{ am_file } #{ am_id }: #{ path }: #{ package dict[ index ][ listed_id ] }"
+          errors << "Listed asset file missing: AM #{ am_id } #{ am_file }: #{ path }: #{ asset_file }"
         end
       end
 
@@ -2166,11 +2168,11 @@ def dcp_inspect( options, arg )
             if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
               if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
                 @logger.debug "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
-                errors << "PKL #{ pkl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                errors << "Signer serial mismatch: PKL #{ pkl_id }: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
               end
             else
               @logger.debug 'Signer info :x509serialnumber or :cert_serial could not be retrieved'
-              errors << "PKL #{ pkl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
+              errors << "Signer info :x509serialnumber or :cert_serial could not be retrieved: PKL #{ pkl_id }"
             end
           end
 
@@ -2237,7 +2239,7 @@ def dcp_inspect( options, arg )
           else
             # For some reason the listed id in PackingList is not in assetmap dictionary
             # Possibly been tampered with
-            errors << "PKL #{ pkl_id }: Asset UUID not in assetmap dictionary: #{ id } (#{ type })"
+            errors << "Asset UUID not in assetmap dictionary: PKL #{ pkl_id }: #{ id } (#{ type })"
           end
 
         end
