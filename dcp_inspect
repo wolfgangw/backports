@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.05'
+AppVersion = 'v1.2012.03.06'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -1740,7 +1740,7 @@ end
 
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signature_result )
-  ns = xml.namespaces
+  ns = xml.collect_namespaces
   report = Array.new
   cpl_referenced_assets = Array.new
   cpl_referenced_assets_types = Array.new
@@ -1809,8 +1809,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report << "Creator:          #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Creator" ).text }"
 
   # Metadata
-  if xml.collect_namespaces.keys.include?( 'xmlns:meta' )
-    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', xml.collect_namespaces )
+  if ns.keys.include?( 'xmlns:meta' )
+    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', ns )
     if cma
       report << "CompositionMetadataAsset:"
       cma.each do |e|
@@ -1841,9 +1841,10 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
     assets.each do |asset|
       next if asset.node_name == 'CompositionMetadataAsset'
-      asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset.namespaces ).text.split( ':' ).last
-      duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset.namespaces ).text.to_i
-      edit_rate = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset.namespaces ).text.split( ' ' ).first.to_i # FIXME ugh
+      asset_ns = asset.namespaces
+      asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.split( ':' ).last
+      duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
+      edit_rate = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text.split( ' ' ).first.to_i # FIXME ugh
       durations << duration
       edit_rates << edit_rate
 
