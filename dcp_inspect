@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.06'
+AppVersion = 'v1.2012.03.07'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -113,6 +113,7 @@ class Options
     options = OpenStruct.new
     options.check_hashes = FALSE
     options.validate = TRUE
+    options.as_asset_store = FALSE
     options.verbosity = 'debug'
     options.verbosity_choices = [ 'quiet', 'errors', 'info', 'debug', 'trace_func' ]
     opts = OptionParser.new do |opts|
@@ -126,6 +127,9 @@ BANNER
       end
       opts.on( '--no-schema-checks', 'Skip schema checks' ) do
         options.validate = FALSE
+      end
+      opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries to resolve missing assets' ) do
+        options.as_asset_store = TRUE
       end
       opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'errors', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
         if options.verbosity_choices.include?( p )
@@ -318,13 +322,23 @@ end
 def amount( item, list )
   "#{ list.size } #{ item }#{ pl list }"
 end
+
+# Thanks to Rein Henrichs
+def truncate( text, num_words = 6, truncate_string = "..." )
+  if text.nil? then return end
+  arr = text.split( ' ' )
+  arr.length > num_words ? arr[ 0...num_words ].join( ' ' ) + truncate_string : text
+end
+
 def pl( list )
   list.size != 1 ? 's' : ''
 end
+
 # package path helper
 def package( relative_path )
   File.join( @package_dir, relative_path )
 end
+
 def print_inspection_messages( inspection )
   inspection[ :errors ].map { |e| @logger.errors [ 'Error', e ].join( ': ' ) }
   inspection[ :hints ].map { |e| @logger.info [ 'Hint', e ].join( ': ' ) }
@@ -1874,6 +1888,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 # not entirely sure that this might apply to first TimeIn as well
                 first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
                 last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
+                first_time_in_text = truncate( ( subtitles[ 0 ].at_xpath( '*/Text|Text' ) || subtitles[ 0 ].at_xpath( '*/Image|Image' ) ).text, 3 )
+                last_time_out_text = truncate( ( subtitles[ -1 ].at_xpath( '*/Text|Text' ) || subtitles[ -1 ].at_xpath( '*/Image|Image' ) ).text, 3 )
                 if subtitles.size > 1
                   subtitles[ 1 .. -1 ].each do |sub|
                     break if first_time_in < sub.attributes[ 'TimeIn' ].value
@@ -1886,7 +1902,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 end
                 first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
                 last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
-                meta_report = "DCSubtitle, #{ first_time_in } - #{ last_time_out }"
+                meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'"
               else
                 meta_report = "DCSubtitle, no Subtitle found"
               end
@@ -2141,8 +2157,36 @@ def dcp_inspect( options, arg )
 
   end # am_files.each
 
-  # All found PKLs: look for CPLs
+  #
+  # Experimental option --as-asset-store
+  #
+  # This will merge all collected dictionaries and flatten pkls accordingly.
+  # Naive merge, though, for now. No asset normalization either.
+  #
+  # Also composition completeness info won't hint at the "use"
+  # of external assets. Use if you know what you are doing.
+  #
+  # Can be used to simulate ingest and completeness checks for VF compositions.
+  #
+  if options.as_asset_store
+    dict_tmp = Array.new << Hash.new
+    dict.map { |d| dict_tmp.first.merge!( d ) { |k, v1, v2| errors << "Experimental option --as-asset-store: Duplicate key: #{ k } => #{ v1 == v2 ? 'v1 == v2' : "\n\tv1: #{ v1 || 'nil' }\n\tv2: #{ v2 || 'nil' }" }" } }
+    dict = dict_tmp
+    pkls = Array.new << pkls.flatten
+  end
+
+  # List all found PKLs
   @logger.info( "Found #{ amount( 'packing list', pkls.flatten ) }" )
+  pkls.each_with_index do |am_pkls, index|
+    am_pkls.each do |pkl_id|
+      if dict[ index ][ pkl_id ]
+        pkl_file = package dict[ index ][ pkl_id ]
+        @logger.debug( "PKL file#{ File.exists?( pkl_file ) ? '' : ' not' } present: #{ [ pkl_id, pkl_file ].join( ': ' ) }" )
+      end
+    end
+  end
+  @logger.debug ''
+
   cpls = Array.new
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
@@ -2192,8 +2236,8 @@ def dcp_inspect( options, arg )
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
           type = asset.xpath( 'Type' ).text
-          # List all PKL listed assets and report AM mapping status
-          @logger.debug( "#{ id }: #{ type }: #{ dict[ index ].keys.include?( id ) ? ( dict[ index ][ id ] ) : 'Asset UUID not in assetmap dictionary' }" )
+          # List all assets listed in PKL and report AM mapping status
+          @logger.debug( "#{ id }: #{ type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
