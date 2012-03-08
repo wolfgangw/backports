@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.07'
+AppVersion = 'v1.2012.03.08'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -897,10 +897,22 @@ class DC_Signer_Crypto_Compliance
       # 2.1.6 Deleted (in CTP 1.1) section
 
       # 2.1.7 Validity present (not before, not after)
-      errors << 'Not before field missing' if cert.not_before.nil?
-      errors << 'Not after field missing' if cert.not_after.nil?
-      errors << 'Not before field is not UTC' unless cert.not_before.utc?
-      errors << 'Not after field is not UTC' unless cert.not_after.utc?
+      #
+      # Note on Ruby version 1.8.7:
+      #
+      # UTC time > jan 19th 2038 is broken in ruby 1.8.7 on 32 bit systems (See https://bugs.ruby-lang.org/issues/5885)
+      # See {"o"=>"DC256.Cinea.Com"} {"ou"=>"Root-CA.DC256.Cinea.Com"} {"cn"=>".Cinea.Root-CA.0"} {"dnq"=>"NFkBZDCGa7KpLK0PhZNCt40dDi8="} {"not_before"=>2006-05-12 16:08:58 UTC} {"not_after"=>2041-05-01 00:00:00 UTC} for a valid X509 cert exceeding 32 bit time_t.
+      # See COFD-3D_FTR-8_C_EN-XX_US_51_2K_20110308_DLB_i3D for a package with NFkBZDCGa7KpLK0PhZNCt40dDi8=.
+      # See DC_Signer_Crypto_Compliance Section 2.1.17 for another spot where this matters.
+      #
+      begin
+        errors << 'Not before field missing' if cert.not_before.nil?
+        errors << 'Not after field missing' if cert.not_after.nil?
+        errors << 'Not before field is not UTC' unless cert.not_before.utc?
+        errors << 'Not after field is not UTC' unless cert.not_after.utc?
+      rescue Exception => e
+        errors << "Internal error: Skip DC_Signer_Crypto_Compliance Section 2.1.7 Validity: RUBY_VERSION #{ RUBY_VERSION } on 32 bit systems broken for UTC times > Jan 19th 2038. Inspect certificate manually." if e.class == ArgumentError
+      end
 
       # Check X.509 extensions
       required_oids = %w( basicConstraints keyUsage authorityKeyIdentifier )
@@ -1077,8 +1089,12 @@ class DC_Signer_Crypto_Compliance
     # The chain completeness and root ca checks are implicit in crypto_context() which leaves validity containment checks:
     @context.each_with_index do |cert, index|
       break if index == @context.size - 1 # root ca
-      if ! ( cert.not_before >= @context[ index + 1 ].not_before and cert.not_after <= @context[ index + 1 ].not_after )
-        context_errors[ cert.subject.to_s ] << "Validity period not contained within parent certificate's validity period"
+      begin
+        if ! ( cert.not_before >= @context[ index + 1 ].not_before and cert.not_after <= @context[ index + 1 ].not_after )
+          context_errors[ cert.subject.to_s ] << "Validity period not contained within parent certificate's validity period"
+        end
+      rescue Exception => e
+        context_errors[ cert.subject.to_s ] << "Internal error: Skip DC_Signer_Crypto_Compliance Section 2.1.17 Chain completeness: RUBY_VERSION #{ RUBY_VERSION } on 32 bit systems broken for UTC times > Jan 19th 2038. Inspect certificate manually." if e.class == ArgumentError
       end
     end
     return context_errors, types_seen
@@ -2194,6 +2210,7 @@ def dcp_inspect( options, arg )
       xml = get_xml_of_type( 'PackingList', pkl_file )
       if xml
 
+        @logger.debug( "PKL #{ pkl_id }: #{ pkl_file }" )
         if options.validate
           valid, errors = validation( errors, xml, pkl_file )
           @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
