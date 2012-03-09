@@ -131,7 +131,7 @@ BANNER
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries to resolve missing assets' ) do
         options.as_asset_store = TRUE
       end
-      opts.on( '-v', '--verbosity level', String, "Use 'quiet', 'errors', 'info', 'debug' or 'trace_func' (Default: info)" ) do |p|
+      opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, info, debug or trace_func (Default: info)' ) do |p|
         if options.verbosity_choices.include?( p )
           options.verbosity = p
         else
@@ -283,12 +283,15 @@ require 'date'
 def time_to_datetime( time ) # OpenSSL's ruby bindings return Time objects for certificate validity info
   DateTime.parse( time.to_s )
 end
+
 def datetime_friendly( dt ) # return something in the form of "Tuesday Nov 30 2010 (18:56)"
   "#{ DateTime::DAYNAMES[ dt.wday ] } #{ DateTime::ABBR_MONTHNAMES[ dt.month ] } #{ dt.day.to_s } #{ dt.year.to_s } #{ '%02d' % dt.hour.to_s }:#{ '%02d' % dt.min.to_s }"
 end
+
 def yyyymmdd( datetime ) # used in KDM filenames. See http://www.kdmnamingconvention.com/
   datetime.to_s.split( 'T' ).first.gsub( /-/,'' )
 end
+
 def hours_minutes_seconds_verbose( seconds )
   t = seconds
   hrs = ( ( t / 3600 ) ).to_i
@@ -301,12 +304,14 @@ def hours_minutes_seconds_verbose( seconds )
     t > 60 ? "(#{ t } seconds)" : nil
   ].compact.join( ' ' )
 end
+
 def hms_from_seconds( seconds )
   hours = ( seconds / 3600.0 ).to_i
   minutes = ( ( seconds / 60.0 ) % 60 ).to_i
   secs = seconds % 60
   return [ hours, minutes, secs ].join( ':' )
 end
+
 def seconds_from_hms( timestring ) # hh:mm:ss.fraction
   a = timestring.split( ':' )
   hours = a[ 0 ].to_i
@@ -807,7 +812,7 @@ class DC_Signer_Crypto_Compliance
     context.each do |cert|
       if cert.issuer.to_s == cert.subject.to_s
         if root
-          pre_context_errors << "Multiple self-signed (root) certificates found"
+          pre_context_errors << 'Multiple self-signed (root) certificates found'
           return [], pre_context_errors
         else
           root = cert
@@ -817,7 +822,7 @@ class DC_Signer_Crypto_Compliance
       end
     end
     if root == NIL
-      pre_context_errors << "Self-signed root certificate not found"
+      pre_context_errors << 'Self-signed root certificate not found'
       return [], pre_context_errors
     end
 
@@ -926,20 +931,20 @@ class DC_Signer_Crypto_Compliance
           case x.oid
 
           # 2.1.8 AuthorityKeyIdentifier field present
-          when "authorityKeyIdentifier"
+          when 'authorityKeyIdentifier'
             nil # 2.1.8 checks for presence only. Omission in CTP?
 
           # 2.1.9 KeyUsage field
-          when "keyUsage"
+          when 'keyUsage'
             if index == 0 # leaf cert
-              errors << "digitalSignature missing from keyUsage" unless values.include?( 'Digital Signature' )
-              errors << "keyEncipherment missing from keyUsage" unless values.include?( 'Key Encipherment' )
+              errors << 'digitalSignature missing from keyUsage' unless values.include?( 'Digital Signature' )
+              errors << 'keyEncipherment missing from keyUsage' unless values.include?( 'Key Encipherment' )
             else # ca's
-              errors << "keyCertSign missing from keyUsage" unless values.include?( 'Certificate Sign' )
+              errors << 'keyCertSign missing from keyUsage' unless values.include?( 'Certificate Sign' )
             end
 
           # * 2.1.10 basicConstraints field
-          when "basicConstraints"
+          when 'basicConstraints'
             if index == 0 # leaf cert
               errors << "CA true in potential #{ type } leaf certificate" unless values.include?( 'CA:FALSE' )
               case type
@@ -982,7 +987,7 @@ class DC_Signer_Crypto_Compliance
           errors << 'dnQualifier missing in subject name'
         end
         if dnq_calc != dnq_cert
-          errors << "dnQualifier mismatch"
+          errors << 'dnQualifier mismatch'
         end
       end
 
@@ -1168,30 +1173,30 @@ class DC_Signature_Verification
     if @signature_node.size == 1
       case @reference_digests_check
       when TRUE
-        @messages << "Document and SignedInfo match"
+        @messages << 'Document and SignedInfo match'
         case @signature_value_check
         when TRUE
-          @messages << "Signature value and SignedInfo match"
+          @messages << 'Signature value and SignedInfo match'
         when FALSE
-          @messages << "Signature value and SignedInfo do not match"
+          @messages << 'Signature value and SignedInfo do not match'
         end
 
       when FALSE
-        @messages << "Document and SignedInfo do not match"
+        @messages << 'Document and SignedInfo do not match'
         case @signature_value_check
         when TRUE
-          @messages << "Signature value and SignedInfo match"
+          @messages << 'Signature value and SignedInfo match'
         when FALSE
-          @messages << "Signature value and SignedInfo do not match"
+          @messages << 'Signature value and SignedInfo do not match'
         end
       end
 
       if @reference_digests_check and @signature_value_check
         @verified = true
-        @messages << "Signature check: OK"
+        @messages << 'Signature check: OK'
       else
         @verified = false
-        @messages << "Signature check: Verification failure"
+        @messages << 'Signature check: Verification failure'
       end
     end
   end
@@ -1226,7 +1231,7 @@ class DC_Signature_Verification
     sig_ns, prefix = signature_namespace_and_prefix( doc )
 
     # 2.a Signer present?
-    @signer_node = doc.xpath( "//xmlns:Signer" ) # FIXME prefix naivete
+    @signer_node = doc.xpath( '//xmlns:Signer' ) # FIXME prefix naivete
     if @signer_node.size != 1
       @messages << "#{ @signer_node.size == 0 ? 'No' : @signer_node.size } Signer node#{ @signer_node.size > 1 ? 's' : '' } found"
     end
@@ -1312,7 +1317,7 @@ class DC_Signature_Verification
           if uri =~ /^#ID_/
             ref_xml = extract_uri( doc, uri ).canonicalize
           else
-            @messages << "Reference URI not valid"
+            @messages << 'Reference URI not valid'
             check = FALSE
             next
           end
@@ -1321,14 +1326,14 @@ class DC_Signature_Verification
         @messages << "URI=#{ uri.empty? ? '""' : uri } Digest calc: #{ digest_calc } (DigestMethod Algorithm=#{ digest_algo })"
         @messages << "URI=#{ uri.empty? ? '""' : uri } Digest doc:  #{ digest_doc  } (DigestMethod Algorithm=#{ digest_algo })"
         if digest_calc == digest_doc
-          @messages << "Reference digest value correct"
+          @messages << 'Reference digest value correct'
         else
-          @messages << "Reference digest value not correct"
+          @messages << 'Reference digest value not correct'
           check = FALSE
         end
       else
         # not reached if doc was validated against schema
-        @messages << "Reference has more than 1 attribute"
+        @messages << 'Reference has more than 1 attribute'
       end
     end
     return check
@@ -1388,7 +1393,7 @@ class DC_Signature_Verification
 
   # See rsa gem
   def i2osp( x, len = nil )
-    raise ArgumentError, "integer too large" if len && x >= 256 ** len
+    raise ArgumentError, 'integer too large' if len && x >= 256 ** len
     StringIO.open do |buffer|
       while x > 0
         b = ( x & 0xFF ).chr
@@ -1486,7 +1491,7 @@ class Numeric
   KILO = 1024.0
   def to_k
     case
-    when self == 1 then "1 Byte"
+    when self == 1 then '1 Byte'
     when self < KILO then "%d Bytes" % self
     when self < MEGA then "%.3f KB" % ( self / KILO )
     when self < GIGA then "%.3f MB" % ( self / MEGA )
@@ -1805,7 +1810,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         errors << "CPL #{ cpl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
       end
     else
-      report << "Signer info :x509serialnumber or :cert_serial could not be retrieved"
+      report << 'Signer info :x509serialnumber or :cert_serial could not be retrieved'
       errors << "CPL #{ cpl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
     end
   end
@@ -1843,7 +1848,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   if ns.keys.include?( 'xmlns:meta' )
     cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', ns )
     if cma
-      report << "CompositionMetadataAsset:"
+      report << 'CompositionMetadataAsset:'
       cma.each do |e|
         report << "                  #{ e.node_name }: #{ e.text }"
       end
@@ -1920,7 +1925,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
                 meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'"
               else
-                meta_report = "DCSubtitle, no Subtitle found"
+                meta_report = 'DCSubtitle, no Subtitle found'
               end
 
             else # MXF?
@@ -1952,7 +1957,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 broken_assets << asset_id
                 cpl_referenced_assets << { asset_id => FALSE }
                 cpl_referenced_assets_types << MStr::AssetTypeUnknown
-                meta_report = "Asset file found but not AS-DCP MXF"
+                meta_report = 'Asset file found but not AS-DCP MXF'
               end
             end
           else
@@ -1965,7 +1970,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         else # ok case: Supplemental/VF/External
           cpl_referenced_assets << { asset_id => FALSE }
           cpl_referenced_assets_types << MStr::AssetTypeUnknown
-          meta_report = "Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
+          meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
           hint_info = [
             'CPL ' + cpl_id,
             asset_id,
@@ -1988,7 +1993,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     composition_edit_rate = edit_rates.min
   end # reels.each_with_index
 
-  report << "Total duration:"
+  report << 'Total duration:'
   report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
 
   # Composition type
@@ -2033,7 +2038,7 @@ def dcp_inspect( options, arg )
   if Nokogiri::XML::Document.new.respond_to?( 'canonicalize' )
     @c14n_available = TRUE
   else
-    hints << "Installed version of Nokogiri does not support C14N which is required for signature verification"
+    hints << 'Installed version of Nokogiri does not support C14N which is required for signature verification'
     hints << 'See https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC for notes on how to install Nokogiri with C14N support from current git (https://github.com/tenderlove/nokogiri)'
     @c14n_available = FALSE
   end
@@ -2332,7 +2337,7 @@ def dcp_inspect( options, arg )
       end
     end
   else
-    @logger.info( "Found no compositions" )
+    @logger.info( 'Found no compositions' )
   end
   @logger.debug ''
 
