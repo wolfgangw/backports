@@ -2104,6 +2104,7 @@ def dcp_inspect( options, arg )
     assets = xml.xpath( '//Asset' )
 
     @logger.debug( "Assetmap #{ am_id }: #{ am_file }"  )
+    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
 
     # Store asset info in a dictionary (uuid => path, relative to package root)
     # look for PackingList(s)
@@ -2120,6 +2121,7 @@ def dcp_inspect( options, arg )
 
         # Assetmap dictionary
         dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
+        @logger.debug( "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (missing)' }" )
 
         # Check listed_id vs actual asset_id
         asset_file = package dict[ index ][ listed_id ]
@@ -2159,9 +2161,7 @@ def dcp_inspect( options, arg )
 
     end # assets.each
 
-    # List asset dictionary
-    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
-    dict[ index ].map { |k, v| @logger.debug( "#{ [ k, v ].join( ': ' ) }#{ File.exists?( package v ) ? '' : ' (missing)' }" ) }
+    # List this Assetmap's PKLs
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
     pkls_missing = Array.new
     pkls[ index ].map { |pkl_id|
