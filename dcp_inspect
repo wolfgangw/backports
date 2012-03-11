@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.08'
+AppVersion = 'v1.2012.03.11'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -2096,8 +2096,8 @@ def dcp_inspect( options, arg )
   end
   am_files = am_candidates
   @logger.debug ''
-  # hint at multiple Assetmaps found
-  hints << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
+  # info about multiple Assetmaps found
+  info << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
   # Process all Assetmaps
   @logger.info( "Found #{ amount( 'Assetmap', am_files ) }" )
@@ -2227,6 +2227,9 @@ def dcp_inspect( options, arg )
   @logger.debug ''
 
   cpls = Array.new
+  packages_size_listed = 0
+  packages_size_actual = 0
+
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
@@ -2269,6 +2272,8 @@ def dcp_inspect( options, arg )
         # FIXME
         xml.remove_namespaces!
         pkl_assets = xml.xpath( '//Asset' )
+        package_size_listed = 0
+        package_size_actual = 0
         pkl_cpls = Array.new
 
         @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
@@ -2289,6 +2294,8 @@ def dcp_inspect( options, arg )
               if ( size_listed = asset.xpath( 'Size' ).text.to_i )
                 size_asset = File.size( asset_file )
                 errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
+                package_size_listed += size_listed
+                package_size_actual += size_asset
               else
                 errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type }"
               end
@@ -2331,6 +2338,7 @@ def dcp_inspect( options, arg )
           end
 
         end
+        @logger.debug( "PKL #{ pkl_id }: Package size: #{ package_size_actual == package_size_listed ? package_size_actual.to_k : package_size_actual.to_k + ' (Listed: ' + package_size_listed.to_k + ')' }" )
         # Add this PKLs CPLs to total CPLs
         cpls += pkl_cpls
         # List this PKLs CPLs
@@ -2340,9 +2348,13 @@ def dcp_inspect( options, arg )
       else
         errors << "Not a PackingList: #{ pkl_file }"
       end
+      packages_size_listed += package_size_listed
+      packages_size_actual += package_size_actual
       @logger.debug ''
     end # am_pkls.each
   end # pkls.each
+
+  info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed: ' + packages_size_listed.to_k + ')' }"
 
   # List all found CPLs
   if cpls.size > 0
