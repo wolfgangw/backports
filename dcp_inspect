@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.11'
+AppVersion = 'v1.2012.03.14'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
