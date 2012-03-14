@@ -2291,12 +2291,13 @@ def dcp_inspect( options, arg )
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
+            size_listed = asset.xpath( 'Size' ).text.to_i
 
             if File.exists?( asset_file )
               # Plug in checks here. we might be skipping validation hence the tag test
               #
               # Check listed and actual asset size
-              if ( size_listed = asset.xpath( 'Size' ).text.to_i )
+              if size_listed
                 size_asset = File.size( asset_file )
                 errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
                 package_size_listed += size_listed
@@ -2334,6 +2335,8 @@ def dcp_inspect( options, arg )
               #
             else
               # asset_file does not exist
+              package_size_listed += size_listed
+              package_size_actual += 0
             end
 
           else
