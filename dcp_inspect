@@ -2238,8 +2238,13 @@ def dcp_inspect( options, arg )
 
         @logger.debug( "PKL #{ pkl_id }: #{ pkl_file }" )
         if options.validate
-          valid, errors = validation( errors, xml, pkl_file )
-          @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+          begin
+            valid, errors = validation( errors, xml, pkl_file )
+            @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+          rescue Exception => e
+            @logger.debug( "Exception in Schema check: PKL #{ pkl_id }: #{ e.message }" )
+            errors << "Exception in Schema check: PKL #{ pkl_id }: #{ pkl_file }: #{ e.message }"
+          end
         end
 
         if @c14n_available
@@ -2382,8 +2387,13 @@ def dcp_inspect( options, arg )
           if xml
 
             if options.validate
-              valid, errors = validation( errors, xml, cpl_file )
-              @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+              begin
+                valid, errors = validation( errors, xml, cpl_file )
+                @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+              rescue Exception => e
+                @logger.debug( "Exception in Schema check: CPL #{ cpl_id }: #{ e.message }" )
+                errors << "Exception in Schema check: CPL #{ cpl_id }: #{ cpl_file }: #{ e.message }"
+              end
             end
 
             if @c14n_available
