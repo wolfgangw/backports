@@ -2004,6 +2004,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
       errors << "Duration mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+    else
+      if durations.first.to_i / edit_rates.min.to_i < 1 # ugh, but hey, re-write is in the works
+        report << "\tReel duration minimum violated (< 1 second)"
+        errors << "Reel duration minimum violated (< 1 second): CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+      end
     end
     report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
     total_duration += durations.min # FIXME ugh
