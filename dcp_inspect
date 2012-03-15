@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.14'
+AppVersion = 'v1.2012.03.15'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -328,15 +328,15 @@ def amount( item, list )
   "#{ list.size } #{ item }#{ pl list }"
 end
 
+def pl( list )
+  list.size != 1 ? 's' : ''
+end
+
 # Thanks to Rein Henrichs
 def truncate( text, num_words = 6, truncate_string = "..." )
   if text.nil? then return end
   arr = text.split( ' ' )
   arr.length > num_words ? arr[ 0...num_words ].join( ' ' ) + truncate_string : text
-end
-
-def pl( list )
-  list.size != 1 ? 's' : ''
 end
 
 # package path helper
@@ -1921,9 +1921,9 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
               xml.remove_namespaces!
               if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
+
                 # scan all subtitles to find actual first_time_in and last_time_out
                 # last subtitle is not necessarily the last displayed
-                # not entirely sure that this might apply to first TimeIn as well
                 first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
                 last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
                 first_time_in_text = truncate( ( subtitles[ 0 ].at_xpath( '*/Text|Text' ) || subtitles[ 0 ].at_xpath( '*/Image|Image' ) ).text, 3 )
@@ -1940,7 +1940,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 end
                 first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
                 last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
-                meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'"
+
+                # Check for empty elements. Thanks to Mattias Mattsson for the field feedback
+                empty_subtitles = 0
+                subtitles.each do |subtitle|
+                  if subtitle.children.empty? or ( subtitle.children.size == 1 and subtitle.children.first.is_a? Nokogiri::XML::Text )
+                    empty_subtitles += 1
+                    errors << "Empty Subtitle element: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }: DCSubtitle #{ asset_id }: #{ asset_file }#{ subtitle.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + subtitle.attributes[ 'SpotNumber' ].value : '' }"
+                  end
+                end
+
+                meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
+
               else
                 meta_report = 'DCSubtitle, no Subtitle found'
               end
