@@ -1,4 +1,7 @@
-## dcp_inspect inspects and checks DCP media and directories
+## dcp_inspect
+
+dcp_inspect is a tool for deep inspection and validation of digital cinema packages (DCP). This includes integrity checks, asset inspection, schema validation, signature and certificate verification and composition summarization. Basically anyone who needs to establish the validity of a digital cinema package can put dcp_inspect to good use.
+
 
 ### Usage
 
@@ -30,7 +33,7 @@
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
 
-    For verification of signatures dcp_inspect requires a recent Nokogiri version with C14N support. See [MISC on Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC) for notes on how to install Nokogiri with C14N support from [current git](https://github.com/tenderlove/nokogiri)
+    For signature verification dcp_inspect requires a recent Nokogiri version with C14N support. See [MISC on Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC) for notes on how to install Nokogiri with C14N support from [current git](https://github.com/tenderlove/nokogiri)
 
 - dcp_inspect requires xsd/ next to it.
 
@@ -46,15 +49,15 @@ in backports to keep up-to-date.
 
 ### Couple of todos
 
-- Some Assetmap options (Offsets, volume indices) are not handled
+- Assetmap options chunks, offsets, volume indices are not handled
 - Marker lists are not handled
-- Check Signer.X509IssuerSerial info (names tbd)
+- Check Signer.X509IssuerSerial issuer name
 - Sound present in SMPTE DCP reels?
 - Verbosity levels
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 
-Tested on linux and Mac OS boxes. Let me know if dcp_inspect actually runs on Windows.
+Tested on linux and Mac OS boxes. Thanks to Terrence for trying on a Windows system (it executed but the libxml infrastructure required for schema checking did not work, so there. Wip)
 
 Copyright 2011-2012 Wolfgang Woehl
 
