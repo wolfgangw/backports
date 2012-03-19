@@ -214,13 +214,12 @@ end
 include MxfTools
 
 
-module Exit
-  DCP_OK = 0
-  DCP_ERROR = 1
-  NO_ARG = 2
-  TOO_MANY_ARGS = 3
-  ARG_NOT_A_DIR = 4
-end
+# Exit codes
+DCP_OK = 0
+DCP_ERROR = 1
+NO_ARG = 2
+TOO_MANY_ARGS = 3
+ARG_NOT_A_DIR = 4
 
 
 # lib/magic_strings.rb
@@ -2105,7 +2104,7 @@ def dcp_inspect( options, arg )
         end
 
       else
-        @logger.debug( errors.last ) # errors.last ?
+        @logger.debug errors.last # errors.last ?
         am_candidates.delete( am_candidate )
       end
     end
@@ -2119,10 +2118,12 @@ def dcp_inspect( options, arg )
   @logger.info( "Found #{ amount( 'Assetmap', am_files ) }" )
   dict = Array.new # list of dictionaries/hashes
   pkls = Array.new
+  pkls_missing = Array.new
   ams = Array.new
   am_files.each_with_index do |am_file, index|
     dict << Hash.new
     pkls << Array.new
+    pkls_missing << Array.new
     am_base = File.dirname am_file
     xml = xml?( package am_file )
     # FIXME
@@ -2197,17 +2198,17 @@ def dcp_inspect( options, arg )
 
     # List this Assetmap's PKLs
     @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
-    pkls_missing = Array.new
     pkls[ index ].map { |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
       if File.exists?( pkl_file )
         @logger.debug "PKL file present: #{ pkl_id }: #{ pkl_file }"
       else
-        pkls_missing << pkl_id
-        @logger.debug "PKL file not present: #{ pkl_id }: #{ pkl_file }"
+        pkls_missing[ index ] << pkl_id
+        errors << "PKL file missing: #{ pkl_id }: #{ pkl_file }"
+        @logger.debug errors.last
       end
     }
-    pkls_missing.map { |pkl_id| pkls[ index ].delete pkl_id }
+    pkls_missing[ index ].map { |pkl_id| pkls[ index ].delete pkl_id }
     @logger.debug nil
 
   end # am_files.each
@@ -2231,7 +2232,7 @@ def dcp_inspect( options, arg )
   end
 
   # List all found PKLs
-  @logger.info( "Found #{ amount( 'packing list', pkls.flatten ) }" )
+  @logger.info( "Found #{ amount( 'Package', pkls.flatten ) }" )
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
       if dict[ index ][ pkl_id ]
@@ -2243,23 +2244,27 @@ def dcp_inspect( options, arg )
   @logger.debug ''
 
   cpls = Array.new
+  cpls_missing = Array.new
   packages_size_listed = 0
   packages_size_actual = 0
 
   pkls.each_with_index do |am_pkls, index|
+    cpls << Array.new
+    cpls_missing << Array.new
     am_pkls.each do |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
       xml = get_xml_of_type( 'PackingList', pkl_file )
       if xml
 
         @logger.debug( "PKL #{ pkl_id }: #{ pkl_file }" )
+
         if options.validate
           begin
             valid, errors = validation( errors, xml, pkl_file )
             @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
           rescue Exception => e
-            @logger.debug( "Exception in Schema check: PKL #{ pkl_id }: #{ e.message }" )
             errors << "Exception in Schema check: PKL #{ pkl_id }: #{ pkl_file }: #{ e.message }"
+            @logger.debug errors.last
           end
         end
 
@@ -2279,15 +2284,16 @@ def dcp_inspect( options, arg )
             # See e.g. dcp_2/V174* for a serial mismatch
             if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
               if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
-                @logger.debug "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
                 errors << "Signer serial mismatch: PKL #{ pkl_id }: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                @logger.debug errors.last
               end
             else
-              @logger.debug 'Signer info :x509serialnumber or :cert_serial could not be retrieved'
               errors << "Signer info :x509serialnumber or :cert_serial could not be retrieved: PKL #{ pkl_id }"
+              @logger.debug errors.last
             end
           end
-
+        else
+          signature_result = nil
         end
 
         # FIXME
@@ -2345,6 +2351,7 @@ def dcp_inspect( options, arg )
                 xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
                 if xml
                   pkl_cpls << id
+                  cpls[ index ] << id
                 end
               end
               #
@@ -2363,12 +2370,19 @@ def dcp_inspect( options, arg )
 
         end
         @logger.debug( "PKL #{ pkl_id }: Package size: #{ package_size_actual == package_size_listed ? package_size_actual.to_k : package_size_actual.to_k + ' (Listed: ' + package_size_listed.to_k + ')' }" )
-        # Add this PKLs CPLs to total CPLs
-        cpls += pkl_cpls
         # List this PKLs CPLs
         @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }" )
-        # FIXME purely informative here, we don't remember referenced files which are missing
-        pkl_cpls.map { |cpl_id| @logger.debug( "CPL file#{ File.exists?( package dict[ index ][ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dict[ index ][ cpl_id ] ].join( ': ' ) }" ) }
+        pkl_cpls.map { |cpl_id|
+          cpl_file = package dict[ index ][ cpl_id ]
+          if File.exists?( cpl_file )
+            @logger.debug "CPL file present: #{ cpl_id }: #{ cpl_file }"
+          else
+            cpls_missing[ index ] << cpl_id
+            errors << "CPL file missing: #{ cpl_id }: #{ cpl_file }"
+            @logger.debug errors.last
+          end
+        }
+        cpls_missing[ index ].map { |cpl_id| cpls[ index ].delete cpl_id }
       else
         errors << "Not a PackingList: #{ pkl_file }"
       end
@@ -2381,12 +2395,16 @@ def dcp_inspect( options, arg )
   info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed: ' + packages_size_listed.to_k + ')' }"
 
   # List all found CPLs
-  if cpls.size > 0
-    @logger.info( "Found #{ amount( 'composition', cpls ) }" )
-    dict.each do |dictionary|
-      cpls.each do |cpl_id|
-        if dictionary.include?( cpl_id )
-          @logger.debug( "CPL file#{ File.exists?( package dictionary[ cpl_id ] ) ? '' : ' not' } present: #{ [ cpl_id, dictionary[ cpl_id ] ].join( ': ' ) }" )
+  if cpls.flatten.size > 0
+    @logger.info( "Found #{ amount( 'Composition', cpls.flatten ) }" )
+    dict.each_with_index do |dictionary, index|
+      cpls[ index ].each do |cpl_id|
+        cpl_file = package dictionary[ cpl_id ]
+        if File.exists? cpl_file
+          @logger.debug "CPL file present: #{ cpl_id }: #{ cpl_file }"
+        else
+          errors << "CPL file missing: #{ cpl_id }: #{ cpl_file }"
+          @logger.debug errors.last
         end
       end
     end
@@ -2397,8 +2415,8 @@ def dcp_inspect( options, arg )
 
   # Inspect CPLs
   # FIXME and all over again ...
-  dict.each do |dictionary|
-    cpls.each do |cpl_id|
+  dict.each_with_index do |dictionary, index|
+    cpls[ index ].each do |cpl_id|
       if dictionary.include?( cpl_id )
         cpl_file = package dictionary[ cpl_id ]
         if File.exists?( cpl_file )
@@ -2410,8 +2428,8 @@ def dcp_inspect( options, arg )
                 valid, errors = validation( errors, xml, cpl_file )
                 @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
               rescue Exception => e
-                @logger.debug( "Exception in Schema check: CPL #{ cpl_id }: #{ e.message }" )
                 errors << "Exception in Schema check: CPL #{ cpl_id }: #{ cpl_file }: #{ e.message }"
+                @logger.debug errors.last
               end
             end
 
@@ -2436,10 +2454,10 @@ def dcp_inspect( options, arg )
     end
   end
 
-  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) }, #{ amount( 'Composition', cpls ) }"
+  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) }, #{ amount( 'Composition', cpls.flatten ) }"
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
-  return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls }
+  return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
 end
 
 
@@ -2454,18 +2472,18 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
   case inspection[ :errors ].size
   when 0
-    exit Exit::DCP_OK
+    exit DCP_OK
   else
-    exit Exit::DCP_ERROR
+    exit DCP_ERROR
   end
 elsif args.size == 0
   @logger.info( "No volume or directory given. See #{ AppName } --help" )
-  exit Exit::NO_ARG
+  exit NO_ARG
 elsif args.size > 1
   @logger.info( "Too many arguments. See #{ AppName } --help" )
-  exit Exit::TOO_MANY_ARGS
+  exit TOO_MANY_ARGS
 else
   @logger.info( "Not a volume or directory. See #{ AppName } --help" )
-  exit Exit::ARG_NOT_A_DIR
+  exit ARG_NOT_A_DIR
 end
 
