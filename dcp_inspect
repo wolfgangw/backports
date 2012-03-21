@@ -1200,6 +1200,20 @@ class DC_Signature_Verification
     end
   end
 
+  def namespace_prefix( doc, ns )
+    doc_ns = doc.collect_namespaces
+    if RUBY_VERSION < '1.9'
+      if doc_ns.index( ns )
+        prefix = doc_ns.index( ns ).split( 'xmlns:' ).last
+      end
+    else
+      if doc_ns.key( ns )
+        prefix = doc_ns.key( ns ).split( 'xmlns:' ).last
+      end
+    end
+    return prefix ||= 'xmlns'
+  end
+
   def signature_namespace_and_prefix( doc )
     # If Signature's namespace is not in doc's namespace collection then it will be either
     #   * in Ns_Xmldsig declared as default namespace for Signature scope
@@ -1230,7 +1244,7 @@ class DC_Signature_Verification
     sig_ns, prefix = signature_namespace_and_prefix( doc )
 
     # 2.a Signer present?
-    @signer_node = doc.xpath( '//xmlns:Signer' ) # FIXME prefix naivete
+    @signer_node = doc.xpath( "//#{ namespace_prefix( doc, doc.root.namespace.href ) }:Signer" )
     if @signer_node.size != 1
       @messages << "#{ @signer_node.size == 0 ? 'No' : @signer_node.size } Signer node#{ @signer_node.size > 1 ? 's' : '' } found"
     end
@@ -1628,17 +1642,13 @@ def namespace_prefix( doc, ns )
   if RUBY_VERSION < '1.9'
     if doc_ns.index( ns )
       prefix = doc_ns.index( ns ).split( 'xmlns:' ).last
-    else
-      prefix = 'xmlns'
     end
   else
     if doc_ns.key( ns )
       prefix = doc_ns.key( ns ).split( 'xmlns:' ).last
-    else
-      prefix = 'xmlns'
     end
   end
-  return prefix
+  return prefix ||= 'xmlns'
 end
 
 # lib/xml.rb
@@ -1796,7 +1806,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   cpl_referenced_assets = Array.new
   cpl_referenced_assets_types = Array.new
 
-  cpl_ns_prefix = namespace_prefix( xml, MStr::Smpte_cpl )
+  cpl_ns_prefix = namespace_prefix( xml, xml.root.namespace.href )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
   cpl_file = dict[ cpl_id ]
   case ns[ cpl_ns_prefix ]
