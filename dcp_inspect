@@ -1906,7 +1906,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       asset_ns = asset.namespaces
       asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.split( ':' ).last
       duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
-      edit_rate = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text.split( ' ' ).first.to_i # FIXME ugh
+      n, d = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text.split( ' ' ).map { |n| n.to_i }
+      edit_rate = Rational( n, d )
       durations << duration
       edit_rates << edit_rate
 
