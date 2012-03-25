@@ -91,27 +91,14 @@ require 'openssl'
 require 'base64'
 require 'stringio'
 
-
-# set up local XML Catalog and patch its xml:base
-AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
-XSDDir = File.join( AppDir, 'xsd' )
-local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
-if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
-  if File.exists? local_xml_catalog
-    c = File.read local_xml_catalog
-    m = c.match( /xml:base="file:\/\/(.+)">/ )
-    if m[ 1 ] != File.join( XSDDir, '' )
-      File.open( local_xml_catalog, 'w' ) { |f| f.write c.gsub( m[ 1 ], File.join( XSDDir, '' ) ); f.close }
-    end
-  else
-    puts "Local XML Catalog #{ local_xml_catalog } not found"
-    exit 1
-  end
-else
-  puts "Local XSD store #{ XSDDir } not found"
-  exit 1
-end
-ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
+# Exit codes
+DCP_OK = 0
+DCP_ERROR = 1
+NO_ARG = 2
+TOO_MANY_ARGS = 3
+ARG_NOT_A_DIR = 4
+XML_CATALOG_NOT_FOUND = 5
+XSD_STORE_NOT_FOUND = 6
 
 
 # lib/options.rb
@@ -220,14 +207,6 @@ module MxfTools
   end
 end
 include MxfTools
-
-
-# Exit codes
-DCP_OK = 0
-DCP_ERROR = 1
-NO_ARG = 2
-TOO_MANY_ARGS = 3
-ARG_NOT_A_DIR = 4
 
 
 # lib/magic_strings.rb
@@ -2502,6 +2481,28 @@ args = ARGV
 @logger = DLogger.new( prefix = '', options )
 @logger.debug( "#{ AppName } #{ AppVersion }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
 
+# Set up local XML Catalog and patch its xml:base
+AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
+XSDDir = File.join( AppDir, 'xsd' )
+local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
+if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
+  if File.exists? local_xml_catalog
+    c = File.read local_xml_catalog
+    m = c.match( /xml:base="file:\/\/(.+)">/ )
+    if m[ 1 ] != File.join( XSDDir, '' )
+      File.open( local_xml_catalog, 'w' ) { |f| f.write c.gsub( m[ 1 ], File.join( XSDDir, '' ) ); f.close }
+    end
+  else
+    @logger.info "Local XML Catalog #{ local_xml_catalog } not found"
+    exit XML_CATALOG_NOT_FOUND
+  end
+else
+  @logger.info "Local XSD store #{ XSDDir } not found"
+  exit XSD_STORE_NOT_FOUND
+end
+ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
+
+# main
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
   inspection = dcp_inspect( options, args[ 0 ] )
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
