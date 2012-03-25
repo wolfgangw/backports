@@ -100,6 +100,9 @@ ARG_NOT_A_DIR = 4
 XML_CATALOG_NOT_FOUND = 5
 XSD_STORE_NOT_FOUND = 6
 
+# Signature counters
+@signed_cpls_count = 0
+@signed_pkls_count = 0
 
 # lib/options.rb
 class Options
@@ -1823,6 +1826,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   cpl_referenced_assets_types << cpl_type
 
   if signature_result and ! signature_result.signature_node.empty?
+    @signed_cpls_count += 1
     sig_info = signer_info( xml, signature_result )
     report << "Signer:           #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
     report << "Signer issuer:    #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
@@ -2286,7 +2290,8 @@ def dcp_inspect( options, arg )
           signature_result = check_signature( xml )
           errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
           @logger.debug( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
-          if ! signature_result.signature_node.empty?
+          if signature_result and ! signature_result.signature_node.empty?
+            @signed_pkls_count += 1
             sig_info = signer_info( xml, signature_result )
             @logger.debug "Signer:        #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
             @logger.debug "Signer issuer: #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
@@ -2468,7 +2473,7 @@ def dcp_inspect( options, arg )
     end
   end
 
-  info << "#{ options.validate ? 'Validated' : 'Not validated' } #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) }, #{ amount( 'Composition', cpls.flatten ) }"
+  info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) } (#{ @signed_pkls_count } signed), #{ amount( 'Composition', cpls.flatten ) } (#{ @signed_cpls_count } signed)"
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
   return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
