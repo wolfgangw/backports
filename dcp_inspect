@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.24'
+AppVersion = 'v1.2012.03.25'
 #
 # Usage:  dcp_inspect /path/to/dir
 #         dcp_inspect --help
@@ -752,6 +752,9 @@ class DC_Signer_Crypto_Compliance
         if @types_seen.uniq.size == 1
           @type = @types_seen.first
           @crypto_context_valid = TRUE
+        else
+          @type = 'Mixed'
+          @crypto_context_valid = FALSE
         end
       else
         @crypto_context_valid = FALSE
@@ -766,28 +769,28 @@ class DC_Signer_Crypto_Compliance
   end
 
   def messages
-    e = Array.new
-    @context.each do |cert|
-      e << "Subject: #{ cert.subject.to_s }"
-      e << "Issuer:  #{ cert.issuer.to_s }"
+    msgs = Array.new
+    @context.each_with_index do |cert, index|
+      msgs << "Subject: #{ cert.subject.to_s }"
+      msgs << "Issuer:  #{ cert.issuer.to_s }"
       unless @errors[ :context ].nil?
         if @errors[ :context ][ cert.subject.to_s ].empty?
-          e << 'OK'
+          msgs << 'OK'
         else
-          e << 'Not a compliant certificate:'
+          msgs << "Not a #{ @types_seen[ index ] } compliant certificate:"
           @errors[ :context][ cert.subject.to_s ].each do |error|
-            e << "\t" + error
+            msgs << "\t" + error
           end
         end
       end
     end
-    e << "Chain signatures #{ @chain_verified == TRUE ? 'verified' : 'verification failed' }"
+    msgs << "Chain signatures #{ @chain_verified == TRUE ? 'verified' : 'verification failed' }"
     if total_errors == 0
-      e << "Compliant certificate chain found: #{ @type } (#{ context.to_a.size } certificate#{ context.to_a.size != 1 ? 's' : '' }, 0 errors)"
+      msgs << "Compliant certificate chain found: #{ @type } (#{ context.to_a.sizmsgs } certificates, 0 errors)"
     else
-      e << "Not a compliant certificate chain: #{ context.to_a.size } certificate#{ context.to_a.size != 1 ? 's' : '' } with #{ total_errors } error#{ total_errors != 1 ? 's' : '' }"
+      msgs << "Not a compliant certificate chain: #{ context.to_a.size } certificate#{ context.to_a.size != 1 ? 's' : '' } with #{ total_errors } error#{ total_errors != 1 ? 's' : '' }"
     end
-    return e
+    return msgs
   end
 
   def find_crypto_context( pems )
@@ -1095,7 +1098,7 @@ class DC_Signer_Crypto_Compliance
     end # @context.each
 
     # 2.1.16 signature verification. verify chain
-    @chain_verified = verify_certs( @context )
+    @chain_verified, context_errors = verify_cert_chain( @context, context_errors )
 
     # 2.1.17 Chain complete? Validity period of child cert contained within validity of parent? Root ca valid?
     # The chain completeness and root ca checks are implicit in crypto_context() which leaves validity containment checks:
@@ -1110,23 +1113,27 @@ class DC_Signer_Crypto_Compliance
       end
     end
     return context_errors, types_seen
-  end # check_smpte_compliance
+  end # check_compliance
 
   # Verify a sorted certificate chain
-  def verify_certs( certs )
+  def verify_cert_chain( certs, context_errors )
+    certs = certs.reverse
+    verification = Array.new
     certs.each_with_index do |cert, index|
-      if index == 0
-        issuer = cert
-      else
-        issuer = certs[ index - 1 ]
-      end
+      if index == 0 then issuer = cert else issuer = certs[ index - 1 ] end
       begin
-        cert.verify cert.public_key
+        check = cert.verify issuer.public_key
+        context_errors[ cert.subject.to_s ] << 'Verification with issuer public key failed' if check == FALSE
+        verification << check
       rescue Exception => e
-        return FALSE
+        verification << e
       end
     end
-    return TRUE
+    if verification.uniq.size == 1 and verification.first == TRUE
+      return TRUE, context_errors
+    else
+      return FALSE, context_errors
+    end
   end
 
   def find_field( fieldname, x509_name )
