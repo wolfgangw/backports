@@ -2101,7 +2101,8 @@ def dcp_inspect( options, arg )
 
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
-  am_candidates = with_etabar( package_dir_tree, options, 'Looking for Assetmap candidates:', 20, '[= ]' ) { |e| ( File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ ) ? e : nil }
+  # am_candidates = with_etabar( package_dir_tree, options, 'Looking for Assetmap candidates:', 20, '[= ]' ) { |e| ( File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ ) ? e : nil }
+  am_candidates = package_dir_tree.select { |e| File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ }.sort
   am_candidates = am_candidates.sort
   if am_candidates.empty?
     errors << 'No Assetmap candidates found' 
