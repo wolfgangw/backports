@@ -43,6 +43,9 @@ AppVersion = 'v1.2012.04.02'
 #    let you know.
 # - Deep-inspects compositions
 #    This includes composition type consistency and completeness checks.
+#    dcp_inspect goes through some lengths to determine a composition's
+#    type (SMPTE/Interop). It does so by collecting all types referenced
+#    and trying to make sense of that list.
 # - Reports in detail all errors encountered
 #
 # Requirements:
