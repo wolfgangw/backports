@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 AppName = File.basename( $0 )
-AppVersion = 'v1.2012.03.29'
+AppVersion = 'v1.2012.04.02'
 # dcp_inspect is a tool for deep inspection and validation of digital
 # cinema packages (DCP). This includes integrity checks, asset inspection,
 # schema validation, signature and certificate verification and composition
@@ -1812,6 +1812,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report = Array.new
   cpl_referenced_assets = Array.new
   cpl_referenced_assets_types = Array.new
+  cpl_reels_references_complete = Array.new
 
   cpl_ns_prefix = namespace_prefix( xml, xml.root.namespace.href )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
@@ -1851,7 +1852,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ cpl_file }"
-  report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ].inspect })"
+  report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ] })"
   content_title_text = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentTitleText" ).text
   report << "ContentTitleText: #{ content_title_text }"
   if content_title_text =~ MStr::Naming_re
@@ -1901,9 +1902,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   # which case we're looking at.
   #
   broken_assets = Array.new
+  reels_references = Array.new
 
   reels.each_with_index do |reel, index|
     report << "Reel #{ index + 1 }:"
+    reels_references[ index ] = Hash.new
     durations = Array.new
     edit_rates = Array.new
     assets_labels = Array.new
@@ -1911,6 +1914,19 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
     assets.each do |asset|
       next if asset.node_name == 'CompositionMetadataAsset'
+
+      # Collect reel referenced EssenceTypes (mainly to check for SMPTE reel completeness)
+      case asset.node_name
+      when 'MainPicture', 'MainStereoscopicPicture'
+        reels_references[ index ][ :picture ] = TRUE
+      when 'MainSound'
+        reels_references[ index ][ :sound ] = TRUE
+      when 'MainSubtitle'
+        reels_references[ index ][ :subtitle ] = TRUE
+      when 'ClosedCaption'
+        reels_references[ index ][ :caption ] = TRUE
+      end
+
       asset_ns = asset.namespaces
       asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.split( ':' ).last
       duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
@@ -1925,80 +1941,81 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
           if File.exists?( asset_file )
 
-            # DCSubtitle?
-            xml = get_xml_of_type( 'DCSubtitle', asset_file )
-            if xml
+            # MXF?
+            meta = MxfTools.mxf_inspect( asset_file )
+            if meta
 
-              cpl_referenced_assets << { asset_id => TRUE }
-              cpl_referenced_assets_types << MStr::AssetTypeInterop
-
-              if options.validate
-                valid, errors = validation( errors, xml, asset_file )
-                @logger.debug( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
-              end
-
-              xml.remove_namespaces!
-              if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
-
-                # scan all subtitles to find actual first_time_in and last_time_out
-                # last subtitle is not necessarily the last displayed
-                first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
-                last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
-                first_time_in_text = truncate( ( subtitles[ 0 ].at_xpath( '*/Text|Text' ) || subtitles[ 0 ].at_xpath( '*/Image|Image' ) ).text, 3 )
-                last_time_out_text = truncate( ( subtitles[ -1 ].at_xpath( '*/Text|Text' ) || subtitles[ -1 ].at_xpath( '*/Image|Image' ) ).text, 3 )
-                if subtitles.size > 1
-                  subtitles[ 1 .. -1 ].each do |sub|
-                    break if first_time_in < sub.attributes[ 'TimeIn' ].value
-                    first_time_in = sub.attributes[ 'TimeIn' ].value
-                  end
-                  subtitles.reverse[ 1 .. -1 ].each do |sub|
-                    break if last_time_out > sub.attributes[ 'TimeOut' ].value
-                    last_time_out = sub.attributes[ 'TimeOut' ].value
-                  end
-                end
-                first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
-                last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
-
-                # Check for empty elements. Thanks to Mattias Mattsson for the field feedback
-                empty_subtitles = 0
-                subtitles.each do |subtitle|
-                  if subtitle.children.empty? or ( subtitle.children.size == 1 and subtitle.children.first.is_a? Nokogiri::XML::Text )
-                    empty_subtitles += 1
-                    errors << "Empty Subtitle element: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }: DCSubtitle #{ asset_id }: #{ asset_file }#{ subtitle.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + subtitle.attributes[ 'SpotNumber' ].value : '' }"
-                  end
-                end
-
-                meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
-
+              case meta[ 'Label Set Type' ]
+              when 'MXF Interop'
+                cpl_referenced_assets << { asset_id => TRUE }
+                cpl_referenced_assets_types << MStr::AssetTypeInterop
+              when 'SMPTE'
+                cpl_referenced_assets << { asset_id => TRUE }
+                cpl_referenced_assets_types << MStr::AssetTypeSmpte
               else
-                meta_report = 'DCSubtitle, no Subtitle found'
+                broken_assets << asset_id
+                cpl_referenced_assets << { asset_id => FALSE }
+                cpl_referenced_assets_types << MStr::AssetTypeUnknown
               end
 
-            else # MXF?
-              meta = MxfTools.mxf_inspect( asset_file )
-              if meta
+              meta_report = [
+                meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
+                meta[ 'ContainerDuration' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ).to_s : 'ContainerDuration:' + MStr::AssetTypeUnknown,
+                meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
+                asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
+                asset.node_name =~ /Sound/ ? ( meta[ 'ChannelCount' ] || 'ChannelCount' + MStr::AssetTypeUnknown ) + ' channels' : '',
+                meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
+              ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
-                case meta[ 'Label Set Type' ]
-                when 'MXF Interop'
-                  cpl_referenced_assets << { asset_id => TRUE }
-                  cpl_referenced_assets_types << MStr::AssetTypeInterop
-                when 'SMPTE'
-                  cpl_referenced_assets << { asset_id => TRUE }
-                  cpl_referenced_assets_types << MStr::AssetTypeSmpte
-                else
-                  broken_assets << asset_id
-                  cpl_referenced_assets << { asset_id => FALSE }
-                  cpl_referenced_assets_types << MStr::AssetTypeUnknown
+            else # DCSubtitle?
+              # DCSubtitle?
+              xml = get_xml_of_type( 'DCSubtitle', asset_file )
+              if xml
+
+                cpl_referenced_assets << { asset_id => TRUE }
+                cpl_referenced_assets_types << MStr::AssetTypeInterop
+
+                if options.validate
+                  valid, errors = validation( errors, xml, asset_file )
+                  @logger.debug( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
                 end
 
-                meta_report = [
-                  meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
-                  meta[ 'ContainerDuration' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, edit_rate ).to_s : 'ContainerDuration:' + MStr::AssetTypeUnknown,
-                  meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
-                  asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
-                  asset.node_name =~ /Sound/ ? ( meta[ 'ChannelCount' ] || 'ChannelCount' + MStr::AssetTypeUnknown ) + ' channels' : '',
-                  meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
-                ].reject { |e| e.nil? or e.empty? }.join( ', ' )
+                xml.remove_namespaces!
+                if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
+
+                  # scan all subtitles to find actual first_time_in and last_time_out
+                  # last subtitle is not necessarily the last displayed
+                  first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
+                  last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
+                  first_time_in_text = truncate( ( subtitles[ 0 ].at_xpath( '*/Text|Text' ) || subtitles[ 0 ].at_xpath( '*/Image|Image' ) ).text, 3 )
+                  last_time_out_text = truncate( ( subtitles[ -1 ].at_xpath( '*/Text|Text' ) || subtitles[ -1 ].at_xpath( '*/Image|Image' ) ).text, 3 )
+                  if subtitles.size > 1
+                    subtitles[ 1 .. -1 ].each do |sub|
+                      break if first_time_in < sub.attributes[ 'TimeIn' ].value
+                      first_time_in = sub.attributes[ 'TimeIn' ].value
+                    end
+                    subtitles.reverse[ 1 .. -1 ].each do |sub|
+                      break if last_time_out > sub.attributes[ 'TimeOut' ].value
+                      last_time_out = sub.attributes[ 'TimeOut' ].value
+                    end
+                  end
+                  first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
+                  last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
+
+                  # Check for empty elements. Thanks to Mattias Mattsson for the field feedback
+                  empty_subtitles = 0
+                  subtitles.each do |subtitle|
+                    if subtitle.children.empty? or ( subtitle.children.size == 1 and subtitle.children.first.is_a? Nokogiri::XML::Text )
+                      empty_subtitles += 1
+                      errors << "Empty Subtitle element: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }: DCSubtitle #{ asset_id }: #{ asset_file }#{ subtitle.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + subtitle.attributes[ 'SpotNumber' ].value : '' }"
+                    end
+                  end
+
+                  meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
+
+                else
+                  meta_report = 'DCSubtitle, no Subtitle found'
+                end
 
               else
                 broken_assets << asset_id
@@ -2007,6 +2024,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 meta_report = 'Asset file found but not AS-DCP MXF'
               end
             end
+
           else
             broken_assets << asset_id
             cpl_referenced_assets << { asset_id => FALSE }
@@ -2031,6 +2049,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       report << "#{ "%6s" % duration }  #{ edit_rate == 0 ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id }  #{ asset.node_name }\t(#{ meta_report })"
 
     end # assets.each
+
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
       errors << "Duration mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
@@ -2040,7 +2059,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         errors << "Reel duration minimum violated (< 1 second): CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
       end
     end
-    report << "\tEditRate mismatch" if edit_rates.uniq.size != 1
+    if edit_rates.uniq.size != 1
+      report << "\tEditRate mismatch"
+      errors << "EditRate mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+    end
+
     total_duration += durations.min # FIXME ugh
     composition_edit_rate = edit_rates.min
   end # reels.each_with_index
@@ -2048,9 +2071,25 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   report << 'Total duration:'
   report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
 
+  # Check if this is a SMPTE composition and reels reference both picture and sound (required in SMPTE CPL)
+  if cpl_referenced_assets_types.uniq.size == 1 and cpl_referenced_assets_types.uniq.first == MStr::AssetTypeSmpte
+    reels_references.each_with_index do |reel_refs, index|
+      if reel_refs[ :picture ] and reel_refs[ :sound ]
+        cpl_reels_references_complete << TRUE
+      else
+        assets_missing = Array.new
+        assets_missing << 'Picture' if ! reel_refs[ :picture ]
+        assets_missing << 'Sound' if ! reel_refs[ :sound ]
+        report << "SMPTE Reel #{ index + 1 }: #{ assets_missing.join( ', ' ) } missing"
+        errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
+        cpl_reels_references_complete << FALSE
+      end
+    end
+  end
+
   # Composition type
   assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
-  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == true
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
     report << "Composition type: #{ cpl_referenced_assets_types.uniq.first }"
   else
     # FIXME Composition type Mixed error or hint?
@@ -2062,6 +2101,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       hints << "Composition type: #{ stab }: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
     end
   end
+
   # Composition completeness
   if assets_status_list.include?( FALSE )
     if broken_assets.size != 0
@@ -2071,6 +2111,12 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       report << "Composition incomplete: Supplemental/VF/External"
       hints << "Composition incomplete: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }"
     end
+  # FIXME cpl_reels_references_complete.size == reels.size (and thus > 0) only in all-SMPTE CPLs
+  elsif cpl_reels_references_complete.include?( FALSE )
+    incomplete_reels = Array.new
+    cpl_reels_references_complete.each_with_index do |e, i| incomplete_reels << ( i + 1 ).to_s if e == FALSE end
+    report << "Composition incomplete: SMPTE reels require both MainPicture and MainSound: Reel#{ incomplete_reels.size != 1 ? 's' : '' } #{ incomplete_reels.join( ', ' ) } incomplete"
+    errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
   else
     report << 'Composition complete'
   end
