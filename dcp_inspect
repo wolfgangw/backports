@@ -2080,10 +2080,10 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       if reel_refs[ :picture ] and reel_refs[ :sound ]
         cpl_reels_references_complete << TRUE
       else
-        assets_missing = Array.new
-        assets_missing << 'Picture' if ! reel_refs[ :picture ]
-        assets_missing << 'Sound' if ! reel_refs[ :sound ]
-        report << "SMPTE Reel #{ index + 1 }: #{ assets_missing.join( ', ' ) } missing"
+        assets_missing_refs = Array.new
+        assets_missing_refs << 'Picture' if ! reel_refs[ :picture ]
+        assets_missing_refs << 'Sound' if ! reel_refs[ :sound ]
+        report << "SMPTE Reel #{ index + 1 }: #{ assets_missing_refs.join( ', ' ) }: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }"
         errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
         cpl_reels_references_complete << FALSE
       end
