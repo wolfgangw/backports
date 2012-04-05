@@ -134,7 +134,7 @@ BANNER
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries to resolve missing assets' ) do
         options.as_asset_store = TRUE
       end
-      opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, info, debug or trace_func (Default: info)' ) do |p|
+      opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, info, debug or trace_func (Default: debug)' ) do |p|
         if options.verbosity_choices.include?( p )
           options.verbosity = p
         else
