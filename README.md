@@ -8,6 +8,9 @@ dcp_inspect is a tool for deep inspection and validation of digital cinema packa
         dcp_inspect --help
         dcp_inspect /path/to/dir
         dcp_inspect /path/to/dir --check-hashes
+### Installation
+
+See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included).
 
 ### Features
 
@@ -28,6 +31,10 @@ dcp_inspect is a tool for deep inspection and validation of digital cinema packa
 - Reports in detail all errors encountered
 
 ### Requirements
+
+See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included).
+
+If you prefer manual installation you will need the following:
 
 - [asdcplib and its cli tools](http://www.cinecert.com/asdcplib/)
 
