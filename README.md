@@ -59,8 +59,8 @@ in backports to keep up-to-date.
 - Assetmap options chunks, offsets, volume indices are not handled
 - Marker lists are not handled
 - Check Signer.X509IssuerSerial issuer name
-- Sound present in SMPTE DCP reels?
-- Verbosity levels
+- ~~Sound present in SMPTE DCP reels?~~ Done (9723e0febb)
+- ~~Verbosity levels~~ Done (eb5da2ecaf)
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 
