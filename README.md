@@ -1,13 +1,14 @@
 ## dcp_inspect
 
 dcp_inspect is a tool for deep inspection and validation of digital cinema packages (DCP). This includes integrity checks, asset inspection, schema validation, signature and certificate verification and composition summarization. Basically anyone who needs to establish the validity of a digital cinema package can put dcp_inspect to good use.
+
 See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect) page for some of the things it can do.
 
 ### Usage
 
         dcp_inspect --help
         dcp_inspect /path/to/dir
-        dcp_inspect /path/to/dir --check-hashes
+        dcp_inspect /path/to/dir --no-hash --no-schema
 ### Installation
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included).
