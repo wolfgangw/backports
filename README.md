@@ -15,7 +15,7 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 ### Features
 
-- Checks all packages under a given location
+- Will find and check all DCPs in a filesystem tree
 
 - Runs schema validation on all infrastructure files and DCSubtitle
 
@@ -33,7 +33,7 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 ### Requirements
 
-See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included).
+See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included). Run the setup occasionally to keep up-to-date.
 
 If you prefer manual installation you will need the following:
 
