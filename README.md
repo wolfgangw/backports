@@ -23,13 +23,13 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 - Checks and verifies signatures
 
-    Signature verification requires a recent Nokogiri version with C14N support (See Requirements). If the installed version of Nokogiri does not support C14N dcp_inspect will skip signature verification and let you know.
-
 - Deep-inspects compositions
 
     This includes composition type consistency and completeness checks. dcp_inspect goes through some lengths to determine a composition's type (SMPTE/Interop). It does so by collecting all types referenced and trying to make sense of that list.
 
 - Reports in detail all errors encountered
+
+See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect).
 
 ### Requirements
 
