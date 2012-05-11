@@ -2052,6 +2052,23 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       end # if dict
 
       report << "#{ "%6s" % duration }  #{ edit_rate == 0 ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id }  #{ asset.node_name }\t(#{ meta_report })"
+      case asset.node_name
+      when 'MainStereoscopicPicture'
+        unless meta[ 'EssenceType' ] == MStr::Stereoscopic_pictures
+          report << "Essence type mismatch: Expected MainStereoscopicPicture, got #{ meta[ 'EssenceType' ] }"
+          errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+        end
+      when 'MainPicture'
+        unless meta[ 'EssenceType' ] == MStr::Pictures
+          report << "Essence type mismatch: Expected MainPicture, got #{ meta[ 'EssenceType' ] }"
+          errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+        end
+      when 'MainSound'
+        unless meta[ 'EssenceType' ] == MStr::Audio
+          report << "Essence type mismatch: Expected MainSound, got #{ meta[ 'EssenceType' ] }"
+          errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+        end
+      end
 
     end # assets.each
 
