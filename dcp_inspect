@@ -1718,9 +1718,7 @@ def errors_signature_verification( errors, signature_result, asset, file )
       errors << "Signature: #{ asset }: #{ file }: #{ signature_result.crypto.errors[ :context ].inspect }"
     end
   else
-    signature_result.messages.each do |message|
-      errors << "Signature: #{ asset }: #{ file }: #{ message }"
-    end
+    errors << "Signature verification failure: #{ asset }: #{ file }:\n\t#{ signature_result.messages.join( "\n\t" ) }"
   end
   return errors
 end
