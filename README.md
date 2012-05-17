@@ -9,6 +9,7 @@ See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-fr
         dcp_inspect --help
         dcp_inspect /path/to/dir
         dcp_inspect /path/to/dir --no-hash --no-schema
+
 ### Installation
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included).
