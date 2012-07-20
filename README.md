@@ -66,7 +66,7 @@ in backports to keep up-to-date.
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 
-Tested on linux and Mac OS boxes. Thanks to Terrence for trying on a Windows system (it executed but the libxml infrastructure required for schema checking did not work, so there. Wip)
+Tested on linux and Mac OS boxes. Thanks to Terrence Meiczinger for trying on a Windows system (it executed but the libxml infrastructure required for schema checking did not work, so there. Wip)
 
-Copyright 2011-2012 Wolfgang Woehl
+Wolfgang Woehl 2011-2012
 
