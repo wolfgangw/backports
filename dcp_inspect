@@ -2525,7 +2525,7 @@ def dcp_inspect( options, arg )
                     errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                   else
                     eta.preserve_terminal_title_with_message( 'OK' )
-                    info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
+                    # info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
                   end
                 end
               else
