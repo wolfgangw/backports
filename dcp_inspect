@@ -2189,7 +2189,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
               ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
-            else # DCSubtitle?
+            else
               # DCSubtitle?
               xml = get_xml_of_type( 'DCSubtitle', asset_file )
               if xml
