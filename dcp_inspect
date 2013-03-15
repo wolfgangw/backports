@@ -2436,8 +2436,8 @@ def dcp_inspect( options, arg )
   if Nokogiri::XML::Document.new.respond_to?( 'canonicalize' )
     @c14n_available = TRUE
   else
-    hints << 'Installed version of Nokogiri does not support C14N which is required for signature verification'
-    hints << 'See https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC for notes on how to install Nokogiri with C14N support from current git (https://github.com/tenderlove/nokogiri)'
+    hints << 'Nokogiri: Installed version of Nokogiri does not support C14N. Signature verification will be skipped'
+    hints << "Nokogiri: Installed version: #{ Nokogiri::VERSION_INFO }"
     @c14n_available = FALSE
   end
 
