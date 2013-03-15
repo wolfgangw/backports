@@ -2546,6 +2546,25 @@ def dcp_inspect( options, arg )
         else
           errors << "Listed asset file missing: AM #{ am_id } #{ am_file }: #{ path }: #{ asset_file }"
         end
+
+        # Check for optional Length element and compare to actual asset size
+        # In the case of a mismatch this results in a hint as Length is optional
+        # and no crucial processing can depend on it. Field behaviour undefined ttbomk.
+        if File.exists?( asset_file )
+          length_el = asset.xpath( 'ChunkList/Chunk/Length' )
+          if ! length_el.empty?
+            begin
+              listed_asset_length = asset.xpath( 'ChunkList/Chunk/Length' ).text.to_i
+              asset_size = File.size asset_file
+              unless listed_asset_length == asset_size
+                hints << "Length mismatch: AM #{ am_id } #{ am_file }: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
+              end
+            rescue Exception => e
+              errors << "Length check fail: AM #{ am_id } #{ am_file }: #{ e.message }"
+            end
+          end
+        end
+
       end
 
       # PackingList?
@@ -2559,24 +2578,6 @@ def dcp_inspect( options, arg )
         if file_basename =~ uuid_re
           unless file_basename.match( uuid_re )[ 0 ] == listed_id
             hints << "Asset UUID and filename UUID component mismatch: #{ listed_id } -> #{ file_basename }"
-          end
-        end
-      end
-
-      # Check for optional Length element and compare to actual asset size
-      # In the case of a mismatch this results in a hint as Length is optional
-      # and no crucial processing can depend on it. Field behaviour undefined ttbomk.
-      if File.exists?( asset_file )
-        length_el = asset.xpath( 'ChunkList/Chunk/Length' )
-        if ! length_el.empty?
-          begin
-            listed_asset_length = asset.xpath( 'ChunkList/Chunk/Length' ).text.to_i
-            asset_size = File.size asset_file
-            unless listed_asset_length == asset_size
-              hints << "Length mismatch: AM #{ am_id } #{ am_file }: Length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
-            end
-          rescue Exception => e
-            errors << "Length check fail: AM #{ am_id } #{ am_file }: #{ e.message }"
           end
         end
       end
