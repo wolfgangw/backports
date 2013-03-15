@@ -2122,6 +2122,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
       asset_ns = asset.namespaces
       asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.split( ':' ).last
+      intrinsic_duration = asset.xpath( "#{ cpl_ns_prefix }:IntrinsicDuration", asset_ns ).text.to_i
+      entry_point = asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i
       duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
       # FIXME Timecode will die on edit_rate == 0
       n, d = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text.split( ' ' ).map { |num| num.to_i }
@@ -2151,6 +2153,21 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 broken_assets << asset_id
                 cpl_referenced_assets << { asset_id => FALSE }
                 cpl_referenced_assets_types << MStr::AssetTypeUnknown
+              end
+
+              # IntrinsicDuration/EntryPoint/Duration sane?
+              if intrinsic_duration - entry_point < duration
+                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: Duration #{ duration } in #{ asset.node_name } does not compute: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
+                cpl_errors = TRUE
+              end
+              if entry_point >= intrinsic_duration
+                exceed_frames = entry_point + 1 - intrinsic_duration
+                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ exceed_frames } frame#{ exceed_frames != 1 ? 's' : '' }"
+                cpl_errors = TRUE
+              end
+              if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
+                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
+                cpl_errors = TRUE
               end
 
               meta_report = [
