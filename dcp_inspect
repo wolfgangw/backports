@@ -1938,6 +1938,7 @@ end
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signature_result )
   ns = xml.collect_namespaces
   report = Array.new
+  cpl_errors = FALSE
   cpl_referenced_assets = Array.new
   cpl_referenced_assets_types = Array.new
   cpl_reels_references_complete = Array.new
@@ -1953,6 +1954,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   else
     cpl_type = 'Unknown'
     errors << "CPL #{ cpl_id }: Default namespace unknown: #{ ns[ cpl_ns_prefix ] }: #{ cpl_file }"
+    cpl_errors = TRUE
   end
   cpl_referenced_assets_types << cpl_type
 
@@ -1971,10 +1973,12 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
       if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
         report << "Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
         errors << "CPL #{ cpl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+        cpl_errors = TRUE
       end
     else
       report << 'Signer info :x509serialnumber or :cert_serial could not be retrieved'
       errors << "CPL #{ cpl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
+      cpl_errors = TRUE
     end
   end
 
@@ -2006,6 +2010,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   if issue_date
     if issue_date.text.empty?
       errors << "CPL #{ cpl_id }: IssueDate is empty"
+      cpl_errors = TRUE
       report << 'IssueDate:        <Empty -- See schema errors below>'
     else
       issue_date_friendly = datetime_friendly( DateTime.parse issue_date.text )
@@ -2148,6 +2153,9 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
                 if options.validate
                   valid, errors = validation( errors, xml, asset_file )
+                  if valid == FALSE
+                    cpl_errors = TRUE
+                  end
                   @logger.debug( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
                 end
 
@@ -2179,6 +2187,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                     last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
                   rescue Exception => e
                     errors << "Timecode: #{ asset_file }: #{ e.message }"
+                    cpl_errors = TRUE
                   end
 
                   # Check for empty elements. Thanks to Mattias Mattsson for the field feedback
@@ -2187,6 +2196,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                     if subtitle.children.empty? or ( subtitle.children.size == 1 and subtitle.children.first.is_a? Nokogiri::XML::Text )
                       empty_subtitles += 1
                       errors << "Empty Subtitle element: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }: DCSubtitle #{ asset_id }: #{ asset_file }#{ subtitle.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + subtitle.attributes[ 'SpotNumber' ].value : '' }"
+                      cpl_errors = TRUE
                     end
                   end
 
@@ -2232,22 +2242,26 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         when 'MainStereoscopicPicture'
           unless meta[ 'EssenceType' ] == MStr::Stereoscopic_pictures
             report << "Essence type mismatch: Expected MainStereoscopicPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            cpl_errors = TRUE
           end
         when 'MainPicture'
           unless ( meta[ 'EssenceType' ] == MStr::Pictures or meta[ 'EssenceType' ] == MStr::Mpeg2 )
             report << "Essence type mismatch: Expected MainPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            cpl_errors = TRUE
           end
         when 'MainSound'
           unless meta[ 'EssenceType' ] == MStr::Audio
             report << "Essence type mismatch: Expected MainSound, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            cpl_errors = TRUE
           end
         when 'MainSubtitle'
           unless meta[ 'EssenceType' ] == MStr::Timed_text
             report << "Essence type mismatch: Expected MainSubtitle, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << report.last + ': ' + cpl_file + ': ' + "Reel #{ index + 1 }"
+            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            cpl_errors = TRUE
           end
         end
       end
@@ -2257,15 +2271,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
       errors << "Duration mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+      cpl_errors = TRUE
     else
       if edit_rates.min > 0 and durations.first.to_i / edit_rates.min.to_i < 1 # ugh, but hey, re-write is in the works
         report << "\tReel duration minimum violated (< 1 second)"
         errors << "Reel duration minimum violated (< 1 second): CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+        cpl_errors = TRUE
       end
     end
     if edit_rates.uniq.size != 1
       report << "\tEditRate mismatch"
       errors << "EditRate mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+      cpl_errors = TRUE
     end
 
     total_duration += durations.min # FIXME ugh
@@ -2274,6 +2291,9 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
   report << 'Total duration:'
   report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
+  if composition_edit_rate == 0
+    cpl_errors = TRUE
+  end
 
   # Check if this is a SMPTE composition and reels reference both picture and sound (required in SMPTE CPL)
   if cpl_referenced_assets_types.uniq.size == 1 and cpl_referenced_assets_types.uniq.first == MStr::AssetTypeSmpte
@@ -2284,8 +2304,9 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         assets_missing_refs = Array.new
         assets_missing_refs << 'Picture' if ! reel_refs[ :picture ]
         assets_missing_refs << 'Sound' if ! reel_refs[ :sound ]
-        report << "SMPTE Reel #{ index + 1 }: #{ assets_missing_refs.join( ', ' ) }: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }"
-        errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
+        report << "SMPTE Reel: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }: #{ assets_missing_refs.join( ', ' ) }"
+        errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+        cpl_errors = TRUE
         cpl_reels_references_complete << FALSE
       end
     end
@@ -2304,6 +2325,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
     if broken_assets.size != 0
       errors << "Composition type: #{ stab }: Broken assets: CPL #{ cpl_id }: #{ cpl_file }: #{ broken_assets.inspect }"
+      cpl_errors = TRUE
     else
       hints << "Composition type: #{ stab }: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
     end
@@ -2314,22 +2336,28 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     if broken_assets.size != 0
       report << "Composition incomplete: Broken assets: #{ broken_assets.inspect }"
       errors << "Composition incomplete: Broken assets: CPL #{ cpl_id }: #{ cpl_file }: #{ broken_assets.inspect }"
+      cpl_errors = TRUE
     else
       report << "Composition incomplete: Supplemental/VF/External"
       hints << "Composition incomplete: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }"
     end
-  # FIXME cpl_reels_references_complete.size == reels.size (and thus > 0) only in all-SMPTE CPLs
+    # FIXME cpl_reels_references_complete.size == reels.size (and thus > 0) only in all-SMPTE CPLs
   elsif cpl_reels_references_complete.include?( FALSE )
     incomplete_reels = Array.new
     cpl_reels_references_complete.each_with_index do |e, i| incomplete_reels << ( i + 1 ).to_s if e == FALSE end
     report << "Composition incomplete: SMPTE reels require both MainPicture and MainSound: Reel#{ incomplete_reels.size != 1 ? 's' : '' } #{ incomplete_reels.join( ', ' ) } incomplete"
     errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
+    cpl_errors = TRUE
   else
     report << 'Composition complete'
+  end
+  if cpl_errors == TRUE
+    report << "There were errors. See CPL #{ cpl_id } errors below"
   end
 
   return report, errors, hints, info
 end
+
 
 def dcp_inspect( options, arg )
   errors = Array.new
