@@ -2790,7 +2790,7 @@ def dcp_inspect( options, arg )
     end # am_pkls.each
   end # pkls.each
 
-  info << "Inspected: #{ File.realpath arg }"
+  info << "Inspected: #{ Pathname( arg ).realpath }"
   info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed: ' + packages_size_listed.to_k + ')' }"
 
   # List all found CPLs
