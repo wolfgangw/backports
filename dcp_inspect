@@ -2020,7 +2020,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     report << "IssueDate:        <Not present -- See schema errors below>"
   end
 
-  # TKR? (TODO: Check URL scheme)
+  # TKR? (FIXME: Check URL scheme)
   issuer = xml.at_xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Issuer" )
   if issuer
     #
@@ -2042,6 +2042,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     report << 'Issuer:           <Not present>'
   end
 
+  # Creator
   creator = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Creator" )
   if creator
     if creator.text.empty?
@@ -2054,7 +2055,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     report << 'Creator:          <Not present>'
   end
 
-  # Metadata
+  # Metadata // CMA
   if ns.keys.include?( 'xmlns:meta' )
     cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', ns )
     if cma
@@ -2117,10 +2118,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
           if File.exists?( asset_file )
 
-            # MXF?
             meta = MxfTools.mxf_inspect( asset_file )
+            # MXF?
             if meta
 
+              # Label types Interop/SMPTE
               case meta[ 'Label Set Type' ]
               when 'MXF Interop'
                 cpl_referenced_assets << { asset_id => TRUE }
