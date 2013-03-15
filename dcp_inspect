@@ -2699,9 +2699,11 @@ def dcp_inspect( options, arg )
 
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
+          errors << "PKL #{ pkl_id }: Asset Id missing" if id.empty?
           type = asset.xpath( 'Type' ).text
+          errors << "PKL #{ pkl_id }: Asset type not specified: #{ id }" if type.empty?
           # List all assets listed in PKL and report AM mapping status
-          @logger.debug( "#{ id }: #{ type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
+          @logger.debug( "#{ id }: #{ type.empty? ? '<Type not specified in PKL>' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
@@ -2717,7 +2719,7 @@ def dcp_inspect( options, arg )
                 package_size_listed += size_listed
                 package_size_actual += size_asset
               else
-                errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type }"
+                errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type.empty? ? '<Type not specified in PKL>' : type }"
               end
 
               # Check listed and actual digests
@@ -2735,7 +2737,7 @@ def dcp_inspect( options, arg )
                   end
                 end
               else
-                errors << "PKL: Hash tag missing or bad content: #{ asset_file }: #{ type }: #{ id }"
+                errors << "PKL: Hash tag missing or bad content: #{ asset_file }: #{ type.empty? ? '<Type not specified in PKL>' : type }: #{ id }"
               end
 
               # Pick CPLs
