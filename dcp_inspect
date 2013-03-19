@@ -31,13 +31,32 @@ AppVersion = 'v1.2013.03.15'
 #
 #   dcp_inspect --help
 #   dcp_inspect /path/to/dir
-#   dcp_inspect /path/to/dir --check-hashes
+#   dcp_inspect /path/to/dir --no-hash
+#
+# And then what?
+#
+#   - If you get errors go bug someone:
+#
+#       Either me (https://github.com/wolfgangw/backports/issues) if you
+#       suspect dcp_inspect to report a false positive or negative
+#
+#       or the author/vendor of the DCP's authoring app.
+#
+#       We all write bugs all the time and your feedback is much appreciated.
+#
+#   - If you get hints think about bugging someone
+#
+#   - If all you get is info and 0 errors:
+#
+#       Either your package is perfectly ok
+#
+#       or you ran into a dcp_inspect bug :) Again, get in touch
+#       (https://github.com/wolfgangw/backports/issues) if you suspect the latter
 #
 # Installation:
 #
 #   See https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki
-#   for an easy-to-use setup script. This will install everything required
-#   (batteries included).
+#   for an easy-to-use setup script. This will install everything required.
 #
 # Features:
 #
@@ -49,43 +68,48 @@ AppVersion = 'v1.2013.03.15'
 #
 # - Checks and verifies signatures
 #
+# - Reports detailed composition overviews
+#
 # - Deep-inspects compositions. This includes composition type consistency
 #   and completeness checks. dcp_inspect goes through some lengths to determine
 #   a composition's type (SMPTE/Interop). It does so by collecting all types
 #   referenced and trying to make sense of that list.
 #
+# - Hints at deviations from the Digital Cinema Naming Convention.
+#   See http://digitalcinemanamingconvention.com for the proper nomenclature
+#
+# - Checks presence and sanity of DCSubtitle resources
+#
 # - Reports in detail all errors encountered
 #
 # See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect).
 #
-# Requirements:
+# Manual installation / Requirements:
 #
 #   If you prefer manual installation you will need the following:
 #
-# - $ git clone git://github.com/wolfgangw/backports.git
-# - asdcplib and its cli tools (http://www.cinecert.com/asdcplib/)
-# - Nokogiri, a ruby wrapper for libxml2
-#    (http://nokogiri.org/tutorials/installing_nokogiri.html)
-#    For signature verification dcp_inspect requires a recent Nokogiri
-#    version with C14N support. See [MISC on Digital Cinema Tools]
-#    (https://github.com/wolfgangw/digital_cinema_tools/wiki/MISC)
-#    for notes on how to install Nokogiri with C14N support from
-#    current git (https://github.com/tenderlove/nokogiri)
-# - dcp_inspect requires xsd/ next to it.
-#    Clone the whole repository to put everything in place:
-#        $ git clone git://github.com/wolfgangw/backports.git
+#  - $ git clone git://github.com/wolfgangw/backports.git
+#  - asdcplib and its cli tools (http://www.cinecert.com/asdcplib/)
+#  - Nokogiri, a ruby wrapper for libxml2
+#     (http://nokogiri.org/tutorials/installing_nokogiri.html)
+#     For signature verification dcp_inspect requires a recent
+#     (post 2012.01.11) Nokogiri version with C14N support.
+#  - dcp_inspect requires xsd/ next to it.
+#     Clone the whole repository to put everything in place:
+#       $ git clone git://github.com/wolfgangw/backports.git
 #
 #   Run
 #     $ git pull
 #   in backports to keep up-to-date.
 #
-# Couple of todos:
-#
-# - Assetmap options chunks, offsets, volume indices are not handled
-# - Marker lists are not handled
-# - Check Signer.X509IssuerSerial issuer name
-#
+# Thanks to the Nokogiri team. You're a wicked crew.
 # Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
+# Thanks to Mattias Mattsson for DCSubtitle.v1.mattsson.xsd and great feedback.
+# Thanks to Mike Radford and Tammo Buhren for test materials.
+# Thanks to Alexis Michaltsis for interesting test cases and feedback.
+# Thanks to Lilian Lefranc for constant feedback and a donation which clearly
+#   exceeded what can safely be called a gesture. Appreciated and you rock.
+# Thanks to Adrianne Jorge for a great user report from Sundance and Sarasota.
 #
 # Tested on linux and Mac OS boxes. Thanks to Terrence Meiczinger for trying
 # on a Windows system (it executed but the libxml infrastructure required for
