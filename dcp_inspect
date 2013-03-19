@@ -2221,11 +2221,22 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 cpl_errors = TRUE
               end
 
-              # Check sound bps
+              # Check audio sampling rate and bps
               case asset.node_name
               when 'MainSound'
-                if meta[ 'QuantizationBits' ] != '24'
-                  errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: MainSound quantization #{ meta[ 'QuantizationBits' ] } bps. Expected 24"
+                audio_sampling_rate = meta[ 'AudioSamplingRate' ]
+                if ( audio_sampling_rate == ( '48000/1' || '96000/1' ) ? false : true )
+                  #
+                  # FIXME long day and I've got to be missing something deep here as
+                  #   if audio_sampling_rate != '48000/1' or audio_sampling_rate != '96000/1'
+                  # isn't doing what I want
+                  #
+                  errors << "CPL #{ cpl_id }: Reel #{ reel_no }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48k or 96k"
+                  cpl_errors = TRUE
+                end
+                audio_quantization_bits = meta[ 'QuantizationBits' ]
+                if audio_quantization_bits != '24'
+                  errors << "CPL #{ cpl_id }: Reel #{ reel_no }: MainSound quantization #{ audio_quantization_bits } bps. Expected 24"
                   cpl_errors = TRUE
                 end
               end
@@ -2236,6 +2247,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
                 asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Sound/ ? ( meta[ 'ChannelCount' ] || 'ChannelCount' + MStr::AssetTypeUnknown ) + ' channels' : '',
+                asset.node_name =~ /Sound/ ? ( meta[ 'AudioSamplingRate' ] || 'AudioSamplingRate' + MStr::AssetTypeUnknown ) + ' hz' : '',
                 asset.node_name =~ /Sound/ ? ( meta[ 'QuantizationBits' ] || 'QuantizationBits' + MStr::AssetTypeUnknown ) + ' bps' : '',
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
               ].reject { |e| e.nil? or e.empty? }.join( ', ' )
