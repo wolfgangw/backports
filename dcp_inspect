@@ -1985,7 +1985,7 @@ end
 
 
 # lib/cpl.rb
-def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signature_result )
+def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   ns = xml.collect_namespaces
   report = Array.new
   cpl_errors = FALSE
@@ -2007,6 +2007,30 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     cpl_errors = TRUE
   end
   cpl_referenced_assets_types << cpl_type
+
+  # Check schema
+  if options.validate
+    begin
+      valid, errors, cpl_errors = validation( errors, cpl_errors, xml, cpl_file, cpl_id, 'CPL' )
+      @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
+    rescue Exception => e
+      errors << "CPL #{ cpl_id }: Exception in Schema check: #{ e.message }"
+      cpl_errors = TRUE
+      @logger.debug errors.last
+    end
+  end
+
+  # Check signature
+  if @c14n_available
+    signature_result = check_signature( xml )
+    if signature_result.verified? and signature_result.crypto.errors[ :context ].values.flatten.empty?
+      @signed_cpls_verified_count += 1
+    end
+    errors, cpl_errors = errors_signature_verification( errors, cpl_errors, signature_result, cpl_id, cpl_file, 'CPL' )
+    @logger.debug( "CPL #{ cpl_id }: #{ signature_result.messages.last }" )
+  else
+    signature_result = nil
+  end
 
   if signature_result and ! signature_result.signature_node.empty?
     @signed_cpls_count += 1
@@ -2963,28 +2987,7 @@ def dcp_inspect( options, arg )
           xml = xml?( cpl_file )
           if xml
 
-            if options.validate
-              begin
-                valid, errors = validation( errors, xml, cpl_file )
-                @logger.debug( "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
-              rescue Exception => e
-                errors << "Exception in Schema check: CPL #{ cpl_id }: #{ cpl_file }: #{ e.message }"
-                @logger.debug errors.last
-              end
-            end
-
-            if @c14n_available
-              signature_result = check_signature( xml )
-              if signature_result.verified? and signature_result.crypto.errors[ :context ].values.flatten.empty?
-                @signed_cpls_verified_count += 1
-              end
-              errors = errors_signature_verification( errors, signature_result, cpl_id, cpl_file )
-              @logger.debug( "CPL #{ cpl_id }: #{ signature_result.messages.last }" )
-            else
-              signature_result = nil
-            end
-
-            report, errors, hints, info = cpl_inspect_xml( xml, dictionary, @package_dir, errors, hints, info, options, signature_result )
+            report, errors, hints, info = cpl_inspect_xml( xml, dictionary, @package_dir, errors, hints, info, options )
           else
             errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
           end
