@@ -2490,7 +2490,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     end
     if edit_rates.uniq.size != 1
       report << "\tEditRate mismatch"
-      errors << "CPL #{ cpl_id }: #{ cpl_file }: Reel #{ reel_no }: EditRate mismatch"
+      errors << "CPL #{ cpl_id }: Reel #{ reel_no }: EditRate mismatch"
       cpl_errors = TRUE
     end
 
@@ -2832,7 +2832,7 @@ def dcp_inspect( options, arg )
 
         if options.validate
           begin
-            valid, errors,pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
+            valid, errors, pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
             @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
           rescue Exception => e
             errors << "PKL #{ pkl_id }: Exception in Schema check: #{ e.message }"
