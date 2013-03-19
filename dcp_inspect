@@ -1754,34 +1754,37 @@ def validate_xml( xml, file )
   end
 end
 
-def validation( errors, xml, source_file )
+def validation( errors, error_status, xml, source_file, id, type_indicator )
   valid, validation_errors = validate_xml( xml, source_file )
   if valid == FALSE
     validation_errors.each do |e|
-      errors << e
+      errors << "#{ type_indicator } #{ id }: #{ e }"
+      error_status = TRUE
     end
   end
-  return valid, errors
+  return valid, errors, error_status
 end
 
 def check_signature( xml )
   signature_result = DC_Signature_Verification.new( xml )
 end
 
-def errors_signature_verification( errors, signature_result, asset, file )
+def errors_signature_verification( errors, error_status, signature_result, id, file, type_indicator )
   if signature_result.signature_node.empty?
-    return errors
+    return errors, error_status
   end
   if signature_result.verified?
     # While the signature might verify there could be problems
     # with dc specific certificate properties. Report those.
     if ! signature_result.crypto.errors[ :context ].values.flatten.empty?
-      errors << "Signature: #{ asset }: #{ file }: #{ signature_result.crypto.errors[ :context ].inspect }"
+      errors << "#{ type_indicator } #{ id }: Signature: #{ signature_result.crypto.errors[ :context ].inspect }"
+      error_status = TRUE
     end
   else
-    errors << "Signature verification failure: #{ asset }: #{ file }:\n\t#{ signature_result.messages.join( "\n\t" ) }"
+    errors << "#{ type_indicator } #{ id }: Signature verification failure:\n\t#{ signature_result.messages.join( "\n\t" ) }"
+    error_status = TRUE
   end
-  return errors
+  return errors, error_status
 end
 
 # returns xml or false.
@@ -2226,7 +2229,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                 cpl_referenced_assets_types << MStr::AssetTypeInterop
 
                 if options.validate
-                  valid, errors = validation( errors, xml, asset_file )
+                  valid, errors, cpl_errors = validation( errors, cpl_errors, xml, asset_file, asset_id, 'DCSubtitle' )
                   if valid == FALSE
                     cpl_errors = TRUE
                   end
@@ -2494,9 +2497,11 @@ def dcp_inspect( options, arg )
       xml = get_xml_of_type( 'AssetMap', am_file )
       if xml
 
+        # Scrounge am id for reporting
+        am_id = get_asset_uuid( am_file )
         if options.validate
-          valid, errors = validation( errors, xml, am_file )
-          @logger.debug( "AM Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ am_file }" )
+          valid, errors, error_status = validation( errors, TRUE, xml, am_file, am_id, 'AM' )
+          @logger.debug( "AM #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ am_file }" )
         end
 
       else
@@ -2676,7 +2681,7 @@ def dcp_inspect( options, arg )
 
         if options.validate
           begin
-            valid, errors = validation( errors, xml, pkl_file )
+            valid, errors,pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
             @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
           rescue Exception => e
             errors << "Exception in Schema check: PKL #{ pkl_id }: #{ pkl_file }: #{ e.message }"
@@ -2689,7 +2694,7 @@ def dcp_inspect( options, arg )
           if signature_result.verified? and signature_result.crypto.errors[ :context ].values.flatten.empty?
             @signed_pkls_verified_count += 1
           end
-          errors = errors_signature_verification( errors, signature_result, pkl_id, pkl_file )
+          errors, pkl_errors = errors_signature_verification( errors, pkl_errors, signature_result, pkl_id, pkl_file, 'PKL' )
           @logger.debug( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
           if signature_result and ! signature_result.signature_node.empty?
             @signed_pkls_count += 1
