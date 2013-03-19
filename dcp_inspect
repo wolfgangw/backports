@@ -1917,21 +1917,21 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, hints )
           parts.delete_at( part_index )
 
           # Examples for more or less useful messages in :field_re matches:
-          hints << "Naming convention: CPL #{ cpl_id }: Part #{ part_name } #{ part.inspect } of #{ title.inspect } does not match strict form"
+          hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } of #{ title.inspect } does not match strict form"
           case part_name
           when :film_title
             if part.size > 14
-              hints << "Naming convention: CPL #{ cpl_id }: Part #{ part_name } #{ part.inspect } has #{ part.size } characters instead of max 14"
+              hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } has #{ part.size } characters instead of max 14"
             end
             if part.upcase != part
-              hints << "Naming convention: CPL #{ cpl_id }: Part #{ part_name } #{ part.inspect } contains lowercase letters"
+              hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } contains lowercase letters"
             end
           when :studio
             if part.size < 2 or part.size > 4
-              hints << "Naming convention: CPL #{ cpl_id }: Part #{ part_name } #{ part.inspect } has #{ part.size } characters instead of 2-4"
+              hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } has #{ part.size } characters instead of 2-4"
             end
           when :territory_rating
-            hints << "Naming convention: CPL #{ cpl_id }: Part #{ part_name } ##{ part.inspect } matches :field_re only"
+            hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } ##{ part.inspect } matches :field_re only"
           end
           break
         else
@@ -1955,16 +1955,16 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, hints )
   end
 
   if original_parts.size < 11 and original_parts.size > 1
-    hints << "Naming convention: CPL #{ cpl_id }: ContentTitleText #{ title.inspect } is missing some parts (matching #{ matches }, missing #{ misses })"
+    hints << "CPL #{ cpl_id }: Naming convention: ContentTitleText #{ title.inspect } is missing some parts"
   elsif original_parts.size > 12
-    hints << "Naming convention: CPL #{ cpl_id }: ContentTitleText #{ title.inspect } has more parts than expected (matching #{ matches }, missing #{ misses })"
+    hints << "CPL #{ cpl_id }: Naming convention: ContentTitleText #{ title.inspect } has more parts than expected (matching #{ matches }, missing #{ misses })"
   elsif original_parts.size == 1
-    hints << "Naming convention: CPL #{ cpl_id }: ContentTitleText #{ title.inspect } has only 1 part. Expected 11 or 12 (missing #{ misses })"
+    hints << "CPL #{ cpl_id }: Naming convention: ContentTitleText #{ title.inspect } has only 1 part. Expected 11 or 12 (missing #{ misses })"
   else
-    hints << "Naming convention: CPL #{ cpl_id }: Expected number of parts present in #{ title.inspect }"
+    hints << "CPL #{ cpl_id }: Naming convention: Expected number of parts present in #{ title.inspect }"
   end
-  hints << "Naming convention: CPL #{ cpl_id }: #{ matches.size } matches: #{ matches.inspect }"
-  hints << "Naming convention: CPL #{ cpl_id }: #{ misses.size } misses: #{ misses.inspect }"
+  hints << "CPL #{ cpl_id }: Naming convention: #{ matches.size } matches: #{ matches.inspect }"
+  hints << "CPL #{ cpl_id }: Naming convention: #{ misses.size } misses: #{ misses.inspect }"
   return hints
 end
 
@@ -2132,7 +2132,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   is_stereoscopic = Array.new # build a flag for naming convention checks
 
   reels.each_with_index do |reel, index|
-    report << "Reel #{ index + 1 }:"
+    reel_no = index + 1
+    report << "Reel #{ reel_no }:"
     reels_references[ index ] = Hash.new
     durations = Array.new
     edit_rates = Array.new
@@ -2142,7 +2143,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     # Check uniqueness of asset kinds
     listed_asset_nodes = assets.collect { |a| a.node_name }
     if listed_asset_nodes.uniq.size != assets.size
-      errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: Found duplicate asset kinds"
+      errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Found duplicate asset kinds"
       cpl_errors = TRUE
     end
 
@@ -2207,16 +2208,16 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
               # IntrinsicDuration/EntryPoint/Duration sane?
               if intrinsic_duration - entry_point < duration
-                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: Duration #{ duration } in #{ asset.node_name } does not compute: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
+                errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Duration #{ duration } in #{ asset.node_name } does not compute: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
                 cpl_errors = TRUE
               end
               if entry_point >= intrinsic_duration
                 exceed_frames = entry_point + 1 - intrinsic_duration
-                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ exceed_frames } frame#{ exceed_frames != 1 ? 's' : '' }"
+                errors << "CPL #{ cpl_id }: Reel #{ reel_no }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ exceed_frames } frame#{ exceed_frames != 1 ? 's' : '' }"
                 cpl_errors = TRUE
               end
               if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
-                errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
+                errors << "CPL #{ cpl_id }: Reel #{ reel_no }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
                 cpl_errors = TRUE
               end
 
@@ -2252,7 +2253,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
                   if valid == FALSE
                     cpl_errors = TRUE
                   end
-                  @logger.debug( "DCSubtitle Schema check: #{ valid ? 'OK' : 'Errors (See below)' }: #{ asset_id }: #{ asset_file }"  )
+                  @logger.debug( "DCSubtitle #{ asset_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }"  )
                 end
 
                 xml.remove_namespaces!
@@ -2328,7 +2329,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
             'Reel ' + ( index + 1 ).to_s,
             asset.node_name
           ].join( ': ' )
-          hints << "Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External: #{ hint_info }"
+          hints << "#{ hint_info }: Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
         end # if dict[ asset_id ]
       end # if dict
 
@@ -2338,25 +2339,25 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         when 'MainStereoscopicPicture'
           unless meta[ 'EssenceType' ] == MStr::Stereoscopic_pictures
             report << "Essence type mismatch: Expected MainStereoscopicPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
             cpl_errors = TRUE
           end
         when 'MainPicture'
           unless ( meta[ 'EssenceType' ] == MStr::Pictures or meta[ 'EssenceType' ] == MStr::Mpeg2 )
             report << "Essence type mismatch: Expected MainPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
             cpl_errors = TRUE
           end
         when 'MainSound'
           unless meta[ 'EssenceType' ] == MStr::Audio
             report << "Essence type mismatch: Expected MainSound, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
             cpl_errors = TRUE
           end
         when 'MainSubtitle'
           unless meta[ 'EssenceType' ] == MStr::Timed_text
             report << "Essence type mismatch: Expected MainSubtitle, got #{ meta[ 'EssenceType' ] || 'NIL' }"
-            errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+            errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
             cpl_errors = TRUE
           end
         end
@@ -2366,18 +2367,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
 
     if durations.uniq.size != 1
       report << "\tDuration mismatch"
-      errors << "Duration mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+      errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Duration mismatch"
       cpl_errors = TRUE
     else
       if edit_rates.min > 0 and durations.first.to_i / edit_rates.min.to_i < 1 # ugh, but hey, re-write is in the works
         report << "\tReel duration minimum violated (< 1 second)"
-        errors << "Reel duration minimum violated (< 1 second): CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+        errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Reel duration minimum violated (< 1 second)"
         cpl_errors = TRUE
       end
     end
     if edit_rates.uniq.size != 1
       report << "\tEditRate mismatch"
-      errors << "EditRate mismatch: CPL #{ cpl_id }: #{ cpl_file }: Reel #{ index + 1 }"
+      errors << "CPL #{ cpl_id }: #{ cpl_file }: Reel #{ reel_no }: EditRate mismatch"
       cpl_errors = TRUE
     end
 
@@ -2401,7 +2402,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
         assets_missing_refs << 'Picture' if ! reel_refs[ :picture ]
         assets_missing_refs << 'Sound' if ! reel_refs[ :sound ]
         report << "SMPTE Reel: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }: #{ assets_missing_refs.join( ', ' ) }"
-        errors << "CPL #{ cpl_id }: Reel #{ index + 1 }: " + report.last
+        errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
         cpl_errors = TRUE
         cpl_reels_references_complete << FALSE
       end
@@ -2434,10 +2435,10 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
     stab = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? 'Undetermined' : assets_status_list.include?( FALSE ) ? 'Undetermined' : 'Mixed' )
     report << "Composition type: #{ stab }: #{ cpl_referenced_assets_types.inspect }"
     if broken_assets.size != 0
-      errors << "Composition type: #{ stab }: Broken assets: CPL #{ cpl_id }: #{ cpl_file }: #{ broken_assets.inspect }"
+      errors << "CPL #{ cpl_id }: Composition type: #{ stab }: Broken assets: #{ broken_assets.inspect }"
       cpl_errors = TRUE
     else
-      hints << "Composition type: #{ stab }: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }: #{ cpl_referenced_assets_types.inspect }"
+      hints << "CPL #{ cpl_id }: Composition type: #{ stab }: Supplemental/VF/External: #{ cpl_referenced_assets_types.inspect }"
     end
   end
 
@@ -2445,18 +2446,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options, signa
   if assets_status_list.include?( FALSE )
     if broken_assets.size != 0
       report << "Composition incomplete: Broken assets: #{ broken_assets.inspect }"
-      errors << "Composition incomplete: Broken assets: CPL #{ cpl_id }: #{ cpl_file }: #{ broken_assets.inspect }"
+      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets.inspect }"
       cpl_errors = TRUE
     else
       report << "Composition incomplete: Supplemental/VF/External"
-      hints << "Composition incomplete: Supplemental/VF/External: CPL #{ cpl_id }: #{ cpl_file }"
+      hints << "CPL #{ cpl_id }: #{ cpl_file }: Composition incomplete: Supplemental/VF/External"
     end
     # FIXME cpl_reels_references_complete.size == reels.size (and thus > 0) only in all-SMPTE CPLs
   elsif cpl_reels_references_complete.include?( FALSE )
     incomplete_reels = Array.new
     cpl_reels_references_complete.each_with_index do |e, i| incomplete_reels << ( i + 1 ).to_s if e == FALSE end
     report << "Composition incomplete: SMPTE reels require both MainPicture and MainSound: Reel#{ incomplete_reels.size != 1 ? 's' : '' } #{ incomplete_reels.join( ', ' ) } incomplete"
-    errors << "#{ report.last }: CPL #{ cpl_id }: #{ cpl_file }"
+    errors << "CPL #{ cpl_id }: #{ report.last }"
     cpl_errors = TRUE
   else
     report << 'Composition complete'
@@ -2577,7 +2578,7 @@ def dcp_inspect( options, arg )
 
         # Assetmap dictionary
         dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
-        @logger.debug( "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (missing)' }" )
+        @logger.debug( "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (file missing)' }" )
 
         # Check listed_id vs actual asset_id
         asset_file = package dict[ index ][ listed_id ]
@@ -2609,7 +2610,7 @@ def dcp_inspect( options, arg )
               listed_asset_length = asset.xpath( 'ChunkList/Chunk/Length' ).text.to_i
               asset_size = File.size asset_file
               unless listed_asset_length == asset_size
-                hints << "Length mismatch: AM #{ am_id } #{ am_file }: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
+                hints << "AM #{ am_id }: Length mismatch: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
               end
             rescue Exception => e
               errors << "Length check fail: AM #{ am_id } #{ am_file }: #{ e.message }"
