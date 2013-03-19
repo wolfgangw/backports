@@ -2610,9 +2610,11 @@ def dcp_inspect( options, arg )
   package_dir_tree = Array.new
   Dir.chdir( @package_dir ) { |d| package_dir_tree = Dir[ "**/*" ] }
 
+  #
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
   # am_candidates = with_etabar( package_dir_tree, options, 'Looking for Assetmap candidates:', 20, '[= ]' ) { |e| ( File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ ) ? e : nil }
+  #
   am_candidates = package_dir_tree.select { |e| File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ }.sort
   am_candidates = am_candidates.sort
   if am_candidates.empty?
@@ -2655,6 +2657,7 @@ def dcp_inspect( options, arg )
   pkls_missing = Array.new
   ams = Array.new
   am_files.each_with_index do |am_file, index|
+    am_errors = FALSE
     dict << Hash.new
     pkls << Array.new
     pkls_missing << Array.new
@@ -2668,6 +2671,7 @@ def dcp_inspect( options, arg )
     else
       ams << NIL
       errors << "Assetmap '#{ am_file }' has no Id"
+      am_errors = TRUE
     end
     # collect all asset nodes
     assets = xml.xpath( '//Asset' )
@@ -2683,9 +2687,13 @@ def dcp_inspect( options, arg )
       # FIXME ChunkList.size == 1 is an assumption and wrong at that. Could be > 1
       path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
       # using AM listed path for listing message, not package path, because this is what we're looking at right now:
-      errors << "Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }" unless listed_id =~ uuid_rfc4122_re
+      if listed_id !~ uuid_rfc4122_re
+        errors << "AM #{ am_id }: Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }"
+        am_errors = TRUE
+      end
       if path.nil? # example: mc t28 ASSETMAP.xml
-        errors << "No path for asset: #{ listed_id }: AM #{ am_id }: #{ am_file }"
+        errors << "AM #{ am_id }: No path for asset: #{ listed_id }"
+        am_errors = TRUE
       else
 
         # Assetmap dictionary
@@ -2698,18 +2706,21 @@ def dcp_inspect( options, arg )
           asset_id = get_asset_uuid( asset_file )
           if asset_id
             unless asset_id =~ uuid_rfc4122_re
-              errors << "Asset UUID: Not an RFC-4122 UUID: #{ asset_file }: #{ asset_id }"
+              errors << "AM #{ am_id }: Asset UUID: Not an RFC-4122 UUID: #{ asset_file }: #{ asset_id }"
+              am_errors = TRUE
             end
             if listed_id.downcase != asset_id.downcase
-              errors << "UUID mismatch: AM #{ am_id } #{ am_file }: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }" 
+              errors << "AM #{ am_id }: UUID mismatch: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }" 
+              am_errors = TRUE
             else
               if listed_id != asset_id
-                hints << "UUID case mismatch: AM #{ am_id } #{ am_file }: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }"
+                hints << "AM #{ am_id }: UUID case mismatch: #{ asset_file }: Listed: #{ listed_id } Asset: #{ asset_id }"
               end
             end
           end
         else
-          errors << "Listed asset file missing: AM #{ am_id } #{ am_file }: #{ path }: #{ asset_file }"
+          errors << "AM #{ am_id }: Listed asset file missing: #{ listed_id }: #{ path }: #{ asset_file }"
+          am_errors = TRUE
         end
 
         # Check for optional Length element and compare to actual asset size
@@ -2725,7 +2736,8 @@ def dcp_inspect( options, arg )
                 hints << "AM #{ am_id }: Length mismatch: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
               end
             rescue Exception => e
-              errors << "Length check fail: AM #{ am_id } #{ am_file }: #{ e.message }"
+              errors << "AM #{ am_id }: Length check fail: #{ e.message }"
+              am_errors = TRUE
             end
           end
         end
@@ -2757,11 +2769,17 @@ def dcp_inspect( options, arg )
         @logger.debug "PKL file present: #{ pkl_id }: #{ pkl_file }"
       else
         pkls_missing[ index ] << pkl_id
-        errors << "PKL file missing: #{ pkl_id }: #{ pkl_file }"
+        errors << "AM #{ am_id }: PKL file missing: #{ pkl_id }: #{ pkl_file }"
+        am_errors = TRUE
         @logger.debug errors.last
       end
     }
     pkls_missing[ index ].map { |pkl_id| pkls[ index ].delete pkl_id }
+
+    if am_errors == TRUE
+      @logger.debug "There were errors. See AM #{ am_id } errors below"
+    end
+
     @logger.debug nil
 
   end # am_files.each
@@ -2805,6 +2823,7 @@ def dcp_inspect( options, arg )
     cpls << Array.new
     cpls_missing << Array.new
     am_pkls.each do |pkl_id|
+      pkl_errors = FALSE
       pkl_file = package dict[ index ][ pkl_id ]
       xml = get_xml_of_type( 'PackingList', pkl_file )
       if xml
@@ -2816,7 +2835,8 @@ def dcp_inspect( options, arg )
             valid, errors,pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
             @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : 'Errors (See below)' }" )
           rescue Exception => e
-            errors << "Exception in Schema check: PKL #{ pkl_id }: #{ pkl_file }: #{ e.message }"
+            errors << "PKL #{ pkl_id }: Exception in Schema check: #{ e.message }"
+            pkl_errors = TRUE
             @logger.debug errors.last
           end
         end
@@ -2841,11 +2861,13 @@ def dcp_inspect( options, arg )
             # See e.g. dcp_2/V174* for a serial mismatch
             if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
               if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
-                errors << "Signer serial mismatch: PKL #{ pkl_id }: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                errors << "PKL #{ pkl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                pkl_errors = TRUE
                 @logger.debug errors.last
               end
             else
-              errors << "Signer info :x509serialnumber or :cert_serial could not be retrieved: PKL #{ pkl_id }"
+              errors << "PKL #{ pkl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
+              pkl_errors = TRUE
               @logger.debug errors.last
             end
           end
@@ -2864,9 +2886,15 @@ def dcp_inspect( options, arg )
 
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
-          errors << "PKL #{ pkl_id }: Asset Id missing" if id.empty?
+          if id.empty?
+            errors << "PKL #{ pkl_id }: Asset Id missing"
+            pkl_errors = TRUE
+          end
           type = asset.xpath( 'Type' ).text
-          errors << "PKL #{ pkl_id }: Asset type not specified: #{ id }" if type.empty?
+          if type.empty?
+            errors << "PKL #{ pkl_id }: Asset type not specified: #{ id }"
+            pkl_errors = TRUE
+          end
           # List all assets listed in PKL and report AM mapping status
           @logger.debug( "#{ id }: #{ type.empty? ? '<Type not specified in PKL>' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
 
@@ -2880,11 +2908,15 @@ def dcp_inspect( options, arg )
               # Check listed and actual asset size
               if size_listed
                 size_asset = File.size( asset_file )
-                errors << "Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }" unless size_listed == size_asset
+                if size_listed != size_asset
+                  errors << "PKL #{ pkl_id }: Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }"
+                  pkl_errors = TRUE
+                end
                 package_size_listed += size_listed
                 package_size_actual += size_asset
               else
-                errors << "PKL: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type.empty? ? '<Type not specified in PKL>' : type }"
+                errors << "PKL #{ pkl_id }: Size tag missing or bad content: #{ id }: #{ asset_file }: #{ type.empty? ? '<Type not specified in PKL>' : type }"
+                pkl_errors = TRUE
               end
 
               # Check listed and actual digests
@@ -2895,7 +2927,8 @@ def dcp_inspect( options, arg )
                   hash_check = Base64.encode64( hash_check ).chomp
                   if hash_listed != hash_check
                     eta.preserve_terminal_title_with_message( 'Mismatch' )
-                    errors << "Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                    errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                    pkl_errors = TRUE
                   else
                     eta.preserve_terminal_title_with_message( 'OK' )
                     # info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
