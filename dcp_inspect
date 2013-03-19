@@ -2514,7 +2514,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
         assets_missing_refs << 'Picture' if ! reel_refs[ :picture ]
         assets_missing_refs << 'Sound' if ! reel_refs[ :sound ]
         report << "SMPTE Reel: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }: #{ assets_missing_refs.join( ', ' ) }"
-        errors << "CPL #{ cpl_id }: Reel #{ reel_no }: " + report.last
+        errors << "CPL #{ cpl_id }: " + report.last
         cpl_errors = TRUE
         cpl_reels_references_complete << FALSE
       end
