@@ -2167,6 +2167,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     # Check uniqueness of asset kinds
     listed_asset_nodes = assets.collect { |a| a.node_name }
     if listed_asset_nodes.uniq.size != assets.size
+      # FIXME check for ST429-12 assets ClosedCaption and MainCaption. How about ClosedSubtitle?
       errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Found duplicate asset kinds"
       cpl_errors = TRUE
     end
