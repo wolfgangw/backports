@@ -380,7 +380,7 @@ def pl( list )
 end
 
 # Thanks to Rein Henrichs
-def truncate( text, num_words = 6, truncate_string = "..." )
+def truncate( text, num_words = 6, truncate_string = " [...]" )
   if text.nil? then return end
   arr = text.split( ' ' )
   arr.length > num_words ? arr[ 0...num_words ].join( ' ' ) + truncate_string : text
@@ -1963,8 +1963,8 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, hints )
   else
     hints << "CPL #{ cpl_id }: Naming convention: Expected number of parts present in #{ title.inspect }"
   end
-  hints << "CPL #{ cpl_id }: Naming convention: #{ matches.size } matches: #{ matches.inspect }"
-  hints << "CPL #{ cpl_id }: Naming convention: #{ misses.size } misses: #{ misses.inspect }"
+  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', matches ) } matching: #{ matches.inspect }"
+  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', misses ) } missing: #{ misses.inspect }"
   return hints
 end
 
