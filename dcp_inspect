@@ -147,6 +147,7 @@ TOO_MANY_ARGS = 3
 ARG_NOT_A_DIR = 4
 XML_CATALOG_NOT_FOUND = 5
 XSD_STORE_NOT_FOUND = 6
+BAD_HASH_LIMIT_ARG = 7
 
 # Signature counters
 @signed_cpls_count = 0
@@ -160,6 +161,7 @@ class Options
     # defaults
     options = OpenStruct.new
     options.check_hashes = TRUE
+    options.check_hashes_limit = :no_limit
     options.validate = TRUE
     options.as_asset_store = FALSE
     options.verbosity = 'debug'
@@ -173,6 +175,9 @@ Usage: #{ AppName } [options] <location>
 BANNER
       opts.on( '--no-hash', 'Skip asset hash checks' ) do
         options.check_hashes = FALSE
+      end
+      opts.on( '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 10GB (Default: no limit)' ) do |p|
+        options.check_hashes_limit = p
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
         options.validate = FALSE
@@ -399,6 +404,24 @@ end
 
 # misc helpers
 #
+# turn items like '100KB' or '1.5 GB' to bytes
+def bytes_from_nice_bytes( nice_bytes )
+  parts = nice_bytes.downcase.split( /(kb|mb|gb)/ )
+  n = Float( parts.first )
+  if parts[ 1 ]
+    case parts[ 1 ]
+    when 'kb'
+      n * Numeric::KILO.to_i
+    when 'mb'
+      n * Numeric::MEGA.to_i
+    when 'gb'
+      n * Numeric::GIGA.to_i
+    end
+  else
+    n
+  end
+end
+
 # plural helper english
 def amount( item, list )
   "#{ list.size } #{ item }#{ pl list }"
@@ -2948,16 +2971,21 @@ def dcp_inspect( options, arg )
               # Check listed and actual digests
               if ( hash_listed = asset.xpath( 'Hash' ).text )
                 if options.check_hashes
-                  etabar_title = "#{ id }: Checking hash value:"
-                  hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options )
-                  hash_check = Base64.encode64( hash_check ).chomp
-                  if hash_listed != hash_check
-                    eta.preserve_terminal_title_with_message( 'Mismatch' )
-                    errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
-                    pkl_errors = TRUE
+                  if options.check_hashes_limit == :no_limit or bytes_from_nice_bytes( options.check_hashes_limit ) > size_asset
+                    etabar_title = "#{ id }: Checking hash value:"
+                    hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options )
+                    hash_check = Base64.encode64( hash_check ).chomp
+                    if hash_listed != hash_check
+                      eta.preserve_terminal_title_with_message( 'Mismatch' )
+                      errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                      pkl_errors = TRUE
+                    else
+                      eta.preserve_terminal_title_with_message( 'OK' )
+                      # info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
+                    end
                   else
-                    eta.preserve_terminal_title_with_message( 'OK' )
-                    # info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
+                    @logger.debug( "#{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit" )
+                    hints << "PKL #{ pkl_id }: Asset #{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit: #{ asset_file }"
                   end
                 end
               else
@@ -3071,7 +3099,20 @@ end
 options = Options.parse( ARGV )
 args = ARGV
 @logger = DLogger.new( prefix = '', options )
-@logger.debug( "#{ AppName } #{ AppVersion }: #{ args } #{ options.validate ? '' : ': Schema checks will be skipped' }" )
+@logger.debug( "#{ AppName } #{ AppVersion }: #{ args }" )
+unless options.validate
+  @logger.info( 'Will skip schema checks' )
+end
+# Check --hash-limit argument
+unless options.check_hashes_limit == :no_limit
+  if options.check_hashes_limit =~ /\d+(\.?\d+)?\s?(kb|mb|gb)/
+    @logger.info( "Will skip hash checks for files bigger than #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k }" )
+  else
+    @logger.info( "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB" )
+    exit BAD_HASH_LIMIT_ARG
+  end
+end
+
 
 # Set up local XML Catalog and patch its xml:base
 AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
