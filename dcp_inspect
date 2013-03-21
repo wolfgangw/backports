@@ -2175,10 +2175,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     assets_labels = Array.new
     assets = reel.xpath( "#{ cpl_ns_prefix }:AssetList/*" )
 
-    # Check uniqueness of asset kinds
-    listed_asset_nodes = assets.collect { |a| a.node_name }
-    if listed_asset_nodes.uniq.size != assets.size
-      # FIXME check for ST429-12 assets ClosedCaption and MainCaption. How about ClosedSubtitle?
+    # Check uniqueness of asset kinds which need to be unique in a reel.
+    # Multiple instances of ClosedCaption, MainCaption and ClosedSubtitle allowed.
+    asset_node_names = assets.collect { |a| a.node_name }
+    assets_required_unique = asset_node_names - [ 'ClosedCaption', 'MainCaption', 'ClosedSubtitle' ]
+    if assets_required_unique.uniq.size != assets_required_unique.size
       errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Found duplicate asset kinds"
       cpl_errors = TRUE
     end
