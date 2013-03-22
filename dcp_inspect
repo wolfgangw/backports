@@ -46,9 +46,12 @@ AppVersion = 'v1.2013.03.21'
 #
 #       We all write bugs all the time and your feedback is much appreciated.
 #
-#   - If you get hints think about bugging someone
+#   - If you get hints think about bugging someone. Try and make an informed
+#     decision whether the issues hinted at might lead to trouble in the field.
+#     Some hints will recommend fixing the issue (e.g. empty Text or Image
+#     elements in DCSubtitle).
 #
-#   - If all you get is info and 0 errors:
+#   - If all you get is info and "0 errors 0 hints":
 #
 #       Either your package is perfectly ok
 #
