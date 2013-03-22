@@ -2512,10 +2512,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Duration mismatch"
       cpl_errors = TRUE
     else
-      if edit_rates.min > 0 and durations.first.to_i / edit_rates.min.to_i < 1 # ugh, but hey, re-write is in the works
+      reel_duration = durations.first.to_i / edit_rates.min.to_i # gets it done but ugh
+      if edit_rates.min > 0 and reel_duration < 1
         report << "\tReel duration minimum violated (< 1 second)"
         errors << "CPL #{ cpl_id }: Reel #{ reel_no }: Reel duration minimum violated (< 1 second)"
         cpl_errors = TRUE
+      elsif edit_rates.min > 0 and reel_duration < 5 # Doremi TB 65 (2010-03-09)
+        hints << "CPL #{ cpl_id }: Reel #{ reel_no }: Reel duration less than 5 seconds. Doremi TB 65 mentions the restriction for their systems"
       end
     end
     if edit_rates.uniq.size != 1
