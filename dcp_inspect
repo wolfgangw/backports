@@ -292,6 +292,8 @@ module MStr
     Interop_cpl => 'PROTO-ASDCP-CPL-20040511.xsd'
   }
 
+  # Digital Cinema Naming Convention V.3.9
+  # http://digitalcinemanamingconvention.com
   Naming_convention = {
     :film_title       => { :re => /^[-A-Z0-9]{1,14}$/,                        :field_re => /^[-a-zA-Z0-9]+$/ },
     :content_type     => { :re => /^(FTR|FTR-\d|TST|TLR|TLR-\d|TLR\d-2D|TLR\d-3D|RTG-F|RTG-T1|TSR|TSR-\d|POL|PSA|ADV|SHR|XSN)$/ },
@@ -1915,7 +1917,7 @@ end
 
 #
 # Consider the naming convention checks performed here
-# to be a moving target
+# to be a moving target.
 #
 def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_required, hints )
   original_parts = title.split( '_' )
@@ -1923,11 +1925,9 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
   matches = Hash.new
   misses = Hash.new
   required_parts = MStr::Naming_convention.keys
-  # puts required_parts.inspect
   required_parts.delete( :i3d_specs ) unless ( is_stereoscopic && i3d_specs_required )
 
   required_parts.each_with_index do |part_name, part_name_index|
-    # puts "  Looking for #{part_name}"
 
     regexp = Hash.new
     regexp[ :re ] = MStr::Naming_convention[ part_name ][ :re ]
@@ -1937,20 +1937,15 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
 
     parts.each_with_index do |part, part_index|
 
-      # puts "    parts: #{parts.inspect}"
       if part =~ regexp[ :re ] # Check strict
         matches[ part_name ] = part
         if misses.keys.include?( part_name ) then misses.delete( part_name ) end
-        # puts "    MATCH: #{ part_name.inspect } => #{ part } => #{ regexp.inspect }"
-        # puts "      matches: #{matches.inspect}"
         parts.delete_at( part_index )
         break
       elsif regexp.keys.include?( :field_re ) # Check less strict
         if part =~ regexp[ :field_re ]
           matches[ part_name ] = part
           if misses.keys.include?( part_name ) then misses.delete( part_name ) end
-          # puts "    MATCH FIELD_RE: #{ part_name.inspect } => #{ part } => #{ regexp.inspect }"
-          # puts "      matches: #{matches.inspect}"
           parts.delete_at( part_index )
 
           # Examples for more or less useful messages in :field_re matches:
@@ -1972,18 +1967,14 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
           end
           break
         else
-          # puts "    MISS: #{ part_name } => #{ part } => #{ regexp.inspect }"
           if part_index = parts.size - 1
             misses[ part_name ] = false
-            # puts "      misses:  #{misses.inspect}"
           end
           next
         end
       else
-        # puts "    MISS: #{ part_name } => #{ part } => #{ regexp.inspect }"
         if part_index = parts.size - 1
           misses[ part_name ] = false
-          # puts "      misses:  #{misses.inspect}"
         end
         next
       end
