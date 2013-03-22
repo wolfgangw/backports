@@ -2360,7 +2360,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   end
 
                   #
-                  # Check for empty elements. Thanks to Mattias Mattsson and Lilian Lefranc for the field feedback
+                  # Check for empty elements. Thanks to Mattias Mattsson, Lilian Lefranc and Johann Hohenwarter for the field feedback
                   #
                   empty_subtitles = 0
                   subtitles.each do |sub|
@@ -2372,7 +2372,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                       nodeset.each do |node|
                         if node.text == ''
                           empty_subtitles += 1
-                          hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Empty #{ node.name } element#{ sub.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + sub.attributes[ 'SpotNumber' ].value : '' }"
+                          hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Empty #{ node.name } element#{ sub.attributes[ 'SpotNumber' ] ? ': SpotNumber ' + sub.attributes[ 'SpotNumber' ].value : '' }. While not a specification error this can lead to playback problems in the field. Consider fixing"
                         end
                       end
                     end
