@@ -178,10 +178,10 @@ class Options
 Usage: #{ AppName } [options] <location>
 
 BANNER
-      opts.on( '--no-hash', 'Skip asset hash checks' ) do
+      opts.on( '--nh', '--no-hash', 'Skip asset hash checks' ) do
         options.check_hashes = FALSE
       end
-      opts.on( '--hl', '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 10GB (Default: no limit)' ) do |p|
+      opts.on( '--hl', '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 1GB (Default: no limit)' ) do |p|
         options.check_hashes_limit = p.downcase
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
@@ -2655,12 +2655,12 @@ def dcp_inspect( options, arg )
   hints = Array.new
   hints << 'Schema checks were skipped' unless options.validate
   info = Array.new
-  uuid_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
   #
   # RFC-4122:
   # The hexadecimal values "a" through "f" are output as
   # lower case characters and are case insensitive on input.
   #
+  uuid_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ # used for filename component
   uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
 
   # Nokogiri git master (2012.01.11) implements interface to libxml2's C14N
