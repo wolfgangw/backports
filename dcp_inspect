@@ -151,6 +151,7 @@ ARG_NOT_A_DIR = 4
 XML_CATALOG_NOT_FOUND = 5
 XSD_STORE_NOT_FOUND = 6
 BAD_HASH_LIMIT_ARG = 7
+LOGFILE_WRITE_ERROR = 8
 
 # Signature counters
 @signed_cpls_count = 0
@@ -168,6 +169,7 @@ class Options
     options.validate = TRUE
     options.as_asset_store = FALSE
     options.verbosity = 'debug'
+    options.logfile = NIL
     options.verbosity_choices = [ 'quiet', 'errors', 'info', 'debug', 'trace_func' ]
 
     opts = OptionParser.new do |opts|
@@ -195,6 +197,9 @@ BANNER
           options.verbosity = "info"
         end
       end
+      opts.on( '-l' '--logfile logfile', String, 'Specify logfile' ) do |p|
+        options.logfile = p
+      end
       opts.on_tail( '-h', '--help', 'Display this screen' ) do
         puts opts
         exit
@@ -217,6 +222,7 @@ end # Options
 class DLogger
   def initialize( prefix, options )
     @prefix = prefix
+    @full_log = ( options.logfile ? Array.new : NIL )
     @verbosity = options.verbosity
     case @verbosity
     when 'quiet'  then @errors, @info, @debug, @cr = [ FALSE, FALSE, FALSE, FALSE ]
@@ -230,12 +236,33 @@ class DLogger
       }
     end
   end
-  def errors( text ); to_console( text ) if @errors; end
-  def info( text ); to_console( text ) if @info; end
-  def debug( text ); to_console( text ) if @debug; end
-  def cr( text ); carriage_return( text ) if @cr; end
-  def to_console( text ); printf "%s %s\n", @prefix, text; end
-  def carriage_return( text ); printf "%s %s\r", @prefix, text; end
+  def errors( text )
+    if @errors
+      to_console( text )
+      @full_log << text if @full_log
+    end
+  end
+  def info( text )
+    if @info
+      to_console( text )
+      @full_log << text if @full_log
+    end
+  end
+  def debug( text )
+    if @debug
+      to_console( text )
+      @full_log << text if @full_log
+    end
+  end
+  def cr( text )
+    # don't go to @full_log here
+    carriage_return( text ) if @cr
+  end
+  def to_console( text ) printf "%s %s\n", @prefix, text end
+  def carriage_return( text ) printf "%s %s\r", @prefix, text end
+  def full_log_blob
+    @full_log.join( "\n" ) + "\n"
+  end
 end
 
 
@@ -3131,6 +3158,18 @@ ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
   inspection = dcp_inspect( options, args[ 0 ] )
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+  if options.logfile
+    if File.exists?( options.logfile )
+      @logger.info "Requested logfile #{ Pathname( options.logfile ).realpath } exists. Not overwriting"
+    else
+      begin
+        File.open( options.logfile, 'w' ) { |f| f.write( @logger.full_log_blob ) }
+      rescue Exception => e
+        @logger.info e.message
+        exit LOGFILE_WRITE_ERROR
+      end
+    end
+  end
   case inspection[ :errors ].size
   when 0
     exit DCP_OK
