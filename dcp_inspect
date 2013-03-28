@@ -179,8 +179,8 @@ BANNER
       opts.on( '--no-hash', 'Skip asset hash checks' ) do
         options.check_hashes = FALSE
       end
-      opts.on( '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 10GB (Default: no limit)' ) do |p|
-        options.check_hashes_limit = p
+      opts.on( '--hl', '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 10GB (Default: no limit)' ) do |p|
+        options.check_hashes_limit = p.downcase
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
         options.validate = FALSE
