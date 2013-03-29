@@ -237,21 +237,21 @@ class DLogger
     end
   end
   def errors( text )
+    @full_log << text if @full_log
     if @errors
       to_console( text )
-      @full_log << text if @full_log
     end
   end
   def info( text )
+    @full_log << text if @full_log
     if @info
       to_console( text )
-      @full_log << text if @full_log
     end
   end
   def debug( text )
+    @full_log << text if @full_log
     if @debug
       to_console( text )
-      @full_log << text if @full_log
     end
   end
   def cr( text )
