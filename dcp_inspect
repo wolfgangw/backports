@@ -2477,10 +2477,27 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                         font_asset = package( File.join( asset_id, File.basename( load_font_uri ) ) )
                         if File.exists?( font_asset )
                           if font?( font_asset )
+                            # Check for font max size recommendation
                             font_asset_size = File.size font_asset
                             if font_asset_size > 655360 # 640 KB
                               errors << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Font #{ font_asset } size #{ font_asset_size.to_k } exceeds 640 KB"
                               cpl_errors = TRUE
+                            end
+                            # Get font name
+                            begin
+                              require 'ttfunk'
+                              ttfunk = TRUE
+                            rescue
+                              ttfunk = FALSE
+                            end
+                            begin
+                              if ttfunk
+                                font_fu = TTFunk::File.open font_asset
+                                font_name = font_fu.name.font_name.first.to_s
+                                hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Font name: #{ font_name }"
+                              end
+                            rescue
+                              #
                             end
                           else
                             errors << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Font #{ font_asset } referenced in LoadFont is neither #{ MStr::TTF } nor #{ MStr::OTF }"
