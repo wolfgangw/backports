@@ -2799,8 +2799,8 @@ def dcp_inspect( options, arg )
     # collect all asset nodes
     assets = xml.xpath( '//Asset' )
 
-    @logger.debug( "Assetmap #{ am_id }: #{ am_file }"  )
-    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'asset', assets ) }:" )
+    @logger.debug( "AM #{ am_id }: #{ am_file }"  )
+    @logger.debug( "AM #{ am_id } lists #{ amount( 'asset', assets ) }:" )
 
     # Store asset info in a dictionary (uuid => path, relative to package root)
     # look for PackingList(s)
