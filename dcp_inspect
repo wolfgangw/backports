@@ -2048,7 +2048,7 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
     hints << "CPL #{ cpl_id }: Naming convention: Expected number of parts present in #{ title.inspect }"
   end
   hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', matches ) } matching: #{ matches.inspect }" if matches.size > 0
-  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', misses ) } missing: #{ misses.inspect }" if misses.size > 0
+  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', misses ) } missing: #{ misses.keys.inspect }" if misses.size > 0
   return hints
 end
 
@@ -2671,10 +2671,10 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
     report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
     if broken_assets.size != 0
-      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Broken assets: #{ broken_assets.inspect }"
+      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
       cpl_errors = TRUE
     else
-      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External: #{ cpl_referenced_assets_types.inspect }"
+      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
     end
   end
 
@@ -2697,7 +2697,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   if assets_status_list.include?( FALSE )
     if broken_assets.size != 0
       report << "Composition incomplete: Broken assets: #{ broken_assets.inspect }"
-      errors << "CPL #{ cpl_id }: Composition incomplete: Broken assets: #{ broken_assets.inspect }"
+      errors << "CPL #{ cpl_id }: Composition incomplete"
       cpl_errors = TRUE
     else
       report << "Composition incomplete: Supplemental/VF/External"
@@ -3053,7 +3053,7 @@ def dcp_inspect( options, arg )
               # Check listed and actual asset size
               if size_listed
                 if size_listed != size_asset
-                  errors << "PKL #{ pkl_id }: Size mismatch: #{ id }: #{ asset_file }: PKL: #{ size_listed } Asset: #{ size_asset }"
+                  errors << "PKL #{ pkl_id }: Size mismatch: #{ id }: PKL: #{ size_listed } (#{ size_listed.to_k }) Asset: #{ size_asset } (#{ size_asset.to_k })"
                   pkl_errors = TRUE
                 end
                 package_size_listed += size_listed
@@ -3072,7 +3072,7 @@ def dcp_inspect( options, arg )
                     hash_check = Base64.encode64( hash_check ).chomp
                     if hash_listed != hash_check
                       eta.preserve_terminal_title_with_message( 'Mismatch' )
-                      errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: #{ asset_file }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                      errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                       pkl_errors = TRUE
                     else
                       eta.preserve_terminal_title_with_message( 'OK' )
