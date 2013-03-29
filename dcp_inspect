@@ -2472,10 +2472,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                     if load_font_el.empty?
                       hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: No LoadFont element found. Playback will use a default font"
                     else
-                      load_font_uri = load_font_el.first.attributes[ 'URI' ]
+                      load_font_uri = load_font_el.first.attributes[ 'URI' ].value
                       font_asset = File.join( asset_id, File.basename( load_font_uri ) )
-                      if dict.values.any? { |val| val.include? font_asset }
-                        font_asset = package( File.join( asset_id, File.basename( load_font_uri ) ) )
+                      font_path = NIL
+                      if dict.values.any? { |val| val =~ /#{ font_asset }$/ && font_path = val }
+                        font_asset = package font_path
                         if File.exists?( font_asset )
                           if font?( font_asset )
                             # Check for font max size recommendation
@@ -2494,8 +2495,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                             begin
                               if ttfunk
                                 font_fu = TTFunk::File.open font_asset
-                                font_name = font_fu.name.font_name.first.to_s
-                                hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Font name: #{ font_name }"
+                                font_unique_subfamily = font_fu.name.unique_subfamily[ 1 ].to_s
+                                hints << "CPL #{ cpl_id }: Reel #{ reel_no }: DCSubtitle: Referenced font subfamily: #{ font_unique_subfamily }"
                               end
                             rescue
                               #
