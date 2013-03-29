@@ -2543,7 +2543,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
           meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
           hint_info = [
             'CPL ' + cpl_id,
-            asset_id,
             'Reel ' + ( index + 1 ).to_s,
             asset.node_name
           ].join( ': ' )
