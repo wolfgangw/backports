@@ -358,7 +358,7 @@ module MStr
     :date             => { :re => /^\d{8}$/,                                  :field_re => /^\d{6}$/ },
     :facility         => { :re => /^[A-Z0-9]{2,3}$/ },
     :i3d_specs        => { :re => /^(i3D|i3D-gb|i3D-ngb)$/ },
-    :package_type     => { :re => /^(OV|VF(-\d)?)$/ }
+    :package_type     => { :re => /^(OV|VF(-\d)?)$/,                          :field_re => /^VF(\d)?$/ }
   }
 
   # asdcp-test answers include
@@ -1976,9 +1976,10 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
   original_parts = title.split( '_' )
   parts = original_parts.dup
   matches = Hash.new
-  misses = Hash.new
   required_parts = MStr::Naming_convention.keys
   required_parts.delete( :i3d_specs ) unless ( is_stereoscopic && i3d_specs_required )
+  misses = Hash.new
+  required_parts.each do |rp| misses[ rp ] = FALSE end
 
   #
   # Try to anchor :studio and :facility to :date. Ugh
@@ -1995,11 +1996,13 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
     if part =~ regexp[ :studio ] and parts_clone[ part_index + 1 ] =~ regexp[ :date ]
       studio_match = TRUE
       matches[ :studio ] = part
+      misses.delete( :studio )
       required_parts.delete( :studio )
       parts.delete_at( part_index )
     end
     if part =~ regexp[ :facility ] and parts_clone[ part_index - 1 ] =~ regexp[ :date ]
       matches[ :facility ] = part
+      misses.delete( :facility )
       required_parts.delete( :facility )
       parts.delete_at( studio_match ? part_index - 1 : part_index )
     end
@@ -2039,6 +2042,8 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
             end
           when :territory_rating
             hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } matches :field_re only"
+          when :package_type
+            hints << "CPL #{ cpl_id }: Naming convention: Part #{ part_name } #{ part.inspect } is missing a hyphen, should be '#{ part.split( /\d/ ).first }-#{ part.split( /\D/ ).last }'"
           end
           # All upcase
           if part.upcase != part
@@ -2071,9 +2076,9 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
   else
     hints << "CPL #{ cpl_id }: Naming convention: Expected number of parts present in #{ title.inspect }"
   end
-  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', matches ) } matching: #{ matches.inspect }" if matches.size > 0
-  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', misses ) } missing: #{ misses.keys.inspect }" if misses.size > 0
-  return hints
+  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', matches ) } matching: #{ matches.map { |k,v| [ k, '"' + v + '"' ].join( ':' ) }.join( ' ' ) }" if matches.size > 0
+  hints << "CPL #{ cpl_id }: Naming convention: #{ amount( 'part', misses ) } missing: #{ misses.keys.join( ', ' ) }" if misses.size > 0
+  return hints, matches, misses
 end
 
 
@@ -2729,7 +2734,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   else
     naming_i3d_specs_required = FALSE
   end
-  hints = naming_convention_compliant?( cpl_id, content_title_text, is_stereoscopic, naming_i3d_specs_required, hints )
+  hints, naming_matches, naming_misses = naming_convention_compliant?( cpl_id, content_title_text, is_stereoscopic, naming_i3d_specs_required, hints )
 
   # Composition completeness
   if assets_status_list.include?( FALSE )
