@@ -79,8 +79,7 @@ AppVersion = 'v1.2013.03.29'
 #
 # - Deep-inspects compositions. This includes composition type consistency
 #   and completeness checks. dcp_inspect goes through some lengths to determine
-#   a composition's type (SMPTE/Interop). It does so by collecting all types
-#   referenced and trying to make sense of that list.
+#   a composition's type (SMPTE/Interop).
 #
 # - Hints at deviations from the Digital Cinema Naming Convention.
 #   See http://digitalcinemanamingconvention.com for the proper nomenclature
@@ -2917,7 +2916,7 @@ def dcp_inspect( options, arg )
           am_errors = TRUE
         end
 
-        # Check for optional Length element and compare to actual asset size
+        # Check for Chunklist:Chunk:Length element and compare to actual asset size.
         # In the case of a mismatch this results in a hint as Length is optional
         # and no crucial processing can depend on it. Field behaviour undefined ttbomk.
         if File.exists?( asset_file )
@@ -2927,7 +2926,7 @@ def dcp_inspect( options, arg )
               listed_asset_length = asset.xpath( 'ChunkList/Chunk/Length' ).text.to_i
               asset_size = File.size asset_file
               unless listed_asset_length == asset_size
-                hints << "AM #{ am_id }: Length mismatch: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } Asset on medium: #{ asset_size }"
+                hints << "AM #{ am_id }: Length mismatch: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } (#{ listed_asset_length.to_k }) Asset on medium: #{ asset_size } (#{ asset_size.to_k })"
               end
             rescue Exception => e
               errors << "AM #{ am_id }: Length check fail: #{ e.message }"
@@ -3098,6 +3097,7 @@ def dcp_inspect( options, arg )
 
             if File.exists?( asset_file )
               size_asset = File.size( asset_file )
+              #
               # Plug in checks here. we might be skipping validation hence the tag test
               #
               # Check listed and actual asset size
