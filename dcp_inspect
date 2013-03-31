@@ -166,6 +166,7 @@ XSD_STORE_NOT_FOUND = 6
 BAD_HASH_LIMIT_ARG = 7
 LOGFILE_WRITE_ERROR = 8
 FILE_ACCESS_ERROR = 9
+LOGFILE_EXISTS_ERROR = 10
 GEM_LOAD_ERROR = 11
 
 # Signature counters
@@ -3279,28 +3280,36 @@ else
 end
 ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 
+
 # main
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
-  inspection = dcp_inspect( options, args[ 0 ] )
-  print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+
   if options.logfile
     if File.exists?( options.logfile )
       @logger.info "Requested logfile #{ Pathname( options.logfile ).realpath } exists. Not overwriting"
-    else
-      begin
-        File.open( options.logfile, 'w' ) { |f| f.write( @logger.full_log_blob ) }
-      rescue Exception => e
-        @logger.info e.message
-        exit LOGFILE_WRITE_ERROR
-      end
+      exit LOGFILE_EXISTS_ERROR
     end
   end
+
+  inspection = dcp_inspect( options, args[ 0 ] )
+  print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+
+  if options.logfile
+    begin
+      File.open( options.logfile, 'w' ) { |f| f.write( @logger.full_log_blob ) }
+    rescue Exception => e
+      @logger.info e.message
+      exit LOGFILE_WRITE_ERROR
+    end
+  end
+
   case inspection[ :errors ].size
   when 0
     exit DCP_OK
   else
     exit DCP_ERROR
   end
+
 elsif args.size == 0
   @logger.info( "No volume or directory given. See #{ AppName } --help" )
   exit NO_ARG
