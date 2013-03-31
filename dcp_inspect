@@ -133,14 +133,27 @@ if RUBY_VERSION <= '1.9'
   rescue LoadError
   end
 end
-require 'nokogiri'
-require 'optparse'
-require 'ostruct'
-require 'pathname'
-require 'shellwords'
-require 'openssl'
-require 'base64'
-require 'stringio'
+[
+'nokogiri',
+'optparse',
+'ostruct',
+'pathname',
+'shellwords',
+'openssl',
+'base64',
+'stringio'
+].each do |gem|
+  begin
+    require gem
+  rescue LoadError => e
+    puts e.message
+    case gem
+    when 'nokogiri'
+      puts "Please run 'gem install nokogiri' and try again"
+    end
+    exit GEM_LOAD_ERROR
+  end
+end
 
 # Exit codes
 DCP_OK = 0
@@ -153,6 +166,7 @@ XSD_STORE_NOT_FOUND = 6
 BAD_HASH_LIMIT_ARG = 7
 LOGFILE_WRITE_ERROR = 8
 FILE_ACCESS_ERROR = 9
+GEM_LOAD_ERROR = 11
 
 # Signature counters
 @signed_cpls_count = 0
