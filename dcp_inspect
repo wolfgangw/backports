@@ -378,6 +378,8 @@ module MStr
 
   TTF = 'Font TrueType'
   OTF = 'Font CFF-based'
+
+  Cpl_standard_content = [ 'feature', 'trailer', 'test', 'teaser', 'rating', 'advertisement', 'short', 'transitional', 'psa', 'policy' ]
 end # module MStr
 
 
@@ -2201,7 +2203,20 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   end
 
   report << "AnnotationText:   #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:AnnotationText" ).text }"
-  report << "ContentKind:      #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" ).text }"
+
+  # Check ContentKind
+  content_kind = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" ).text
+  if content_kind.empty?
+    hints << "CPL #{ cpl_id }: ContentKind is empty"
+    report << "ContentKind:      [Empty]"
+  else
+    if MStr::Cpl_standard_content.include? content_kind
+      report << "ContentKind:      #{ content_kind }"
+    else
+      hints << "CPL #{ cpl_id }: ContentKind has non-standard value #{ content_kind.inspect }"
+      report << "ContentKind:      #{ content_kind } [non-standard value]"
+    end
+  end
 
   issue_date = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:IssueDate" )
   if issue_date
