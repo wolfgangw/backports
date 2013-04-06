@@ -3156,6 +3156,7 @@ def dcp_inspect( options, arg )
                 end
               else
                 errors << "PKL #{ pkl_id }: Hash tag missing or bad content: #{ asset_file }: #{ type.empty? ? '<Type not specified in PKL>' : type }: #{ id }"
+                pkl_errors = TRUE
               end
 
               # Pick CPLs
@@ -3170,6 +3171,8 @@ def dcp_inspect( options, arg )
               #
             else
               # asset_file does not exist
+              errors << "PKL #{ pkl_id }: Asset file missing: #{ id }: #{ asset_file }"
+              pkl_errors = TRUE
               package_size_listed += size_listed
               package_size_actual += 0
             end
@@ -3178,6 +3181,7 @@ def dcp_inspect( options, arg )
             # For some reason the listed id in PackingList is not in assetmap dictionary
             # Possibly been tampered with
             errors << "Asset UUID not in assetmap dictionary: PKL #{ pkl_id }: #{ id } (#{ type })"
+            pkl_errors = TRUE
           end
 
         end
@@ -3192,18 +3196,25 @@ def dcp_inspect( options, arg )
             cpls_missing[ index ] << cpl_id
             errors << "CPL file missing: #{ cpl_id }: #{ cpl_file }"
             @logger.debug errors.last
+            pkl_errors = TRUE
           end
         }
         cpls_missing[ index ].map { |cpl_id| cpls[ index ].delete cpl_id }
       else
         errors << "Not a PackingList: #{ pkl_file }"
         @logger.debug errors.last
+        pkl_errors = TRUE
       end
       if package_size_listed
         packages_size_listed += package_size_listed
         packages_size_actual += package_size_actual
         package_size_listed, package_size_actual = NIL, NIL
       end
+
+      if pkl_errors == TRUE
+        @logger.debug "There were errors. See PKL #{ pkl_id } errors #{ error_output }"
+      end
+
       @logger.debug ''
     end # am_pkls.each
   end # pkls.each
