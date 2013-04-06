@@ -140,7 +140,8 @@ end
 'shellwords',
 'openssl',
 'base64',
-'stringio'
+'stringio',
+'fileutils'
 ].each do |gem|
   begin
     require gem
@@ -3260,6 +3261,29 @@ def dcp_inspect( options, arg )
 end
 
 
+def confirm_or_create( location )
+  testfile = File.join( location, Random.new.rand.to_s )
+  if File.exists?( location )
+    begin
+      result = FileUtils.touch( testfile )
+      File.delete( testfile )
+      return TRUE
+    rescue Exception => result
+      return FALSE
+    end
+  else
+    begin
+      result = FileUtils.mkdir_p( location )
+      return TRUE
+    rescue Exception => result
+      return FALSE
+    end
+  end
+end
+
+
+#
+# Prepare for main
 #
 options = Options.parse( ARGV )
 args = ARGV
@@ -3304,13 +3328,19 @@ ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 # main
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
 
+  # Check requested logfile early (exists? overwrite? writable?)
   if options.logfile
     if File.exists?( options.logfile )
       puts " Requested logfile #{ options.logfile.inspect } exists. Will #{ options.overwrite_logfile ? '' : 'not ' }overwrite"
       exit LOGFILE_EXISTS_ERROR unless options.overwrite_logfile
     end
+    if ! confirm_or_create( File.dirname options.logfile )
+      puts " Cannot write requested logfile at #{ options.logfile.inspect }. Please specify another location"
+      exit LOGFILE_WRITE_ERROR
+    end
   end
 
+  # Inspection
   inspection = dcp_inspect( options, args[ 0 ] )
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
 
