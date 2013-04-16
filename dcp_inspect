@@ -2330,7 +2330,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
         if issue_date_dt > now_dt
           hints << "CPL #{ cpl_id }: IssueDate #{ issue_date.text.inspect } in the future: Ahead of now (#{ now_dt.to_s }) by #{ distance_of_time_in_words( issue_date_dt, now_dt ) }"
         elsif issue_date_dt < now_dt
-          info << "CPL #{ cpl_id }: Composition was issued #{ distance_of_time_in_words( issue_date_dt, now_dt ) } ago"
+          info << "CPL #{ cpl_id }: Composition #{ content_title_text } was issued #{ distance_of_time_in_words( issue_date_dt, now_dt ) } ago"
         end
         issue_date_friendly = datetime_friendly( issue_date_dt )
         report << "IssueDate:        #{ issue_date.text } (#{ issue_date_friendly })"
