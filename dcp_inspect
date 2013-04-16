@@ -479,6 +479,50 @@ def seconds_from_hms( timestring ) # hh:mm:ss.fraction
   return ( hours * 3600 + minutes * 60 + secs )
 end
 
+# Adapted from actionpack-3.2.11/lib/action_view/helpers/date_helper.rb
+def distance_of_time_in_words(from_time, to_time = 0, include_seconds = false, options = {})
+  from_time = from_time.to_time if from_time.respond_to?(:to_time)
+  to_time = to_time.to_time if to_time.respond_to?(:to_time)
+  distance_in_minutes = (((to_time - from_time).abs)/60).round
+  distance_in_seconds = ((to_time - from_time).abs).round
+
+  case distance_in_minutes
+  when 0..1
+    return distance_in_minutes == 0 ?
+      "less than 1 minute" :
+      "#{ amount 'minute', distance_in_minutes }" unless include_seconds
+
+    case distance_in_seconds
+    when 0..59   then "less than 1 minute"
+    else             "1 minute"
+    end
+
+  when 2..44           then "#{ amount 'minute', distance_in_minutes }"
+  when 45..89          then "about 1 hour"
+  when 90..1439        then "about #{ amount 'hour', (distance_in_minutes.to_f / 60.0).round }"
+  when 1440..2519      then "1 day"
+  when 2520..43199     then "#{ amount 'day', (distance_in_minutes.to_f / 1440.0).round }"
+  when 43200..86399    then "about 1 month"
+  when 86400..525599   then "#{ amount 'month', (distance_in_minutes.to_f / 43200.0).round }"
+  else
+    fyear = from_time.year
+    fyear += 1 if from_time.month >= 3
+    tyear = to_time.year
+    tyear -= 1 if to_time.month < 3
+    leap_years = (fyear > tyear) ? 0 : (fyear..tyear).count{|x| Date.leap?(x)}
+    minute_offset_for_leap_year = leap_years * 1440
+    minutes_with_offset         = distance_in_minutes - minute_offset_for_leap_year
+    remainder                   = (minutes_with_offset % 525600)
+    distance_in_years           = (minutes_with_offset / 525600)
+    if remainder < 131400
+      "about #{ amount 'year', distance_in_years }"
+    elsif remainder < 394200
+      "over #{ amount 'year', distance_in_years }"
+    else
+      "almost #{ amount 'year', distance_in_years + 1 }"
+    end
+  end
+end
 
 # misc helpers
 #
@@ -2275,8 +2319,22 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       cpl_errors = TRUE
       report << "IssueDate:        [Empty -- See schema errors #{ error_output }]"
     else
-      issue_date_friendly = datetime_friendly( DateTime.parse issue_date.text )
-      report << "IssueDate:        #{ issue_date.text } (#{ issue_date_friendly })"
+      begin
+        issue_date_dt = DateTime.parse issue_date.text
+        now_dt = DateTime.now
+      rescue Exception => e
+        errors << "CPL #{ cpl_id }: Can not parse IssueDate #{ issue_date.text.inspect }"
+        cpl_errors = TRUE
+      end
+      if issue_date_dt
+        if issue_date_dt > now_dt
+          hints << "CPL #{ cpl_id }: IssueDate #{ issue_date.text.inspect } in the future: Ahead of now (#{ now_dt.to_s }) by #{ distance_of_time_in_words( issue_date_dt, now_dt ) }"
+        elsif issue_date_dt < now_dt
+          info << "CPL #{ cpl_id }: Composition was issued #{ distance_of_time_in_words( issue_date_dt, now_dt ) } ago"
+        end
+        issue_date_friendly = datetime_friendly( issue_date_dt )
+        report << "IssueDate:        #{ issue_date.text } (#{ issue_date_friendly })"
+      end
     end
   else
     report << "IssueDate:        [Not present -- See schema errors #{ error_output }]"
