@@ -3039,10 +3039,10 @@ def dcp_inspect( options, arg )
 
         # Assetmap dictionary
         dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
+        asset_file = package dict[ index ][ listed_id ]
         @logger.debug( "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (file missing)' }" )
 
         # Check listed_id vs actual asset_id
-        asset_file = package dict[ index ][ listed_id ]
         if File.exists?( asset_file )
           asset_id = get_asset_uuid( asset_file )
           if asset_id
@@ -3081,6 +3081,11 @@ def dcp_inspect( options, arg )
               am_errors = TRUE
             end
           end
+        end
+
+        # Check for whitespace in asset filename
+        if path.scan( /\s+/ ).size != 0
+          hints << "AM #{ am_id }: Asset #{ listed_id }: Filename #{ path.inspect } contains whitespace"
         end
 
       end
