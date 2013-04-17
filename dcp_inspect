@@ -2990,8 +2990,6 @@ def dcp_inspect( options, arg )
   end
   am_files = am_candidates
   @logger.debug ''
-  # info about multiple Assetmaps found
-  info << "Found #{ am_files.size } Assetmaps" unless am_files.size == 1
 
   # Process all Assetmaps
   @logger.debug( "Found #{ amount( 'Assetmap', am_files ) }" )
@@ -3358,9 +3356,6 @@ def dcp_inspect( options, arg )
     end # am_pkls.each
   end # pkls.each
 
-  info << "Inspected: #{ Pathname( arg ).realpath }"
-  info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed total: ' + packages_size_listed.to_k + ')' }"
-
   # List all found CPLs
   if cpls.flatten.size > 0
     @logger.debug( "Found #{ amount( 'Composition', cpls.flatten ) }" )
@@ -3403,6 +3398,10 @@ def dcp_inspect( options, arg )
     end
   end
 
+  # Info summary block
+  info << "#{ AppName } #{ AppVersion } on #{ datetime_friendly DateTime.now }"
+  info << "Inspected: #{ Pathname( arg ).realpath }"
+  info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed total: ' + packages_size_listed.to_k + ')' }"
   info << 'Hash checks skipped' if options.check_hashes == FALSE
   info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
