@@ -1206,14 +1206,15 @@ class DC_Signer_Crypto_Compliance
 
       # 2.1.11 Public key thumbprint dnQualifier
       #
-      # This works for rubies < 1.9.3:
-      #   asn1 = Base64.decode64( cert.public_key.to_pem.split( "\n" )[ 1 .. -2 ].join )
-      #   dnq_calc = Base64.encode64( OpenSSL::Digest.new( 'sha1', asn1 ).digest ).chomp
-      #
-      # rubies >= 1.9.3 changed the default encoding of public key so do this instead:
-      #
-      pkey_der = OpenSSL::ASN1::Sequence( [ OpenSSL::ASN1::Integer( cert.public_key.n ), OpenSSL::ASN1::Integer( cert.public_key.e ) ] ).to_der
-      dnq_calc = Base64.encode64( OpenSSL::Digest.new( 'sha1', pkey_der ).digest ).chomp
+      if RUBY_VERSION < '1.9.3'
+        # works for rubies < 1.9.3:
+        asn1 = Base64.decode64( cert.public_key.to_pem.split( "\n" )[ 1 .. -2 ].join )
+        dnq_calc = Base64.encode64( OpenSSL::Digest.new( 'sha1', asn1 ).digest ).chomp
+      else
+        # rubies >= 1.9.3 changed the default encoding of public key so do this instead:
+        pkey_der = OpenSSL::ASN1::Sequence( [ OpenSSL::ASN1::Integer( cert.public_key.n ), OpenSSL::ASN1::Integer( cert.public_key.e ) ] ).to_der
+        dnq_calc = Base64.encode64( OpenSSL::Digest.new( 'sha1', pkey_der ).digest ).chomp
+      end
       #
       field_dnq = find_field( 'dnQualifier', cert.subject )
       if field_dnq.empty?
