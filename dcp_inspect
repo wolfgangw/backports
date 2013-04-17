@@ -2026,6 +2026,19 @@ def get_asset_uuid( file )
   return id
 end
 
+def element_text( xml, xpath_query, ns )
+  text = xml.xpath( xpath_query, ns )
+  if text.empty?
+    nil
+  else
+    text
+  end
+end
+
+def uuid_from_urn_scheme( string )
+  string.split( 'urn:uuid:' ).last
+end
+
 # Returns subject, issuer and serial (from signing certificate) and x509serialnumber (from Signer..X509SerialNumber)
 def signer_info( xml, sig )
   sig_info = Hash.new
