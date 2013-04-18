@@ -2523,13 +2523,14 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 cpl_errors = TRUE
               end
               if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
-                errors << "#{ cpl_reel }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
+                errors << "#{ cpl_reel }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ].nil? ? '[NaN]' : meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
                 cpl_errors = TRUE
               end
 
               # Check audio sampling rate and bps
               case asset.node_name
               when 'MainSound'
+                # Sampling rate
                 audio_sampling_rate = meta[ 'AudioSamplingRate' ]
                 if audio_sampling_rate != '48000/1' and audio_sampling_rate != '96000/1'
                   errors << "#{ cpl_reel }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48k or 96k"
@@ -2548,7 +2549,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 meta[ 'ContainerDuration' ] ? meta[ 'EditRate' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, asset_edit_rate ).to_s : '[NaN]' : 'ContainerDuration:' + MStr::AssetTypeUnknown,
                 meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
                 asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
-                asset.node_name =~ /Sound/ ? ( meta[ 'ChannelCount' ] || 'ChannelCount:' + MStr::AssetTypeUnknown ) + ' channels' : '',
+                asset.node_name =~ /Sound/ ? ( amount( 'channel', meta[ 'ChannelCount' ].to_i ) || 'ChannelCount:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Sound/ ? audio_sampling_rate == '48000/1' ? '48 kHz' : audio_sampling_rate == '96000/1' ? '96 kHz' : audio_sampling_rate : '',
                 asset.node_name =~ /Sound/ ? ( meta[ 'QuantizationBits' ] || 'QuantizationBits:' + MStr::AssetTypeUnknown ) + ' bps' : '',
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
@@ -2788,25 +2789,25 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
         case asset.node_name
         when 'MainStereoscopicPicture'
           unless meta[ 'EssenceType' ] == MStr::Stereoscopic_pictures
-            reels_report << "Essence type mismatch: Expected MainStereoscopicPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
+            reels_report << "Essence type mismatch: Expected MainStereoscopicPicture, got #{ meta[ 'EssenceType' ] || '[NIL]' }"
             errors << "#{ cpl_reel }: " + reels_report.last
             cpl_errors = TRUE
           end
         when 'MainPicture'
           unless ( meta[ 'EssenceType' ] == MStr::Pictures or meta[ 'EssenceType' ] == MStr::Mpeg2 )
-            reels_report << "Essence type mismatch: Expected MainPicture, got #{ meta[ 'EssenceType' ] || 'NIL' }"
+            reels_report << "Essence type mismatch: Expected MainPicture, got #{ meta[ 'EssenceType' ] || '[NIL]' }"
             errors << "#{ cpl_reel }: " + reels_report.last
             cpl_errors = TRUE
           end
         when 'MainSound'
           unless meta[ 'EssenceType' ] == MStr::Audio
-            reels_report << "Essence type mismatch: Expected MainSound, got #{ meta[ 'EssenceType' ] || 'NIL' }"
+            reels_report << "Essence type mismatch: Expected MainSound, got #{ meta[ 'EssenceType' ] || '[NIL]' }"
             errors << "#{ cpl_reel }: " + reels_report.last
             cpl_errors = TRUE
           end
         when 'MainSubtitle'
           unless meta[ 'EssenceType' ] == MStr::Timed_text
-            reels_report << "Essence type mismatch: Expected MainSubtitle, got #{ meta[ 'EssenceType' ] || 'NIL' }"
+            reels_report << "Essence type mismatch: Expected MainSubtitle, got #{ meta[ 'EssenceType' ] || '[NIL]' }"
             errors << "#{ cpl_reel }: " + reels_report.last
             cpl_errors = TRUE
           end
