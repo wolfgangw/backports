@@ -2527,7 +2527,29 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 cpl_errors = TRUE
               end
 
-              # Check audio sampling rate and bps
+              # Check picture
+              case asset.node_name
+              when 'MainPicture', 'MainStereoscopicPicture'
+                picture_stored_width, picture_stored_height = meta[ 'StoredWidth' ], meta[ 'StoredHeight' ]
+                picture_aspect_ratio = ( picture_stored_width.to_f / picture_stored_height.to_f ).round( 3 )
+                case picture_aspect_ratio
+                when 1.896 # Full container
+                  picture_aspect_ratio_moniker = 'C'
+                when 1.85 # Flat
+                  picture_aspect_ratio_moniker = 'F'
+                when 2.387 # Scope
+                  picture_aspect_ratio_moniker = 'S'
+                when 1.778 # HD
+                  picture_aspect_ratio_moniker = 'HD'
+                  hints << "#{ cpl_reel }: MainPicture has non-DCI aspect ratio #{ [ picture_stored_width, picture_stored_height ].join( 'x' ) } (#{ picture_aspect_ratio_moniker }): Playback with proper non-standard masking recommended"
+                else
+                  picture_aspect_ratio_moniker = picture_aspect_ratio.to_s
+                  hints << "#{ cpl_reel }: MainPicture has non-DCI aspect ratio #{ [ picture_stored_width, picture_stored_height ].join( 'x' ) } (#{ picture_aspect_ratio_moniker }): Playback with proper non-standard masking recommended"
+                end
+                composition_aspect_ratios << picture_aspect_ratio
+              end
+
+              # Check audio
               case asset.node_name
               when 'MainSound'
                 # Sampling rate
@@ -2536,9 +2558,30 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   errors << "#{ cpl_reel }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48k or 96k"
                   cpl_errors = TRUE
                 end
-                audio_quantization_bits = meta[ 'QuantizationBits' ]
-                if audio_quantization_bits != '24'
-                  errors << "CPL #{ cpl_id }: Reel #{ reel_no }: MainSound quantization #{ audio_quantization_bits } bps. Expected 24 bps"
+                # Bits per sample
+                audio_quantization_bits = meta[ 'QuantizationBits' ].to_i
+                if audio_quantization_bits != 24
+                  errors << "#{ cpl_reel }: MainSound quantization #{ audio_quantization_bits } bps. Expected 24 bps"
+                  cpl_errors = TRUE
+                end
+                # Channel configuration
+                audio_channel_count = meta[ 'ChannelCount' ].to_i
+                case audio_channel_count
+                when 1, 3, 4, 5
+                  errors << "#{ cpl_reel }: MainSound has #{ amount( 'channel', audio_channel_count ) }: Use 5.1, 7.1, 7.1DS or wild track (2.0 is expected to mostly work)"
+                  cpl_errors = TRUE
+                when 2
+                  hints << "#{ cpl_reel }: MainSound has 2 channels: Expected to mostly work. Use 5.1, 7.1, 7.1DS or wild track to make sure"
+                end
+                # Block align
+                audio_block_align = meta[ 'BlockAlign' ].to_i
+                if audio_block_align != audio_channel_count * 3 # don't use audio_quantization_bits here -- anything other than 24 bps is an error
+                  errors << "#{ cpl_reel }: MainSound has unexpected BlockAlign value #{ audio_block_align }: Expected #{ audio_channel_count * 3 }: Check audio source"
+                  cpl_errors = TRUE
+                end
+                # Edit rate
+                if asset_edit_rate != edit_rate
+                  errors << "#{ cpl_reel }: MainSound EditRate #{ edit_rate } does not match asset EditRate #{ asset_edit_rate }"
                   cpl_errors = TRUE
                 end
               end
@@ -2943,6 +2986,53 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   end
   if cpl_errors == TRUE
     report << "There were errors. See CPL #{ cpl_id } errors #{ error_output }"
+  end
+
+  # Set up composition_aspect_ratio
+  composition_aspect_ratio = NIL
+  if composition_aspect_ratios.size == reels.size
+    if composition_aspect_ratios.uniq.size == 1
+      case composition_aspect_ratios.first
+      when 1.896
+        composition_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
+      when 1.85
+        composition_aspect_ratio = { :abbrev => 'F', :name => 'Flat' }
+      when 2.387
+        composition_aspect_ratio = { :abbrev => 'S', :name => 'Scope' }
+      when 1.778
+        composition_aspect_ratio = { :abbrev => 'HD', :name => 'HD' }
+      else
+        composition_aspect_ratio = { :abbrev => composition_aspect_ratios.first.to_s, :name => composition_aspect_ratios.first.to_s }
+      end
+    else
+      errors << "CPL #{ cpl_id }: Found different asset aspect ratios: #{ composition_aspect_ratios.inspect }"
+      cpl_errors = TRUE
+    end
+  else
+    errors << "CPL #{ cpl_id }: Could not scrounge aspect #{ amount( 'ratio', reels.size ) } from #{ reels.size > 1 ? 'all reels' : 'reel' }"
+    cpl_errors = TRUE
+  end
+
+  #
+  # Example for comparing naming fields with asset metadata
+  #
+  # Aspect ratio
+  if naming_matches[ :aspect_ratio ]
+    if composition_aspect_ratio
+      if naming_matches[ :aspect_ratio ] != composition_aspect_ratio[ :abbrev ]
+        case naming_matches[ :aspect_ratio ]
+        when 'C'
+          aspect_ratio_claim = 'Full Container'
+        when 'F'
+          aspect_ratio_claim = 'Flat'
+        when 'S'
+          aspect_ratio_claim = 'Scope'
+        else
+          aspect_ratio_claim = naming_matches[ :aspect_ratio ]
+        end
+        hints << "CPL #{ cpl_id }: Naming convention: Part aspect_ratio claims #{ aspect_ratio_claim } but composition aspect ratio is #{ composition_aspect_ratio[ :name ] }"
+      end
+    end
   end
 
   return report, errors, hints, info
