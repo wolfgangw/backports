@@ -3008,7 +3008,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       cpl_errors = TRUE
     end
   else
-    errors << "CPL #{ cpl_id }: Could not scrounge aspect #{ amount( 'ratio', reels.size ) } from #{ reels.size > 1 ? 'all reels' : 'reel' }"
+    errors << "CPL #{ cpl_id }: Could not scrounge #{ amount( 'aspect ratio', reels.size ) } from #{ amount( 'reel', reels.size ) }"
     cpl_errors = TRUE
   end
 
@@ -3132,7 +3132,7 @@ def dcp_inspect( options, arg )
     assets = xml.xpath( '//Asset' )
 
     @logger.debug( "AM #{ am_id }: #{ am_file }"  )
-    @logger.debug( "AM #{ am_id } lists #{ amount( 'asset', assets ) }:" )
+    @logger.debug( "AM #{ am_id } lists #{ amount( 'asset', assets.size ) }:" )
 
     # Store asset info in a dictionary (uuid => path, relative to package root)
     # look for PackingList(s)
@@ -3342,7 +3342,7 @@ def dcp_inspect( options, arg )
         package_size_actual = 0
         pkl_cpls = Array.new
 
-        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets ) }" )
+        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets.size ) }" )
 
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
