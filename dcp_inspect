@@ -2742,14 +2742,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                               glyphs_missing = FALSE
                               text_elements_values.each do |spot|
                                 unless font_fu.provides_glyphs_for?( spot[ :text ] )
-                                  hints << "#{ cpl_reel }: DCSubtitle: SpotNumber #{ spot[ :number ] }: Font is missing glyphs to render #{ spot[ :text ].inspect } (#{ spot[ :text ].encoding })"
                                   glyphs_missing = TRUE
                                   # pick the exact ones
                                   glyphs_missing_list = Array.new
                                   spot[ :text ].split( '' ).each do |char|
                                     glyphs_missing_list << char unless font_fu.provides_glyphs_for?( char )
                                   end
-                                  hints << "#{ cpl_reel }: DCSubtitle: SpotNumber #{ spot[ :number ] }: Font is missing glyphs to render #{ glyphs_missing_list.inspect }"
+                                  hints << "#{ cpl_reel }: DCSubtitle: SpotNumber #{ spot[ :number ] }: Font is missing #{ amount( 'glyph', glyphs_missing_list ) } to render #{ spot[ :text ].inspect } (#{ spot[ :text ].encoding }): #{ glyphs_missing_list.inspect }"
                                 end
                               end
                               if glyphs_missing
