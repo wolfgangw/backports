@@ -2068,6 +2068,7 @@ def naming_convention_compliant?( cpl_id, title, is_stereoscopic, i3d_specs_requ
   required_parts.delete( :i3d_specs ) unless ( is_stereoscopic && i3d_specs_required )
   if ( is_stereoscopic && i3d_specs_required ) then expected_number_of_parts = 12 else expected_number_of_parts = 11 end
   required_parts.each do |rp| misses[ rp ] = FALSE end
+  hints << "CPL #{ cpl_id }: Naming convention: ContentTitleText #{ title.inspect } contains whitespace" if title =~ /\s+/
 
   #
   # Try to anchor :studio and :facility to :date. Ugh
