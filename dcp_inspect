@@ -202,7 +202,7 @@ BANNER
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = TRUE
       end
-      opts.on( '-l', '--logfile logfile', String, 'Specify logfile. Will receive full output' ) do |p|
+      opts.on( '-l', '--logfile logfile', String, 'Write full report to logfile' ) do |p|
         options.logfile = p
       end
       opts.on( '-L', '--overwrite-logfile', 'Force writing of logfile (Default: Do not overwrite existing logfile)' ) do
