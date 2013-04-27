@@ -3100,11 +3100,19 @@ def dcp_inspect( options, arg )
   uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
 
   # collect all files
-  # see http://stackoverflow.com/a/2370805 for a portable and generic way to get at a tree's contents
   @package_dir = arg
   package_dir_tree = Array.new
   begin
     Dir.chdir( @package_dir ) { |d| package_dir_tree = Dir[ "**/*" ] }
+    #
+    # Alternatively consider
+    #
+    # require 'find'
+    # package_dir_tree = Find.find( @package_dir ).to_a
+    #
+    # which will not work out-of-the-box, though (see different path results from Dir and Find).
+    # Will need this for superfluous files check.
+    #
   rescue Exception => e
     @logger.info e.message
     exit FILE_ACCESS_ERROR
@@ -3113,20 +3121,31 @@ def dcp_inspect( options, arg )
   #
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
-  # am_candidates = with_etabar( package_dir_tree, options, 'Looking for Assetmap candidates:', 20, '[= ]', @logger ) { |e| ( File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ ) ? e : nil }
+  am_candidates = with_etabar( package_dir_tree, options, 'Looking for Assetmap candidates:', 20, '[= ]', @logger ) { |e|
+    (
+      File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or
+      File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/
+    ) ? e : nil
+  }
   #
-  am_candidates = package_dir_tree.select { |e| File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/ }.sort
+  # am_candidates = package_dir_tree.select { |e|
+  #   File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP$/ or
+  #     File.basename( e.respond_to?( :force_encoding ) ? e.force_encoding( Encoding::BINARY ) : e ) =~ /^ASSETMAP.xml$/
+  # }.sort
+  #
+
   if am_candidates.empty?
     errors << 'No Assetmap candidates found'
   else
     @logger.debug( "Found #{ amount( 'Assetmap candidate', am_candidates ) }: #{ am_candidates.inspect }" )
+    @logger.debug( "Found #{ amount( 'file', package_dir_tree ) } in total" )
   end
 
   # Check XML for Assetmap content
   unless am_candidates.empty?
     am_candidates_tmp = am_candidates.dup
     am_candidates.each do |am_candidate|
-      am_file = package( am_candidate )
+      am_file = package am_candidate
       xml = get_xml_of_type( 'AssetMap', am_file )
       if xml
 
