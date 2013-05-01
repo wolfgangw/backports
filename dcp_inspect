@@ -1916,7 +1916,7 @@ def validate_xml( xml, file )
     return TRUE, errors
   else
     validation_errors.each do |e|
-      errors << "Schema check: #{ File.basename xsd_file } #{ file }: #{ e }"
+      errors << "Schema check: #{ File.basename xsd_file } #{ file } line #{ e.line }: #{ e }"
     end
     return FALSE, errors
   end
