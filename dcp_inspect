@@ -449,6 +449,7 @@ end
 def datetime_friendly( dt ) # return something in the form of "Tuesday Nov 30 2010 (18:56)"
   "#{ DateTime::DAYNAMES[ dt.wday ] } #{ DateTime::ABBR_MONTHNAMES[ dt.month ] } #{ dt.day.to_s } #{ dt.year.to_s } #{ '%02d' % dt.hour.to_s }:#{ '%02d' % dt.min.to_s }"
 end
+RunDatetime = datetime_friendly DateTime.now
 
 def yyyymmdd( datetime ) # used in KDM filenames. See http://www.kdmnamingconvention.com/
   datetime.to_s.split( 'T' ).first.gsub( /-/,'' )
@@ -554,6 +555,9 @@ def amount( item, count )
   elsif count.is_a? Fixnum
     "#{ count } #{ item }#{ pl count }"
   end
+end
+def plural( item, count )
+  "#{ item }#{ pl count }"
 end
 def pl( count )
   if count.is_a? Array or count.is_a? Hash
@@ -2976,7 +2980,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
     total_duration += durations.min # FIXME ugh
     composition_edit_rate = edit_rates.min
-  end # reels.each_with_index
+  end # reels loop
 
   reels_report << 'Total duration:'
   begin
@@ -3713,14 +3717,20 @@ def dcp_inspect( options, arg )
   end
 
   # Info summary block
-  info << "#{ AppName } #{ AppVersion } on #{ datetime_friendly DateTime.now }"
+  pkls = pkls.flatten
+  cpls = cpls.flatten
+  total_size = "#{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed total: ' + packages_size_listed.to_k + ')' }"
+  pkls_signature_info = "#{ @signed_pkls_count } signed#{ @signed_pkls_count > 0 ? '/' + @signed_pkls_verified_count.to_s + ' verified' : '' }"
+  cpls_signature_info = "#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }"
+  cpls_encryption_info = "#{ cpls.size - @encrypted_compositions > 0 ? ( cpls.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
+  info << "#{ AppName } #{ AppVersion } on #{ RunDatetime }"
   info << "Inspected: #{ Pathname( arg ).realpath }"
-  info << "Found #{ amount( 'Package', pkls.flatten ) } with total size #{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed total: ' + packages_size_listed.to_k + ')' }"
+  info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
   info << 'Hash checks skipped' if options.check_hashes == FALSE
   info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
   info << 'Schema checks skipped' unless options.validate
-  info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls.flatten ) } (#{ @signed_pkls_count } signed#{ @signed_pkls_count > 0 ? '/' + @signed_pkls_verified_count.to_s + ' verified' : '' }), #{ amount( 'Composition', cpls.flatten ) } (#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }, #{ cpls.flatten.size - @encrypted_compositions > 0 ? ( cpls.flatten.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
+  info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) } (#{ pkls_signature_info }), #{ amount( 'Composition', cpls ) } (#{ cpls_signature_info }, #{ cpls_encryption_info }"
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
   return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
