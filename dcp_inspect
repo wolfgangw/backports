@@ -291,6 +291,46 @@ class DLogger
 end
 
 
+# Workaround Nokogiri::XML::Document#collect_namespaces peculiarity
+# (see https://github.com/sparklemotion/nokogiri/issues/885 for details)
+#
+# collect_all_namespaces_href_keys will return
+#
+#   {
+#     "http://www.w3.org/XML/1998/namespace"              =>  ["xml"],
+#     "http://www.smpte-ra.org/schemas/429-7/2006/CPL"    =>  [nil],
+#     "http://isdcf.com/schemas/draft/2011/cpl-metadata"  =>  ["meta"],
+#     "http://www.w3.org/2000/09/xmldsig#"                =>  [nil]
+#   }
+#
+# where nil implies xmlns.
+# This is an example where multiple default namespace definitions exist
+# and are used in different document fragments.
+#
+# collect_all_namespaces_prefix_keys will return
+#
+#   {
+#     "xml"   =>  ["http://www.w3.org/XML/1998/namespace"],
+#     "nil"   =>  ["http://www.smpte-ra.org/schemas/429-7/2006/CPL", "http://www.w3.org/2000/09/xmldsig#"],
+#     "meta"  =>  ["http://isdcf.com/schemas/draft/2011/cpl-metadata"]
+#   }
+#
+class Nokogiri::XML::Document
+  def collect_all_namespaces_href_keys
+    xpath( "//namespace::*" ).inject( {} ) do |hash, ns|
+      ( hash[ ns.href ] ||= [] ) << ns.prefix unless ( hash[ ns.href ] and hash[ ns.href ].include? ns.prefix )
+      hash
+    end
+  end
+  def collect_all_namespaces_prefix_keys
+    xpath( "//namespace::*" ).inject( {} ) do |hash, ns|
+      ( hash[ ns.prefix ] ||= [] ) << ns.href unless ( hash[ ns.prefix ] and hash[ ns.prefix ].include? ns.href )
+      hash
+    end
+  end
+end
+
+
 # lib/mxf.rb
 module MxfTools
   def mxf_inspect( filename )
