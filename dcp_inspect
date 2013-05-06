@@ -2992,20 +2992,42 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     cpl_errors = TRUE
   end
 
-  # Check if this is a SMPTE composition and reels reference both picture and sound (required in SMPTE CPL)
-  if cpl_referenced_assets_types.uniq.size == 1 and cpl_referenced_assets_types.uniq.first == MStr::AssetTypeSmpte
-    reels_references.each_with_index do |reel_refs, index|
-      if reel_refs[ :picture ] and reel_refs[ :sound ]
-        cpl_reels_references_complete << TRUE
-      else
-        assets_missing_refs = Array.new
-        assets_missing_refs << 'Picture' if ! reel_refs[ :picture ]
-        assets_missing_refs << 'Sound' if ! reel_refs[ :sound ]
-        reels_report << "SMPTE Reel: Missing reference#{ assets_missing_refs.size > 1 ? 's' : '' }: #{ assets_missing_refs.join( ', ' ) }"
-        errors << "CPL #{ cpl_id }: " + reels_report.last
+  # Composition type SMPTE/Interop/Undetermined?
+  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
+    composition_type = cpl_referenced_assets_types.uniq.first
+    report << "Composition type: #{ composition_type }"
+  else
+    # FIXME Composition type Mixed error or hint?
+    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
+    report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
+    if broken_assets.size != 0
+      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
+      cpl_errors = TRUE
+    else
+      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
+    end
+  end
+
+  # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
+  # See SMPTE ST 429-2:2009 section 9.1 for the requirement
+  reels_references.each_with_index do |reel_refs, index|
+    if reel_refs[ :picture ] and reel_refs[ :sound ] # :picture covers both MainPicture and MainStereoscopicPicture
+      cpl_reels_references_complete << TRUE
+    else
+      reel_no = index + 1
+      assets_missing_refs = Array.new
+      assets_missing_refs << 'MainPicture or MainStereoscopicPicture' if ! reel_refs[ :picture ]
+      assets_missing_refs << 'MainSound' if ! reel_refs[ :sound ]
+      reels_report << "#{ composition_type }: Reel #{ reel_no }: Missing #{ amount( 'reference', assets_missing_refs ) }: #{ assets_missing_refs.join( ', ' ) }"
+      case composition_type
+      when MStr::AssetTypeSmpte
+        errors << "CPL #{ cpl_id }: #{ reels_report.last }"
         cpl_errors = TRUE
-        cpl_reels_references_complete << FALSE
+      else
+        hints << "CPL #{ cpl_id }: #{ reels_report.last }"
       end
+      cpl_reels_references_complete << FALSE
     end
   end
 
@@ -3042,23 +3064,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     cpl_errors = TRUE
   end
 
-  # Composition type SMPTE/Interop/Undetermined?
-  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
-  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
-    composition_type = cpl_referenced_assets_types.uniq.first
-    report << "Composition type: #{ composition_type }"
-  else
-    # FIXME Composition type Mixed error or hint?
-    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
-    report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
-    if broken_assets.size != 0
-      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
-      cpl_errors = TRUE
-    else
-      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
-    end
-  end
-
   # Naming convention
   case composition_type
   when MStr::AssetTypeInterop
@@ -3088,9 +3093,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   elsif cpl_reels_references_complete.include?( FALSE )
     incomplete_reels = Array.new
     cpl_reels_references_complete.each_with_index do |e, i| incomplete_reels << ( i + 1 ).to_s if e == FALSE end
-    report << "Composition incomplete: SMPTE reels require both MainPicture and MainSound: Reel#{ incomplete_reels.size != 1 ? 's' : '' } #{ incomplete_reels.join( ', ' ) } incomplete"
-    errors << "CPL #{ cpl_id }: #{ report.last }"
-    cpl_errors = TRUE
+    case composition_type
+    when MStr::AssetTypeSmpte
+      report << "Composition incomplete: SMPTE reels require both MainPicture or MainStereoscopicPicture and MainSound: #{ plural( 'Reel', incomplete_reels ) } #{ incomplete_reels.join( ', ' ) } incomplete"
+      errors << "CPL #{ cpl_id }: #{ report.last }"
+      cpl_errors = TRUE
+    else
+      report << "Composition warning: Reference both MainPicture or MainStereoscopicPicture and MainSound in reels in order to avoid playback issues in the field: See #{ plural( 'reel', incomplete_reels ) } #{ incomplete_reels.join( ', ' ) }"
+      hints << "CPL #{ cpl_id }: #{ report.last }"
+    end
   else
     report << 'Composition complete'
   end
