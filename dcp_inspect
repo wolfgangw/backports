@@ -19,6 +19,7 @@
 #
 AppName = File.basename( $0 )
 AppVersion = 'v1.2013.05.06'
+AppStartSeconds = Time.now
 #
 # dcp_inspect is a tool for deep inspection and validation of digital
 # cinema packages (DCP). This includes integrity checks, asset inspection,
@@ -3779,11 +3780,13 @@ def dcp_inspect( options, arg )
   # Info summary block
   pkls = pkls.flatten
   cpls = cpls.flatten
+  execution_time_seconds = Time.now - AppStartSeconds
+  execution_time = Timecode.new( execution_time_seconds.round, 60 ).to_s
   total_size = "#{ packages_size_actual == packages_size_listed ? packages_size_actual.to_k : packages_size_actual.to_k + ' (Listed total: ' + packages_size_listed.to_k + ')' }"
   pkls_signature_info = "#{ @signed_pkls_count } signed#{ @signed_pkls_count > 0 ? '/' + @signed_pkls_verified_count.to_s + ' verified' : '' }"
   cpls_signature_info = "#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }"
   cpls_encryption_info = "#{ cpls.size - @encrypted_compositions > 0 ? ( cpls.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
-  info << "#{ AppName } #{ AppVersion } on #{ RunDatetime }"
+  info << "#{ AppName } #{ AppVersion } on #{ RunDatetime } (#{ execution_time })"
   info << "Inspected: #{ Pathname( arg ).realpath }"
   info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
   info << 'Hash checks skipped' if options.check_hashes == FALSE
