@@ -372,6 +372,7 @@ module MStr
   Interop_am  = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
   Interop_pkl = 'http://www.digicine.com/PROTO-ASDCP-PKL-20040311#'
   Interop_cpl = 'http://www.digicine.com/PROTO-ASDCP-CPL-20040511#'
+  Composition_metadata_href = 'http://isdcf.com/schemas/draft/2011/cpl-metadata'
 
   Ns_Xmldsig  = 'http://www.w3.org/2000/09/xmldsig#'
 
@@ -1500,18 +1501,22 @@ class DC_Signature_Verification
     end
   end
 
+  #
+  # FIXME
+  # Looking only at the first prefix returned from collect_all_namespaces_href_keys
+  # for a given namespace will fall on its nose when there would be multiple prefixes
+  # for the same namespace. E.g. I think in a Signature it would be entirely valid to
+  # use different prefixes for different portions, all evaluating to the same namespace.
+  #
+  # Good enough for now but ktfim
+  #
   def namespace_prefix( doc, ns )
-    doc_ns = doc.collect_namespaces
-    if RUBY_VERSION < '1.9'
-      if doc_ns.index( ns )
-        prefix = doc_ns.index( ns ).split( 'xmlns:' ).last
-      end
+    doc_ns = doc.collect_all_namespaces_href_keys
+    if doc_ns.key?( ns )
+      doc_ns[ ns ].first.nil? ? 'xmlns' : doc_ns[ ns ].first
     else
-      if doc_ns.key( ns )
-        prefix = doc_ns.key( ns ).split( 'xmlns:' ).last
-      end
+      'xmlns'
     end
-    return prefix ||= 'xmlns'
   end
 
   def signature_namespace_and_prefix( doc )
@@ -1920,21 +1925,25 @@ def digest_with_etabar( digest_algorithm, title, file, pbar_width, looks_like, o
   return dgst.digest, eta
 end
 
+# lib/xml.rb
+#
+# FIXME
+# Looking only at the first prefix returned from collect_all_namespaces_href_keys
+# for a given namespace will fall on its nose when there would be multiple prefixes
+# for the same namespace. E.g. I think in a Signature it would be entirely valid to
+# use different prefixes for different portions, all evaluating to the same namespace.
+#
+# Good enough for now but ktfim
+#
 def namespace_prefix( doc, ns )
-  doc_ns = doc.collect_namespaces
-  if RUBY_VERSION < '1.9'
-    if doc_ns.index( ns )
-      prefix = doc_ns.index( ns ).split( 'xmlns:' ).last
-    end
+  doc_ns = doc.collect_all_namespaces_href_keys
+  if doc_ns.key?( ns )
+    doc_ns[ ns ].first.nil? ? 'xmlns' : doc_ns[ ns ].first
   else
-    if doc_ns.key( ns )
-      prefix = doc_ns.key( ns ).split( 'xmlns:' ).last
-    end
+    'xmlns'
   end
-  return prefix ||= 'xmlns'
 end
 
-# lib/xml.rb
 def validate_xml( xml, file )
   errors = Array.new
   asdcp_type = xml.root.node_name
@@ -2265,9 +2274,6 @@ end
 # lib/cpl.rb
 def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   cpl_errors = FALSE
-  # FIXME Nokogiri's XML::Document#collect_namespaces is broken
-  # See https://github.com/sparklemotion/nokogiri/issues/885
-  ns = xml.collect_namespaces 
   report = Array.new
   reels_report = Array.new
   cpl_referenced_assets = Array.new
@@ -2276,19 +2282,22 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   cpl_referenced_assets_types = Array.new
   cpl_reels_references_complete = Array.new
 
+  ns = xml.collect_all_namespaces_href_keys
+  cpl_ns = xml.root.namespace.href
   cpl_ns_prefix = namespace_prefix( xml, xml.root.namespace.href )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
   cpl_file = package dict[ cpl_id ]
-  case ns[ cpl_ns_prefix ]
+
+  case cpl_ns
   when MStr::Smpte_cpl
     cpl_type = 'SMPTE'
   when MStr::Interop_cpl
     cpl_type = 'Interop'
   else
     cpl_type = 'Unknown'
-    errors << "CPL #{ cpl_id }: Default namespace unknown: #{ ns[ cpl_ns_prefix ] }: #{ cpl_file }"
-    # FIXME Nokogiri's XML::Document#collect_namespaces is broken
-    errors << "CPL #{ cpl_id }: Default namespace unknown: FIXME: This might be a dcp_inspect bug. Fix due"
+    errors << "CPL #{ cpl_id }: Default namespace unknown: #{ cpl_ns }: #{ cpl_file }"
+    errors << "CPL #{ cpl_id }: Default namespace unknown: This might be a dcp_inspect bug. If you think it is ..."
+    errors << "CPL #{ cpl_id }: Default namespace unknown: ... please file an issue at https://github.com/wolfgangw/backports/issues/new"
     cpl_errors = TRUE
   end
   cpl_referenced_assets_types << cpl_type
@@ -2343,7 +2352,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
   report << "CPL Id:           #{ cpl_id }"
   report << "CPL file:         #{ cpl_file }"
-  report << "CPL type:         #{ cpl_type } (#{ ns[ cpl_ns_prefix ] })"
+  report << "CPL type:         #{ cpl_type } (#{ cpl_ns })"
 
   # Scrounge ContentTitleText
   content_title_text = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentTitleText" ).text
@@ -2442,8 +2451,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   end
 
   # Metadata // CMA
-  if ns.keys.include?( 'xmlns:meta' )
-    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', ns )
+  if ns.keys.include? MStr::Composition_metadata_href
+    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', 'meta' => MStr::Composition_metadata_href )
     if cma
       report << 'CompositionMetadataAsset:'
       cma.each do |e|
