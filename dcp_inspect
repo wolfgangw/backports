@@ -150,16 +150,16 @@ if RUBY_VERSION <= '1.9'
   end
 end
 [
-'nokogiri',
-'ttfunk',
-'optparse',
-'ostruct',
-'pathname',
-'shellwords',
-'openssl',
-'base64',
-'stringio',
-'fileutils'
+  'nokogiri',
+  'ttfunk',
+  'optparse',
+  'ostruct',
+  'pathname',
+  'shellwords',
+  'openssl',
+  'base64',
+  'stringio',
+  'fileutils'
 ].each do |gem|
   begin
     require gem
