@@ -491,7 +491,8 @@ end
 def datetime_friendly( dt ) # return something in the form of "Tuesday Nov 30 2010 (18:56)"
   "#{ DateTime::DAYNAMES[ dt.wday ] } #{ DateTime::ABBR_MONTHNAMES[ dt.month ] } #{ dt.day.to_s } #{ dt.year.to_s } #{ '%02d' % dt.hour.to_s }:#{ '%02d' % dt.min.to_s }"
 end
-RunDatetime = datetime_friendly DateTime.now
+RunDatetime = time_to_datetime AppStartSeconds
+RunDatetime_friendly = datetime_friendly RunDatetime
 
 def yyyymmdd( datetime ) # used in KDM filenames. See http://www.kdmnamingconvention.com/
   datetime.to_s.split( 'T' ).first.gsub( /-/,'' )
@@ -3792,7 +3793,7 @@ def dcp_inspect( options, arg )
   pkls_signature_info = "#{ @signed_pkls_count } signed#{ @signed_pkls_count > 0 ? '/' + @signed_pkls_verified_count.to_s + ' verified' : '' }"
   cpls_signature_info = "#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }"
   cpls_encryption_info = "#{ cpls.size - @encrypted_compositions > 0 ? ( cpls.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
-  info << "#{ AppName } #{ AppVersion } on #{ RunDatetime } (#{ execution_time })"
+  info << "#{ AppName } #{ AppVersion } on #{ RunDatetime_friendly } (#{ execution_time })"
   info << "Inspected: #{ Pathname( arg ).realpath }"
   info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
   info << 'Hash checks skipped' if options.check_hashes == FALSE
