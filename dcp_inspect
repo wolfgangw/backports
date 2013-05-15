@@ -3457,7 +3457,8 @@ def dcp_inspect( options, arg )
               listed_asset_length = asset.xpath( 'ChunkList/Chunk/Length' ).text.to_i
               asset_size = File.size asset_file
               unless listed_asset_length == asset_size
-                hints << "AM #{ am_id }: Length mismatch: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } (#{ listed_asset_length.to_k }) Asset on medium: #{ asset_size } (#{ asset_size.to_k })"
+                errors << "AM #{ am_id }: Mismatch in optional Length element: Asset: #{ listed_id }: Listed length: #{ listed_asset_length } (#{ listed_asset_length.to_k }) Asset on medium: #{ asset_size } (#{ asset_size.to_k })"
+                am_errors = TRUE
               end
             rescue Exception => e
               errors << "AM #{ am_id }: Length check fail: #{ e.message }"
