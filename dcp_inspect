@@ -2966,8 +2966,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
           cpl_referenced_assets << { asset_id => FALSE }
           cpl_referenced_assets_types << MStr::AssetTypeUnknown
           meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
-          hint_info = [ "#{ cpl_reel }", asset.node_name ].join
-          hints << "#{ hint_info }: Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
+          hints << "#{ cpl_reel }: #{ asset.node_name }: Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
 
           # Infer encryption from presence of KeyId
           if key_id
