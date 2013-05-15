@@ -140,7 +140,10 @@ LOGFILE_WRITE_ERROR = 8
 FILE_ACCESS_ERROR = 9
 LOGFILE_EXISTS_ERROR = 10
 GEM_LOAD_ERROR = 11
-REQUIRED_COMAND_NOT_FOUND = 12
+REQUIRED_COMMAND_NOT_FOUND = 12
+ENV_DCP_INSPECT_DIR_NOT_SET = 13
+DCP_INSPECT_DIR_NOT_WRITABLE = 14
+AUTOLOGFILE_WRITE_ERROR = 15
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -3845,7 +3848,7 @@ required_command_not_found = FALSE
     required_command_not_found = TRUE
   end
 end
-exit REQUIRED_COMAND_NOT_FOUND if required_command_not_found
+exit REQUIRED_COMMAND_NOT_FOUND if required_command_not_found
 
 
 # Check Nokogiri C14N support
