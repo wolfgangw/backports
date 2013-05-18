@@ -269,28 +269,27 @@ class DLogger
     @prints_errors, @prints_hints, @prints_info, @prints_debug, @prints_cr, @prints_cpl = @errors, @hints, @info, @debug, @cr, @cpl
   end
   def errors( text )
-    @full_log << text if @full_log
-    if @errors then to_console( text ) end
+    if @errors then outbound( text ) end
   end
   def hints( text )
-    @full_log << text if @full_log
-    if @hints then to_console( text ) end
+    if @hints then outbound( text ) end
   end
   def info( text )
-    @full_log << text if @full_log
-    if @info then to_console( text ) end
+    if @info then outbound( text ) end
   end
   def debug( text )
-    @full_log << text if @full_log
-    if @debug then to_console( text ) end
+    if @debug then outbound( text ) end
   end
   def cpl( text )
-    @full_log << text if @full_log
-    if @cpl then to_console( text ) end
+    if @cpl then outbound( text ) end
   end
   def cr( text )
     # don't go to @full_log here
     carriage_return( text ) if @cr
+  end
+  def outbound( text )
+    printf "%s %s\n", @prefix, text
+    @full_log << text if @full_log
   end
   def to_console( text ) printf "%s %s\n", @prefix, text end
   def carriage_return( text ) printf "%s %s\r", @prefix, text end
