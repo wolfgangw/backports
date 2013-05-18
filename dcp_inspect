@@ -2511,6 +2511,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   composition_aspect_ratios = Array.new
   composition_resolutions = Array.new
   composition_channel_counts = Array.new
+  supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0 }
 
   reels.each_with_index do |reel, index|
     reel_no = index + 1
@@ -2993,7 +2994,17 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
           cpl_referenced_assets << { asset_id => FALSE }
           cpl_referenced_assets_types << MStr::AssetTypeUnknown
           meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
-          hints << "#{ cpl_reel }: #{ asset.node_name }: Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External"
+          hints << "#{ cpl_reel }: #{ asset.node_name }: #{ meta_report }"
+          case asset.node_name
+          when 'MainPicture', 'MainStereoscopicPicture'
+            supplemental_refs[ :main_picture ] += 1
+          when 'MainSound'
+            supplemental_refs[ :main_sound ] += 1
+          when 'MainSubtitle'
+            supplemental_refs[ :main_subtitle ] += 1
+          when 'MainCaption'
+            supplemental_refs[ :main_caption ] += 1
+          end
 
           # Infer encryption from presence of KeyId
           if key_id
@@ -3216,8 +3227,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       cpl_errors = TRUE
     end
   else
-    errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'aspect ratio', reels.size ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_aspect_ratios.size }"
-    cpl_errors = TRUE
+    expected_aspect_ratios = reels.size - supplemental_refs[ :main_picture ]
+    if expected_aspect_ratios > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'aspect ratio', expected_aspect_ratios ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_aspect_ratios.size }"
+      cpl_errors = TRUE
+    end
   end
 
   # Set up composition_resolution
@@ -3244,8 +3258,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       cpl_errors = TRUE
     end
   else
-    errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'picture resolution', reels.size ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_resolutions.size }"
-    cpl_errors = TRUE
+    expected_picture_resolutions = reels.size - supplemental_refs[ :main_picture ]
+    if expected_picture_resolutions > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'picture resolution', expected_picture_resolutions ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_resolutions.size }"
+      cpl_errors = TRUE
+    end
   end
 
   # Set up composition_channel_count
@@ -3257,8 +3274,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       errors << "CPL #{ cpl_id }: Found different audio types: #{ composition_channel_counts.inspect }"
     end
   else
-    errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', reels.size ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
-    cpl_errors = TRUE
+    expected_audio_types = reels.size - supplemental_refs[ :main_sound ]
+    if expected_audio_types > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
+      cpl_errors = TRUE
+    end
   end
 
   #
