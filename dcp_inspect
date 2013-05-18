@@ -3959,7 +3959,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   # Write logfile
   if options.logfile
     begin
-      File.open( options.logfile, 'w' ) { |f| f.write( @logger.full_log_blob ) }
+      File.open( options.logfile, 'w' ) { |f| f.write @logger.full_log_blob }
       @logger.info "See logfile at #{ options.logfile }"
     rescue Exception => e
       @logger.info e.message
