@@ -185,6 +185,7 @@ class Options
     options.as_asset_store = FALSE
     options.verbosity = 'debug'
     options.logfile = NIL
+    options.logfile_autolog = FALSE
     options.overwrite_logfile = FALSE
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'info', 'cpl', 'debug', 'trace_func' ]
 
@@ -206,10 +207,13 @@ BANNER
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = TRUE
       end
-      opts.on( '-l', '--logfile logfile', String, 'Write full report to logfile' ) do |p|
+      opts.on( '-l', '--logfile path', String, 'Write full report to logfile at path' ) do |p|
         options.logfile = p
       end
-      opts.on( '-L', '--overwrite-logfile', 'Force writing of logfile (Default: Do not overwrite existing logfile)' ) do
+      opts.on( '--autolog', "Write full report to $DCP_INSPECT_DIR. (Default: Don't)" ) do
+        options.logfile_autolog = TRUE
+      end
+      opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
       end
       opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, hints, info, debug, cpl or trace_func (Default: debug)' ) do |p|
@@ -239,10 +243,10 @@ end # Options
 
 # * lib/logger.rb
 class DLogger
-  attr_reader :is_quiet, :prints_errors, :prints_hints, :prints_info, :prints_debug, :prints_cr, :prints_cpl, :writes_logfile, :logfile
+  attr_reader :is_quiet, :prints_errors, :prints_hints, :prints_info, :prints_debug, :prints_cr, :prints_cpl, :writes_logfile, :logfile, :writes_autolog
   def initialize( prefix, options )
     @prefix = prefix
-    @full_log = ( options.logfile ? Array.new : NIL )
+    @full_log = ( options.logfile || options.logfile_autolog ? Array.new : NIL )
 
     case options.verbosity
     when 'quiet'  then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]
@@ -259,7 +263,8 @@ class DLogger
     end
 
     @is_quiet = TRUE if options.verbosity == 'quiet'
-    @writes_logfile = TRUE if @full_log
+    @writes_logfile = TRUE if options.logfile
+    @writes_autolog = TRUE if options.logfile_autolog
     @logfile = options.logfile
     @prints_errors, @prints_hints, @prints_info, @prints_debug, @prints_cr, @prints_cpl = @errors, @hints, @info, @debug, @cr, @cpl
   end
@@ -2265,11 +2270,34 @@ def font?( file )
 end
 
 
+def confirm_or_create( location )
+  testfile = File.join( location, rand.to_s )
+  if File.exists?( location )
+    begin
+      result = FileUtils.touch( testfile )
+      File.delete( testfile )
+      return TRUE
+    rescue Exception => result
+      return FALSE
+    end
+  else
+    begin
+      result = FileUtils.mkdir_p( location )
+      return TRUE
+    rescue Exception => result
+      return FALSE
+    end
+  end
+end
+
+
 # And the error goes to ...
 def error_output
   where = Array.new
   where << 'below' if @logger.prints_errors
   where << 'with increased verbosity' if ! @logger.prints_errors
+  where << "in autolog at #{ ENV[ 'DCP_INSPECT_DIR' ] }" if @logger.writes_autolog
+  where << 'in autolog with option --autolog' if ! @logger.writes_autolog
   where << "in #{ @logger.logfile }" if @logger.writes_logfile
   where << 'in a logfile with option --logfile' if ! @logger.writes_logfile
   return where.join ' or '
@@ -3810,32 +3838,14 @@ def dcp_inspect( options, arg )
 end
 
 
-def confirm_or_create( location )
-  testfile = File.join( location, rand.to_s )
-  if File.exists?( location )
-    begin
-      result = FileUtils.touch( testfile )
-      File.delete( testfile )
-      return TRUE
-    rescue Exception => result
-      return FALSE
-    end
-  else
-    begin
-      result = FileUtils.mkdir_p( location )
-      return TRUE
-    rescue Exception => result
-      return FALSE
-    end
-  end
-end
-
-
 #
 # Prepare for main
 #
 options = Options.parse( ARGV )
 args = ARGV
+if ENV[ 'DCP_INSPECT_AUTOLOG' ]
+  options.logfile_autolog = TRUE
+end
 @logger = DLogger.new( prefix = '', options )
 @logger.debug( "#{ AppName } #{ AppVersion }: #{ args }" )
 
@@ -3904,6 +3914,20 @@ ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 # main
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
 
+  # autolog?
+  if options.logfile_autolog
+    if ENV[ 'DCP_INSPECT_DIR' ]
+      if ! confirm_or_create( ENV[ 'DCP_INSPECT_DIR' ] )
+        @logger.info "Cannot write to #{ ENV[ 'DCP_INSPECT_DIR' ].inspect }"
+        exit DCP_INSPECT_DIR_NOT_WRITABLE
+      end
+    else
+      @logger.info "Autolog requested but env DCP_INSPECT_DIR is not set"
+      @logger.info "Will not write autolog"
+      exit ENV_DCP_INSPECT_DIR_NOT_SET
+    end
+  end
+
   # Check requested logfile early (exists? overwrite? writable?)
   if options.logfile
     if File.exists?( options.logfile )
@@ -3920,6 +3944,20 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   inspection = dcp_inspect( options, args[ 0 ] )
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
 
+  # Write autolog
+  if options.logfile_autolog
+    #autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ RunDatetime.to_s.gsub( /\D/, '' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + '.' + AppName )
+    autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ), RunDatetime.to_s.gsub( /\D/, '-' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + ".#{ AppName }" )
+    begin
+      File.open( autologfile, 'w' ) { |f| f.write @logger.full_log_blob }
+      @logger.info "See autolog at #{ autologfile }"
+    rescue Exception => e
+      @logger.info e.message
+      exit AUTOLOGFILE_WRITE_ERROR
+    end
+  end
+
+  # Write logfile
   if options.logfile
     begin
       File.open( options.logfile, 'w' ) { |f| f.write( @logger.full_log_blob ) }
