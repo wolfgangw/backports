@@ -3965,7 +3965,6 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
 
   # Write autolog
   if options.logfile_autolog
-    #autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ RunDatetime.to_s.gsub( /\D/, '' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + '.' + AppName )
     autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ), RunDatetime.to_s.gsub( /\D/, '-' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + ".#{ AppName }" )
     begin
       File.open( autologfile, 'w' ) { |f| f.write @logger.full_log_blob }
