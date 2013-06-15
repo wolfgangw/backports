@@ -533,6 +533,12 @@ def seconds_from_hms( timestring ) # hh:mm:ss.fraction
   return ( hours * 3600 + minutes * 60 + secs )
 end
 
+def time_string( t )
+  return "--:--:--" if t.nil?
+  t = t.to_i; s = t % 60; m  = ( t / 60 ) % 60; h = t / 3600
+  "%02d:%02d:%02d" % [ h, m, s ]
+end
+
 # Adapted from actionpack-3.2.11/lib/action_view/helpers/date_helper.rb
 def distance_of_time_in_words(from_time, to_time = 0, include_seconds = false, options = {})
   from_time = from_time.to_time if from_time.respond_to?(:to_time)
@@ -3712,11 +3718,11 @@ def dcp_inspect( options, arg )
                         hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options, logger = @logger )
                         hash_check = Base64.encode64( hash_check ).chomp
                         if hash_listed != hash_check
-                          eta.preserve_terminal_title_with_message( 'Mismatch' )
+                          eta.preserve_terminal_title_with_message( "Mismatch (#{ time_string( eta.elapsed ) })" )
                           errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                           pkl_errors = TRUE
                         else
-                          eta.preserve_terminal_title_with_message( 'OK' )
+                          eta.preserve_terminal_title_with_message( "OK (#{ time_string( eta.elapsed ) })" )
                           # info << "Hash value: OK: #{ id }: #{ asset_file }: #{ hash_check }"
                         end
                       else
