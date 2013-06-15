@@ -3986,7 +3986,9 @@ end
 
 # Check required tools
 required_command_not_found = FALSE
-[ 'asdcp-test', 'kmuuidgen' ].each do |command|
+required_commands = [ 'asdcp-test', 'kmuuidgen' ]
+required_commands << 'sox' if options.full_audio_examination
+required_commands.flatten.each do |command|
   if ! command_exists? command
     @logger.info( "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually" )
     required_command_not_found = TRUE
