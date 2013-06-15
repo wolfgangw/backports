@@ -144,6 +144,7 @@ REQUIRED_COMMAND_NOT_FOUND = 12
 ENV_DCP_INSPECT_DIR_NOT_SET = 13
 DCP_INSPECT_DIR_NOT_WRITABLE = 14
 AUTOLOGFILE_WRITE_ERROR = 15
+MKFIFO_FAIL = 16
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -162,7 +163,8 @@ end
   'openssl',
   'base64',
   'stringio',
-  'fileutils'
+  'fileutils',
+  'open3'
 ].each do |gem|
   begin
     require gem
@@ -187,6 +189,8 @@ class Options
     options.logfile = NIL
     options.logfile_autolog = FALSE
     options.overwrite_logfile = FALSE
+    options.full_image_examination = FALSE
+    options.full_audio_examination = FALSE
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'info', 'cpl', 'debug', 'trace_func' ]
 
     opts = OptionParser.new do |opts|
@@ -215,6 +219,12 @@ BANNER
       end
       opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
+      end
+      opts.on( '--fix', '--full-image-examination', 'Full image examination' ) do
+        options.full_image_examination = TRUE
+      end
+      opts.on( '--fax', '--full-audio-examination', 'Full audio examination' ) do
+        options.full_audio_examination = TRUE
       end
       opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, hints, info, debug, cpl or trace_func (Default: debug)' ) do |p|
         if options.verbosity_choices.include?( p )
@@ -336,6 +346,72 @@ class Nokogiri::XML::Document
       hash
     end
   end
+end
+
+
+class Ramdisk
+  attr_reader :device
+  def initialize( diskname, size )
+    @diskname = diskname
+    @size = size
+    @device = NIL
+    result = make_ramdisk
+  end
+
+  def eject
+    case RUBY_PLATFORM
+    when /darwin/
+      out, err, status = Open3.capture3( "hdiutil eject #{ self.path }" )
+    else
+      out, err, status = Open3.capture3( "rm -rf #{ self.path }" ) 
+    end
+  end
+
+  def path
+    case RUBY_PLATFORM
+    when /darwin/
+      "/Volumes/#{ @diskname }"
+    else
+      "/dev/shm/#{ @diskname }"
+    end
+  end
+
+  private
+
+  def make_ramdisk
+    case RUBY_PLATFORM
+    when /darwin/
+      out, err, status = Open3.capture3( "hdiutil attach -nomount ram://#{ @size }" )
+      @device = out.chomp
+      out, err, status = Open3.capture3( "diskutil erasevolume HFS+ '#{ @diskname }' #{ @device }" )
+      TRUE
+    when /linux/
+      out, err, status = Open3.capture3( "mkdir #{ self.path }" )
+      @device = self.path
+      TRUE # we just write to /dev/shm
+    else
+      FALSE
+    end
+  end
+end
+
+
+def parse_sox_stats( stats_str )
+  [ 'DC offset', 'Min level', 'Max level', 'Pk lev dB', 'RMS lev dB', 'RMS Pk dB', 'RMS Tr dB', 'Crest factor', 'Flat factor', 'Pk count', 'Bit-depth', 'Num samples', 'Length s', 'Scale max', 'Window s' ].inject( {} ) do |hash, item|
+    values = stats_str.match( /^#{ item }.+$/ )[ 0 ].split( /\s+/ ).reject { |e| item =~ /#{ e }/ }
+    key = item.downcase.gsub( /\W/, '_' ).to_sym
+    hash[ key ] = { :overall => values[ 0 ], :channels => values[ 1 .. -1 ] }
+    hash
+  end
+end
+
+
+def audio_characteristics( asset_file, key = NIL )
+  pid = Process.spawn( "asdcp-test -x #{ @asdcp_audio_prefix } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file }" )
+  Process.detach pid
+  system( 'sleep 0.2' )
+  out, err, status = Open3.capture3( "sox #{ @fifo_audio } -n stats" )
+  parse_sox_stats( err )
 end
 
 
@@ -2648,10 +2724,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
               if intrinsic_duration - entry_point < duration
                 errors << "#{ cpl_reel }: Duration #{ duration } in #{ asset.node_name } does not compute: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
                 cpl_errors = TRUE
+                extractable_duration = intrinsic_duration - entry_point
               end
               if entry_point >= intrinsic_duration
                 exceed_frames = entry_point + 1 - intrinsic_duration
-                errors << "#{ cpl_reel }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ exceed_frames } frame#{ exceed_frames != 1 ? 's' : '' }"
+                errors << "#{ cpl_reel }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ amount( 'frame', exceed_frames ) }"
                 cpl_errors = TRUE
               end
               if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
@@ -2752,6 +2829,36 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   errors << "#{ cpl_reel }: MainSound EditRate #{ edit_rate } does not match asset EditRate #{ asset_edit_rate }"
                   cpl_errors = TRUE
                 end
+
+                # Audio characteristics (Levels, RMS, silent channels)
+                audio_stats = NIL
+                if options.full_audio_examination
+                  if meta[ 'EncryptedEssence' ] == 'Yes'
+                    if dkdms[ cpl_id ]
+                      if dkdms[ cpl_id ][ asset_key_id ]
+                        key = dkdms[ cpl_id ][ asset_key_id ]
+                      else
+                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }"
+                        key = NIL
+                      end
+                    else
+                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }"
+                      key = NIL
+                    end
+                  else
+                    key = NIL
+                  end
+                  if @dcp_inspect_temp
+                    if key
+                      audio_stats = audio_characteristics( asset_file, key )
+                    elsif meta[ 'EncryptedEssence' ] == 'No'
+                      audio_stats = audio_characteristics( asset_file, key )
+                    end
+
+                  else
+                    hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no temp location to write to"
+                  end
+                end
               end
 
               # This meta_report (and edit_rate) abomination below needs to go. Ugh
@@ -2763,6 +2870,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 asset.node_name =~ /Sound/ ? ( amount( 'channel', meta[ 'ChannelCount' ].to_i ) || 'ChannelCount:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Sound/ ? audio_sampling_rate == '48000/1' ? '48 kHz' : audio_sampling_rate == '96000/1' ? '96 kHz' : audio_sampling_rate : '',
                 asset.node_name =~ /Sound/ ? ( meta[ 'QuantizationBits' ] || 'QuantizationBits:' + MStr::AssetTypeUnknown ) + ' bps' : '',
+                audio_stats ? asset.node_name =~ /Sound/ ? "RMS #{ audio_stats[ :rms_lev_db ][ :overall ] } dB"  : '' : '',
+                audio_stats ? asset.node_name =~ /Sound/ ? "Peak #{ audio_stats[ :pk_lev_db ][ :overall ] } dB"  : '' : '',
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
               ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
@@ -3021,7 +3130,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       end # if dict
 
       begin
-        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id }  #{ asset.node_name }\t(#{ meta_report })"
+        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id.split( '-' ).first }  #{ asset.node_name }\t(#{ meta_report })"
       rescue Exception => e
         errors << "#{ cpl_reel }: Duration #{ duration }: EditRate #{ edit_rate }: #{ e.message }"
         cpl_errors = TRUE
@@ -3939,6 +4048,22 @@ ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 # main
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
 
+  # Full audio/image examination?
+  if options.full_audio_examination # not implemented yet: or options.full_image_examination
+    @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
+    @logger.info "Full audio examination: Setting up temp location at #{ @dcp_inspect_temp.path }"
+    @asdcp_audio_prefix = File.join( @dcp_inspect_temp.path, 'audio' )
+    @fifo_audio = @asdcp_audio_prefix + '_1.wav'
+    begin
+      out, err, status = Open3.popen3( "mkfifo #{ @fifo_audio }" )
+    rescue Exception => e
+      @logger.info e.inspect
+      @logger.info "Removing #{ @dcp_inspect_temp.path } ..."
+      @dcp_inspect_temp.eject
+      exit MKFIFO_FAIL
+    end
+  end
+
   # autolog?
   if options.logfile_autolog
     if ENV[ 'DCP_INSPECT_DIR' ]
@@ -3968,6 +4093,13 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   # Inspection
   inspection = dcp_inspect( options, args[ 0 ] )
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+
+  # Remove @dcp_inspect_temp
+  if options.full_audio_examination
+    if @dcp_inspect_temp
+      @dcp_inspect_temp.eject
+    end
+  end
 
   # Write autolog
   if options.logfile_autolog
