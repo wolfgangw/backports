@@ -411,6 +411,9 @@ def audio_characteristics( asset_file, key = NIL )
   Process.detach pid
   system( 'sleep 0.2' )
   out, err, status = Open3.capture3( "sox #{ @fifo_audio } -n stats" )
+  puts
+  puts err
+  puts
   parse_sox_stats( err )
 end
 
