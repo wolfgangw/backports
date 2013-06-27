@@ -2407,7 +2407,12 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   rescue
   end
 
-  report << "AnnotationText:   #{ xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:AnnotationText" ).text }"
+  annotation_text = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:AnnotationText" ).text
+  if annotation_text.empty?
+    report << "AnnotationText:   [Empty]"
+  else
+    report << "AnnotationText:   #{ annotation_text }"
+  end
 
   # Check ContentKind
   content_kind = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" ).text
