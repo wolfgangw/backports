@@ -2627,6 +2627,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
     # Check a whole bunch of other things
     assets.each do |asset|
+
+      #
+      # CompositionMetadataAsset is already handled
+      # Defer handling of MainMarkers to later on when we know reel duration
+      #
       next if asset.node_name == 'CompositionMetadataAsset'
 
       # Collect reel referenced EssenceTypes (mainly to check for SMPTE reel completeness)
@@ -2668,7 +2673,13 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       else
         edit_rate = nil
       end
-      durations << duration
+
+      case asset.node_name
+      when 'MainMarkers'
+        # MainMarkers does not have Duration
+      else
+        durations << duration
+      end
       edit_rates << edit_rate
 
       if dict
@@ -3117,24 +3128,35 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
         else # ok case: Supplemental/VF/External
 
-          cpl_referenced_assets << { asset_id => FALSE }
-          cpl_referenced_assets_types << MStr::AssetTypeUnknown
-          meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
-          hints << "#{ cpl_reel }: #{ asset.node_name }: #{ meta_report }"
           case asset.node_name
-          when 'MainPicture', 'MainStereoscopicPicture'
-            supplemental_refs[ :main_picture ] += 1
-          when 'MainSound'
-            supplemental_refs[ :main_sound ] += 1
-          when 'MainSubtitle'
-            supplemental_refs[ :main_subtitle ] += 1
-          when 'MainCaption'
-            supplemental_refs[ :main_caption ] += 1
-          end
+          when 'MainMarkers'
+            markers = asset.xpath( "#{ cpl_ns_prefix }:MarkerList/#{ cpl_ns_prefix }:Marker", asset_ns )
+            markers.each do |marker|
+              label = marker.xpath( "#{ cpl_ns_prefix }:Label" ).text
+            end
+            meta_report = "We have MainMarkers"
+          else
 
-          # Infer encryption from presence of KeyId
-          if key_id
-            cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
+            cpl_referenced_assets << { asset_id => FALSE }
+            cpl_referenced_assets_types << MStr::AssetTypeUnknown
+            meta_report = 'Referenced asset file not listed in Assetmap dictionary: Supplemental/VF/External'
+            hints << "#{ cpl_reel }: #{ asset.node_name }: #{ meta_report }"
+            case asset.node_name
+            when 'MainPicture', 'MainStereoscopicPicture'
+              supplemental_refs[ :main_picture ] += 1
+            when 'MainSound'
+              supplemental_refs[ :main_sound ] += 1
+            when 'MainSubtitle'
+              supplemental_refs[ :main_subtitle ] += 1
+            when 'MainCaption'
+              supplemental_refs[ :main_caption ] += 1
+            end
+
+            # Infer encryption from presence of KeyId
+            if key_id
+              cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
+            end
+
           end
 
         end # if dict[ asset_id ]
