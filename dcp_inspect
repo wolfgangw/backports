@@ -3104,7 +3104,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 cpl_referenced_assets_types << MStr::AssetTypeUnknown
                 meta_report = 'File found but not AS-DCP MXF'
 
-                # Infer encryption from presence of KeyId
+                # We don't have meta. Infer encryption from presence of KeyId
                 if key_id
                   cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
                 end
