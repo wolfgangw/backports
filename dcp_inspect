@@ -4067,7 +4067,7 @@ if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
     c = File.read local_xml_catalog
     m = c.match( /xml:base="file:\/\/(.+)">/ )
     if m[ 1 ] != File.join( XSDDir, '' )
-      File.open( local_xml_catalog, 'w' ) { |f| f.write c.gsub( m[ 1 ], File.join( XSDDir, '' ) ); f.close }
+      File.write( local_xml_catalog, c.gsub( m[ 1 ], File.join( XSDDir, '' ) ) )
     end
   else
     @logger.info "Local XML Catalog #{ local_xml_catalog } not found"
@@ -4140,7 +4140,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   if options.logfile_autolog
     autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ), RunDatetime.to_s.gsub( /\D/, '-' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + ".#{ AppName }" )
     begin
-      File.open( autologfile, 'w' ) { |f| f.write @logger.full_log_blob }
+      File.write( autologfile, @logger.full_log_blob )
       @logger.info "See autolog at #{ autologfile }"
     rescue Exception => e
       @logger.info e.message
@@ -4151,7 +4151,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   # Write logfile
   if options.logfile
     begin
-      File.open( options.logfile, 'w' ) { |f| f.write @logger.full_log_blob }
+      File.write( options.logfile, @logger.full_log_blob )
       @logger.info "See logfile at #{ options.logfile }"
     rescue Exception => e
       @logger.info e.message
