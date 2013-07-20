@@ -3478,7 +3478,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     if composition_channel_count
       if naming_matches[ :audio_type ].split( '-' ).first != composition_channel_count[ :abbrev ]
         channel_count_claim = naming_matches[ :audio_type ].split( '-' ).first
-        hints << "CPL #{ cpl_id }: Naming convention: Part audio type claims #{ channel_count_claim } but compoition audio type is #{ composition_channel_count[ :abbrev ] }"
+        hints << "CPL #{ cpl_id }: Naming convention: Part audio type claims #{ channel_count_claim } but composition audio type is #{ composition_channel_count[ :abbrev ] }"
       end
     end
   end
