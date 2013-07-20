@@ -2116,6 +2116,7 @@ def get_xml_of_type( asdcp_type, file )
     @logger.info "#{ file }: #{ e.message }"
     return FALSE
   end
+
   unless xml.errors.empty?
     xml.errors.each do |error|
       # expected errors from non-xml
@@ -2125,9 +2126,13 @@ def get_xml_of_type( asdcp_type, file )
     return FALSE
   end
 
-  case xml.root.node_name
-  when asdcp_type
-    return xml
+  if xml.root
+    case xml.root.node_name
+    when asdcp_type
+      return xml
+    else
+      return FALSE
+    end
   else
     return FALSE
   end
