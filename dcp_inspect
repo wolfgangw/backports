@@ -3886,7 +3886,7 @@ def dcp_inspect( options, arg )
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
   return { :errors => errors, :hints => hints, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
-end
+end # dcp_inspect
 
 
 #
