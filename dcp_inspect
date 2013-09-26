@@ -2794,9 +2794,9 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 if options.validate
                   begin
                     valid, errors, cpl_errors = validation( errors, cpl_errors, xml, asset_file, asset_id, 'DCSubtitle' )
-                    report << "DCSubtitle #{ asset_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }"
+                    report << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }"
                   rescue Exception => e
-                    errors << "DCSubtitle #{ asset_id }: Exception in Schema check: #{ e.message }"
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Exception in Schema check: #{ e.message }"
                     cpl_errors = TRUE
                     report << errors.last
                   end
