@@ -2806,6 +2806,20 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
 
                   #
+                  # Check for TC range violations
+                  #
+                  subtitles.each do |sub|
+                    [ 'TimeIn', 'TimeOut' ].each do |tc_attr|
+                      begin
+                        tc = Timecode.parse_with_ticks( sub.attributes[ tc_attr ].value, edit_rate )
+                      rescue Exception => e
+                        spot_number = ( sub.attributes[ 'SpotNumber' ] ? sub.attributes[ 'SpotNumber' ].value : NIL )
+                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Spot #{ spot_number }: #{ e.inspect }"
+                      end
+                    end
+                  end
+
+                  #
                   # Scan all subtitles to find actual first_time_in and last_time_out
                   # Last subtitle is not necessarily the last displayed
                   # Scrounge content snippets along the way
