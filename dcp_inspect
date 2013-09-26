@@ -2962,7 +2962,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                               # Scrounge font subfamily name
                               font_fu = TTFunk::File.open font_asset
                               font_unique_subfamily = font_fu.name.unique_subfamily[ 1 ].to_s # FIXME not always 2nd element. Why/how?
-                              hints << "#{ cpl_reel }: DCSubtitle: Referenced font subfamily: #{ font_unique_subfamily }"
+                              info << "#{ cpl_reel }: DCSubtitle: Referenced font subfamily: #{ font_unique_subfamily }"
 
                               # Check if all glyphs can be rendered with provided font
                               glyphs_missing = FALSE
