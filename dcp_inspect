@@ -2849,9 +2849,36 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                     first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
                     last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
                   rescue Exception => e
-                    errors << "Timecode: #{ asset_file }: #{ e.message }"
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Timecode: #{ e.message }"
                     cpl_errors = TRUE
                   end
+
+                  #
+                  # Cross-check duration/reel duration and last TimeOut
+                  # We don't have reel_duration yet so here's an indirect way to tell if something's wrong
+                  # Boy-oh-boy, this an ugly hack which exposes nicely the essential design flaw
+                  #
+                  # duration (self) and last TimeOut
+                  #
+                  if last_time_out.to_i > duration
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last TimeOut #{ last_time_out.to_s } exceeds MainSubtitle duration #{ Timecode.new( duration, edit_rate ).to_s }"
+                    cpl_errors = TRUE
+                  end
+                  #
+                  # reel duration (preliminary) and last TimeOut
+                  #
+                  if durations.size > 1 # Assume we have one previous asset duration
+                    begin
+                      if last_time_out > Timecode.new( durations[ 0 .. -2 ].min, edit_rates[ 0 .. -2 ].min )
+                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last TimeOut exceeds reel duration"
+                        cpl_errors = TRUE
+                      end
+                    rescue Exception => e
+                      errors << "#{ cp_reel }: DCSubtitle #{ asset_id }: Timecode: #{ e.message }"
+                      cpl_errors = TRUE
+                    end
+                  end
+
 
                   #
                   # Check for empty elements. Thanks to Mattias Mattsson, Lilian Lefranc and Johann Hohenwarter for the field feedback
