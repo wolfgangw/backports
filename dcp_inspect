@@ -1029,6 +1029,18 @@ class Timecode
   end
 end # Timecode
 
+# TC helper: parse both hh:mm:ss:ttt and hh:mm:ss.sss TC formats used in DCSubtitle
+def parse_dcsubtitle_tc_string( tc_string, fps )
+  case tc_string
+  when /\d\d:\d\d:\d\d:\d\d\d/ # hh:mm:ss:ttt
+    Timecode.parse_with_ticks( tc_string, fps )
+  when /\d\d:\d\d:\d\d\.\d\d\d/ # hh:mm:ss.sss
+    Timecode.parse( tc_string, fps )
+  else
+    NIL
+  end
+end
+
 
 class DC_Signer_Crypto_Compliance
   attr_reader :context, :errors, :crypto_context_valid, :type
@@ -2809,9 +2821,10 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   # Check for TC range violations
                   #
                   subtitles.each do |sub|
-                    [ 'TimeIn', 'TimeOut' ].each do |tc_attr|
+                    [ 'TimeIn', 'TimeOut' ].each do |tc_attr_name|
+                      tc_string = sub.attributes[ tc_attr_name ].value
                       begin
-                        tc = Timecode.parse_with_ticks( sub.attributes[ tc_attr ].value, edit_rate )
+                        tc = parse_dcsubtitle_tc_string( tc_string, edit_rate )
                       rescue Exception => e
                         spot_number = ( sub.attributes[ 'SpotNumber' ] ? sub.attributes[ 'SpotNumber' ].value : NIL )
                         errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Spot #{ spot_number }: #{ e.inspect }"
@@ -2846,8 +2859,8 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   end
 
                   begin
-                    first_time_in = Timecode.parse_with_ticks( first_time_in, edit_rate )
-                    last_time_out = Timecode.parse_with_ticks( last_time_out, edit_rate )
+                    first_time_in = parse_dcsubtitle_tc_string( first_time_in, edit_rate )
+                    last_time_out = parse_dcsubtitle_tc_string( last_time_out, edit_rate )
                   rescue Exception => e
                     errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Timecode: #{ e.message }"
                     cpl_errors = TRUE
