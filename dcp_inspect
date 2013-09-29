@@ -3017,6 +3017,16 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                       errors << "#{ cpl_reel }: DCSubtitle: No Font Id declared via LoadFont but referenced Font Ids found: #{ font_ids.inspect }"
                       cpl_errors = TRUE
                     end
+                  else
+                    if load_font_el.first.attributes[ 'Id' ]
+                      load_font_id = load_font_el.first.attributes[ 'Id' ].value
+                      font_ids.each do |font_id|
+                        if font_id != load_font_id
+                          errors << "#{ cpl_reel }: DCSubtitle: Referenced font Id '#{ font_id }' does not match the Id '#{ load_font_id }' declared in LoadFont. Font cannot be loaded"
+                          cpl_errors = TRUE
+                        end
+                      end
+                    end
                   end
 
                   meta_report = "DCSubtitle, #{ first_time_in } '#{ first_time_in_text.nil? ? '[NIL]' : first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text.nil? ? '[NIL]' : last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
