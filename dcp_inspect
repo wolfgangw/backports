@@ -2839,6 +2839,23 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   #
                   first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
                   first_nodeset = subtitles.first.xpath( '*/Text|Text|*/Image|Image' )
+                  #
+                  # See CRAWL which sports empty Subtitle elements
+                  #
+                  # TI spec 2.9 Subtitle says
+                  #
+                  #   "The Subtitle element is a parent element. It includes [...] one or more child elements [...]"
+                  #
+                  # The XSD we're using right now (DCSubtitle.v1.mattsson.xsd), though, has
+                  #
+                  #     <xs:choice minOccurs="0" maxOccurs="unbounded">
+                  #       <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
+                  #       <xs:element minOccurs="0" maxOccurs="unbounded" ref="Text"/>
+                  #       <xs:element ref="Image"/>
+                  #     </xs:choice>
+                  #
+                  # Correctness tbd
+                  #
                   first_time_in_text = truncate( first_nodeset.first.text.gsub( /^\s+|\s+$/, '' ), 3 ) # first line
                   subtitles[ 1 .. -1 ].each do |sub|
                     if first_time_in < sub.attributes[ 'TimeIn' ].value
