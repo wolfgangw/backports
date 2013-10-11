@@ -2837,8 +2837,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   # Last subtitle is not necessarily the last displayed
                   # Scrounge content snippets along the way
                   #
-                  first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
-                  first_nodeset = subtitles.first.xpath( '*/Text|Text|*/Image|Image' )
                   #
                   # See CRAWL which sports empty Subtitle elements
                   #
@@ -2856,23 +2854,46 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                   #
                   # Correctness tbd
                   #
-                  first_time_in_text = truncate( first_nodeset.first.text.gsub( /^\s+|\s+$/, '' ), 3 ) # first line
+                  #
+                  # First
+                  #
+                  first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
+                  nodeset = subtitles.first.xpath( '*/Text|Text|*/Image|Image' )
+                  if nodeset.empty?
+                    first_time_in_text = '[No child element]'
+                    hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: First Subtitle element has neither Text nor Image"
+                  else
+                    first_time_in_text = truncate( nodeset.first.text.gsub( /^\s+|\s+$/, '' ), 3 ) # first line
+                  end
                   subtitles[ 1 .. -1 ].each do |sub|
                     if first_time_in < sub.attributes[ 'TimeIn' ].value
                       break
                     end
                     first_time_in = sub.attributes[ 'TimeIn' ].value
                   end
+                  #
+                  # Last
+                  #
                   last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
-                  last_nodeset = subtitles.last.xpath( '*/Text|Text|*/Image|Image' )
-                  last_time_out_text = truncate( last_nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 )
+                  nodeset = subtitles.last.xpath( '*/Text|Text|*/Image|Image' )
+                  if nodeset.empty?
+                    last_time_out_text = '[No child element]'
+                    hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last Subtitle element has neither Text nor Image"
+                  else
+                    last_time_out_text = truncate( nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 )
+                  end
                   subtitles.reverse[ 1 .. -1 ].each do |sub|
                     if last_time_out > sub.attributes[ 'TimeOut' ].value
                       break
                     end
                     last_time_out = sub.attributes[ 'TimeOut' ].value
                     nodeset = sub.xpath( '*/Text|Text|*/Image|Image' )
-                    last_time_out_text = truncate( nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 ) # last line
+                    if nodeset.empty?
+                      last_time_out_text = '[No child element]'
+                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last to-be-displayed Subtitle element has neither Text nor Image"
+                    else
+                      last_time_out_text = truncate( nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 ) # last line
+                    end
                   end
 
                   begin
