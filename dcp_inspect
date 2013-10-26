@@ -3610,8 +3610,8 @@ def dcp_inspect( options, arg )
 
       listed_id = asset.xpath( 'Id' ).text.split( ':' ).last
       # FIXME ChunkList.size == 1 is an assumption and wrong at that. Could be > 1
-      path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
       # using AM listed path for listing message, not package path, because this is what we're looking at right now:
+      path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
 
       # Check for UUID specs. Defer RFC-4122 compliance check to a later stage where we know asset kind
       # DCSubtitle does not require RFC-4122 UUID
@@ -3619,7 +3619,9 @@ def dcp_inspect( options, arg )
         errors << "AM #{ am_id }: Listed in Assetmap: Not a UUID: #{ path }: #{ listed_id }"
         am_errors = TRUE
       end
-      if path.nil? # example: mc t28 ASSETMAP.xml
+
+      # Path element present? See e.g. mc t28 ASSETMAP.xml
+      if path.nil?
         errors << "AM #{ am_id }: No path for asset: #{ listed_id }"
         am_errors = TRUE
       else
@@ -3841,7 +3843,7 @@ def dcp_inspect( options, arg )
             pkl_errors = TRUE
           end
           # List all assets listed in PKL and report AM mapping status
-          @logger.debug( "#{ id }: #{ type.empty? ? '<Type not specified in PKL>' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
+          @logger.debug( "#{ id }: #{ type.empty? ? '[Type not specified in PKL]' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
