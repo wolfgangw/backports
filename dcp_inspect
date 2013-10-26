@@ -432,6 +432,16 @@ module MStr
 
   Cpl_standard_content = [ 'feature', 'trailer', 'test', 'teaser', 'rating', 'advertisement', 'short', 'transitional', 'psa', 'policy' ]
   Cpl_standard_content_moniker_map = { :ftr => :feature, :tlr => :trailer, :tst => :test, :tsr => :teaser, :rtg => :rating, :pol => :policy, :adv => :advertisement, :shr => :short, :xsn => :transitional, :psa => :psa, :pol => :policy  }
+
+  #
+  # RFC-4122:
+  # The hexadecimal values "a" through "f" are output as
+  # lower case characters and are case insensitive on input.
+  #
+  Uuid_re = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+  Uuid_particle_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ # used for filename component
+  Uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
+
 end # module MStr
 
 
@@ -2409,7 +2419,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     end
   end
 
-  report << "CPL Id:           #{ cpl_id }"
+  # CPL:Id RFC-4122 compliant?
+  if cpl_id !~ MStr::Uuid_rfc4122_re
+    report << "CPL Id:           #{ cpl_id } [Not RFC-4122 compliant]"
+    errors << "CPL #{ cpl_id }: Value of CompositionPlaylist:Id is not RFC-422 compliant"
+    cpl_errors = TRUE
+  else
+    report << "CPL Id:           #{ cpl_id }"
+  end
+
   report << "CPL file:         #{ cpl_file }"
   report << "CPL type:         #{ cpl_type } (#{ cpl_ns })"
 
@@ -2622,6 +2640,12 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
             meta = MxfTools.mxf_inspect( asset_file )
             # MXF?
             if meta
+
+              # Check asset Id for RFC-4122 compliance. All assets except DCSubtitle require this
+              if asset_id !~ MStr::Uuid_rfc4122_re
+                errors << "#{ cpl_reel }: Listed asset Id #{ asset_id } is not RFC-4122 compliant"
+                cpl_errors = TRUE
+              end
 
               # Get asset edit rate early
               begin
@@ -3476,13 +3500,6 @@ def dcp_inspect( options, arg )
   hints = Array.new
   hints << 'Schema checks were skipped' unless options.validate
   info = Array.new
-  #
-  # RFC-4122:
-  # The hexadecimal values "a" through "f" are output as
-  # lower case characters and are case insensitive on input.
-  #
-  uuid_re = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ # used for filename component
-  uuid_rfc4122_re = /^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[8-9a-b][0-9a-f]{3}-[0-9a-f]{12}$/
 
   # collect all files
   @package_dir = arg
@@ -3596,6 +3613,11 @@ def dcp_inspect( options, arg )
       # using AM listed path for listing message, not package path, because this is what we're looking at right now:
       if listed_id !~ uuid_rfc4122_re
         errors << "AM #{ am_id }: Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }"
+
+      # Check for UUID specs. Defer RFC-4122 compliance check to a later stage where we know asset kind
+      # DCSubtitle does not require RFC-4122 UUID
+      if listed_id.downcase !~ MStr::Uuid_re
+        errors << "AM #{ am_id }: Listed in Assetmap: Not a UUID: #{ path }: #{ listed_id }"
         am_errors = TRUE
       end
       if path.nil? # example: mc t28 ASSETMAP.xml
@@ -3612,8 +3634,8 @@ def dcp_inspect( options, arg )
         if File.exists?( asset_file )
           asset_id = get_asset_uuid( asset_file )
           if asset_id
-            unless asset_id =~ uuid_rfc4122_re
-              errors << "AM #{ am_id }: Asset UUID: Not an RFC-4122 UUID: #{ asset_file }: #{ asset_id }"
+            unless asset_id.downcase =~ MStr::Uuid_re
+              errors << "AM #{ am_id }: Asset UUID: Not a UUID: #{ asset_file }: #{ asset_id }"
               am_errors = TRUE
             end
             if listed_id.downcase != asset_id.downcase
@@ -3665,8 +3687,8 @@ def dcp_inspect( options, arg )
       # Check if possible uuid component in the asset filename matches the actual asset uuid
       if dict[ index ][ listed_id ]
         file_basename = File.basename( dict[ index ][ listed_id ] )
-        if file_basename =~ uuid_re
-          unless file_basename.match( uuid_re )[ 0 ] == listed_id
+        if file_basename =~ MStr::Uuid_particle_re
+          unless file_basename.match( MStr::Uuid_particle_re )[ 0 ] == listed_id
             hints << "Asset UUID and filename UUID component mismatch: #{ listed_id } -> #{ file_basename }"
           end
         end
