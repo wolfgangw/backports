@@ -3611,8 +3611,6 @@ def dcp_inspect( options, arg )
       # FIXME ChunkList.size == 1 is an assumption and wrong at that. Could be > 1
       path = asset.xpath( 'ChunkList/Chunk/Path' ).text.split( /file:\/+/ ).last
       # using AM listed path for listing message, not package path, because this is what we're looking at right now:
-      if listed_id !~ uuid_rfc4122_re
-        errors << "AM #{ am_id }: Listed in Assetmap: Not an RFC-4122 UUID: #{ listed_id }: #{ path }"
 
       # Check for UUID specs. Defer RFC-4122 compliance check to a later stage where we know asset kind
       # DCSubtitle does not require RFC-4122 UUID
