@@ -3587,6 +3587,7 @@ def dcp_inspect( options, arg )
     pkls_missing << Array.new
     am_base = File.dirname am_file
     xml = xml?( package am_file )
+    am_ns = xml.namespaces[ 'xmlns' ]
     # FIXME
     xml.remove_namespaces!
     am_id = get_asset_uuid( package am_file )
@@ -3679,7 +3680,18 @@ def dcp_inspect( options, arg )
 
       # PackingList?
       unless asset.xpath( 'PackingList' ).empty?
-        pkls[ index ] << listed_id
+        case am_ns
+        when MStr::Interop_am
+          pkls[ index ] << listed_id
+        when MStr::Smpte_am
+          if asset.xpath( 'PackingList' ).text == 'true'
+            pkls[ index ] << listed_id
+          else
+            errors << "AM #{ am_id }: SMPTE AM requires a PackingList element to contain the value 'true' (value is missing). Continuing anyway"
+            am_errors = TRUE
+            pkls[ index ] << listed_id
+          end
+        end
       end
 
       # Check if possible uuid component in the asset filename matches the actual asset uuid
