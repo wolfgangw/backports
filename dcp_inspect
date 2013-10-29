@@ -3306,7 +3306,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   elsif is_stereoscopic.uniq.size == 1 and is_stereoscopic.uniq.first == FALSE
     report << 'Composition kind: 2D/Monoscopic'
     is_stereoscopic = FALSE
-  elsif is_stereoscopic.uniq.size != 1
+  elsif is_stereoscopic.uniq.size == 2
     report << 'Composition references monoscopic and stereoscopic elements'
     is_stereoscopic = TRUE
     errors << "CPL #{ cpl_id }: " + report.last
