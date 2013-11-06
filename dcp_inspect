@@ -2463,7 +2463,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     if MStr::Cpl_standard_content.include? content_kind
       report << "ContentKind:      #{ content_kind }"
     else
-      hints << "CPL #{ cpl_id }: ContentKind has non-standard value #{ content_kind.inspect }"
+      hints << "CPL #{ cpl_id }: ContentKind has non-standard value #{ content_kind.inspect }. May result in display problems with player UIs"
       report << "ContentKind:      #{ content_kind } [Non-standard value]"
     end
   end
