@@ -3543,8 +3543,8 @@ def dcp_inspect( options, arg )
   if am_candidates.empty?
     errors << 'No Assetmap candidates found'
   else
-    @logger.debug( "Found #{ amount( 'Assetmap candidate', am_candidates ) }: #{ am_candidates.inspect }" )
-    @logger.debug( "Found #{ amount( 'file', package_dir_tree ) } in total" )
+    @logger.debug "Found #{ amount( 'Assetmap candidate', am_candidates ) }: #{ am_candidates.inspect }"
+    @logger.debug "Found #{ amount( 'file', package_dir_tree ) } in total"
   end
 
   # Check XML for Assetmap content
@@ -3560,7 +3560,7 @@ def dcp_inspect( options, arg )
         if options.validate
           begin
             valid, errors, error_status = validation( errors, TRUE, xml, am_file, am_id, 'AM' )
-            @logger.debug( "AM #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }: #{ am_file }" )
+            @logger.debug "AM #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }: #{ am_file }"
           rescue Exception => e
             errors << "AM #{ am_id.nil? ? am_id.inspect : am_id }: Exception in Schema check: #{ e.message }"
             error_status = TRUE
@@ -3579,7 +3579,7 @@ def dcp_inspect( options, arg )
   @logger.debug ''
 
   # Process all Assetmaps
-  @logger.debug( "Found #{ amount( 'Assetmap', am_files ) }" )
+  @logger.debug "Found #{ amount( 'Assetmap', am_files ) }"
   dict = Array.new # list of dictionaries/hashes
   pkls = Array.new
   pkls_missing = Array.new
@@ -3605,8 +3605,8 @@ def dcp_inspect( options, arg )
     # collect all asset nodes
     assets = xml.xpath( '//Asset' )
 
-    @logger.debug( "AM #{ am_id }: #{ am_file }"  )
-    @logger.debug( "AM #{ am_id } lists #{ amount( 'asset', assets.size ) }:" )
+    @logger.debug "AM #{ am_id }: #{ am_file }"
+    @logger.debug "AM #{ am_id } lists #{ amount( 'asset', assets.size ) }:"
 
     # Store asset info in a dictionary (uuid => path, relative to package root)
     # look for PackingList(s)
@@ -3633,7 +3633,7 @@ def dcp_inspect( options, arg )
         # Assetmap dictionary
         dict[ index ][ listed_id ] = Pathname( File.join( am_base, path ) ).cleanpath.to_s
         asset_file = package dict[ index ][ listed_id ]
-        @logger.debug( "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (file missing)' }" )
+        @logger.debug "#{ listed_id }: #{ dict[ index ][ listed_id ] }#{ File.exists?( package dict[ index ][ listed_id ] ) ? '' : ' (file missing)' }"
 
         # Check listed_id vs actual asset_id
         if File.exists?( asset_file )
@@ -3713,7 +3713,7 @@ def dcp_inspect( options, arg )
     end # assets.each
 
     # List this Assetmap's PKLs
-    @logger.debug( "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:" )
+    @logger.debug "Assetmap #{ am_id } lists #{ amount( 'PKL', pkls[ index ] ) }:"
     pkls[ index ].map { |pkl_id|
       pkl_file = package dict[ index ][ pkl_id ]
       if File.exists?( pkl_file )
@@ -3754,12 +3754,12 @@ def dcp_inspect( options, arg )
   end
 
   # List all found PKLs
-  @logger.debug( "Found #{ amount( 'Package', pkls.flatten ) }" )
+  @logger.debug "Found #{ amount( 'Package', pkls.flatten ) }"
   pkls.each_with_index do |am_pkls, index|
     am_pkls.each do |pkl_id|
       if dict[ index ][ pkl_id ]
         pkl_file = package dict[ index ][ pkl_id ]
-        @logger.debug( "PKL file#{ File.exists?( pkl_file ) ? '' : ' not' } present: #{ [ pkl_id, pkl_file ].join( ': ' ) }" )
+        @logger.debug "PKL file#{ File.exists?( pkl_file ) ? '' : ' not' } present: #{ [ pkl_id, pkl_file ].join( ': ' ) }"
       end
     end
   end
@@ -3779,12 +3779,12 @@ def dcp_inspect( options, arg )
       xml = get_xml_of_type( 'PackingList', pkl_file )
       if xml
 
-        @logger.debug( "PKL #{ pkl_id }: #{ pkl_file }" )
+        @logger.debug "PKL #{ pkl_id }: #{ pkl_file }"
 
         if options.validate
           begin
             valid, errors, pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
-            @logger.debug( "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }" )
+            @logger.debug "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK' : "Errors (See #{ error_output })" }"
           rescue Exception => e
             errors << "PKL #{ pkl_id }: Exception in Schema check: #{ e.message }"
             pkl_errors = TRUE
@@ -3798,7 +3798,7 @@ def dcp_inspect( options, arg )
             @signed_pkls_verified_count += 1
           end
           errors, pkl_errors = errors_signature_verification( errors, pkl_errors, signature_result, pkl_id, pkl_file, 'PKL' )
-          @logger.debug( "PKL #{ pkl_id }: #{ signature_result.messages.last }" )
+          @logger.debug "PKL #{ pkl_id }: #{ signature_result.messages.last }"
           if signature_result and ! signature_result.signature_node.empty?
             @signed_pkls_count += 1
             sig_info = signer_info( xml, signature_result )
@@ -3847,7 +3847,7 @@ def dcp_inspect( options, arg )
             pkl_errors = TRUE
           end
           # List all assets listed in PKL and report AM mapping status
-          @logger.debug( "#{ id }: #{ type.empty? ? '[Type not specified in PKL]' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }" )
+          @logger.debug "#{ id }: #{ type.empty? ? '[Type not specified in PKL]' : type }: #{ dict[ index ][ id ] ? File.exists?( package dict[ index ][ id ] ) ? dict[ index ][ id ] : dict[ index ][ id ] + ' (missing)' : 'Asset UUID not in assetmap dictionary' }"
 
           if dict[ index ].keys.include?( id )
             asset_file = package dict[ index ][ id ]
@@ -3896,7 +3896,7 @@ def dcp_inspect( options, arg )
                         end
                       else
                         @check_hashes_limit_hits += 1
-                        @logger.debug( "#{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit" )
+                        @logger.debug "#{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit"
                         hints << "PKL #{ pkl_id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit: Asset #{ id }: #{ asset_file }"
                       end
                     end
@@ -3933,9 +3933,9 @@ def dcp_inspect( options, arg )
           end
 
         end
-        @logger.debug( "PKL #{ pkl_id }: Package size: #{ package_size_actual == package_size_listed ? package_size_actual.to_k : package_size_actual.to_k + ' (Listed: ' + package_size_listed.to_k + ')' }" )
+        @logger.debug "PKL #{ pkl_id }: Package size: #{ package_size_actual == package_size_listed ? package_size_actual.to_k : package_size_actual.to_k + ' (Listed: ' + package_size_listed.to_k + ')' }"
         # List this PKLs CPLs
-        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }" )
+        @logger.debug "PKL #{ pkl_id } lists #{ amount( 'composition', pkl_cpls ) }"
         pkl_cpls.map { |cpl_id|
           cpl_file = package dict[ index ][ cpl_id ]
           if File.exists?( cpl_file )
@@ -3969,7 +3969,7 @@ def dcp_inspect( options, arg )
 
   # List all found CPLs
   if cpls.flatten.size > 0
-    @logger.debug( "Found #{ amount( 'Composition', cpls.flatten ) }" )
+    @logger.debug "Found #{ amount( 'Composition', cpls.flatten ) }"
     dict.each_with_index do |dictionary, index|
       cpls[ index ].each do |cpl_id|
         cpl_file = package dictionary[ cpl_id ]
@@ -3982,7 +3982,7 @@ def dcp_inspect( options, arg )
       end
     end
   else
-    @logger.info( 'Found no compositions' )
+    @logger.info 'Found no compositions'
   end
   @logger.debug ''
 
@@ -4041,14 +4041,14 @@ if ENV[ 'DCP_INSPECT_AUTOLOG' ]
   options.logfile_autolog = TRUE
 end
 @logger = DLogger.new( prefix = '', options )
-@logger.debug( "#{ AppName } #{ AppVersion }: #{ args }" )
+@logger.debug "#{ AppName } #{ AppVersion }: #{ args }"
 
 
 # Check required tools
 required_command_not_found = FALSE
 [ 'asdcp-test', 'kmuuidgen' ].each do |command|
   if ! command_exists? command
-    @logger.info( "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually" )
+    @logger.info "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually"
     required_command_not_found = TRUE
   end
 end
@@ -4074,10 +4074,10 @@ end
 unless options.check_hashes_limit == :no_limit
   if options.check_hashes_limit =~ /\d+(\.?\d+)?\s?(kb|mb|gb)?/
     @check_hashes_limit_nice = bytes_from_nice_bytes( options.check_hashes_limit ).to_k
-    @logger.info( "Will skip hash checks for files bigger than #{ @check_hashes_limit_nice }" )
+    @logger.info "Will skip hash checks for files bigger than #{ @check_hashes_limit_nice }"
   else
     @check_hashes_limit_nice = NIL
-    @logger.info( "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB" )
+    @logger.info "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB"
     exit BAD_HASH_LIMIT_ARG
   end
 end
@@ -4184,13 +4184,13 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   end
 
 elsif args.size == 0
-  @logger.info( "No volume or directory given. See #{ AppName } --help" )
+  @logger.info "No volume or directory given. See #{ AppName } --help"
   exit NO_ARG
 elsif args.size > 1
-  @logger.info( "Too many arguments. See #{ AppName } --help" )
+  @logger.info "Too many arguments. See #{ AppName } --help"
   exit TOO_MANY_ARGS
 else
-  @logger.info( "Not a volume or directory. See #{ AppName } --help" )
+  @logger.info "Not a volume or directory. See #{ AppName } --help"
   exit ARG_NOT_A_DIR
 end
 
