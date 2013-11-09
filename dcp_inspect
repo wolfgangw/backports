@@ -3844,12 +3844,20 @@ def dcp_inspect( options, arg )
 
         # FIXME
         xml.remove_namespaces!
-        pkl_assets = xml.xpath( '//Asset' )
+
+        pkl_annotation_text = xml.xpath( '/PackingList/AnnotationText' ).text
+        if pkl_annotation_text.empty?
+          @logger.debug "PKL #{ pkl_id }: AnnotationText: [Empty]"
+        else
+          @logger.debug "PKL #{ pkl_id }: AnnotationText: #{ pkl_annotation_text }"
+        end
+
         package_size_listed = 0
         package_size_actual = 0
         pkl_cpls = Array.new
 
-        @logger.debug( "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets.size ) }" )
+        pkl_assets = xml.xpath( '//Asset' )
+        @logger.debug "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets.size ) }"
 
         pkl_assets.each do |asset|
           id = asset.xpath( 'Id' ).text.split( ':' ).last
