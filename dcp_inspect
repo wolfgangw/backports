@@ -434,6 +434,7 @@ module MStr
   TTF = 'Font TrueType'
   OTF = 'Font CFF-based'
 
+  Cpl_content_kind_default_scope = 'http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-content'
   Cpl_standard_content = [ 'feature', 'trailer', 'test', 'teaser', 'rating', 'advertisement', 'short', 'transitional', 'psa', 'policy' ]
   Cpl_standard_content_moniker_map = { :ftr => :feature, :tlr => :trailer, :tst => :test, :tsr => :teaser, :rtg => :rating, :pol => :policy, :adv => :advertisement, :shr => :short, :xsn => :transitional, :psa => :psa, :pol => :policy  }
 
@@ -2459,16 +2460,31 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   end
 
   # Check ContentKind
-  content_kind = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" ).text
+  content_kind_nodeset = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" )
+  content_kind = content_kind_nodeset.text
+  content_kind_scope_is_default = FALSE
+  content_kind_scope = content_kind_nodeset.first.attributes[ 'scope' ]
   if content_kind.empty?
-    hints << "CPL #{ cpl_id }: ContentKind is empty"
+    hints << "CPL #{ cpl_id }: ContentKind is empty. May lead to display issues in player UIs"
     report << "ContentKind:      [Empty]"
   else
-    if MStr::Cpl_standard_content.include? content_kind
-      report << "ContentKind:      #{ content_kind }"
+    if content_kind_scope
+      if content_kind_scope.value == MStr::Cpl_content_kind_default_scope
+        content_kind_scope_is_default = TRUE
+      else
+        hints << "CPL #{ cpl_id }: ContentKind has non-standard scoped value #{ content_kind.inspect }. May lead to display issues in player UIs"
+        report << "ContentKind:      #{ content_kind } [Non-standard scope #{ content_kind_scope.value.inspect }]"
+      end
     else
-      hints << "CPL #{ cpl_id }: ContentKind has non-standard value #{ content_kind.inspect }. May result in display problems with player UIs"
-      report << "ContentKind:      #{ content_kind } [Non-standard value]"
+      content_kind_scope_is_default = TRUE
+    end
+    if content_kind_scope_is_default
+      if MStr::Cpl_standard_content.include? content_kind
+        report << "ContentKind:      #{ content_kind }"
+      else
+        hints << "CPL #{ cpl_id }: ContentKind has non-standard value #{ content_kind.inspect }. May lead to display issues in player UIs"
+        report << "ContentKind:      #{ content_kind } [Non-standard value]"
+      end
     end
   end
 
@@ -3444,7 +3460,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   if naming_matches[ :content_kind ]
     naming_content_kind_moniker = naming_matches[ :content_kind ].split( '-' ).first.downcase.to_sym
     if MStr::Cpl_standard_content_moniker_map[ naming_content_kind_moniker ] != content_kind.downcase.to_sym
-      hints << "CPL #{ cpl_id }: Naming convention: Part content_kind claims #{ MStr::Cpl_standard_content_moniker_map[ naming_content_kind_moniker ] } but CPL ContentKind says #{ content_kind }"
+      hints << "CPL #{ cpl_id }: Naming convention: Part content_kind claims #{ MStr::Cpl_standard_content_moniker_map[ naming_content_kind_moniker ] } but CPL ContentKind says #{ content_kind.inspect }"
     end
     #
   end
