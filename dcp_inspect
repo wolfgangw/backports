@@ -2358,7 +2358,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
   ns = xml.collect_all_namespaces_href_keys
   cpl_ns = xml.root.namespace.href
-  cpl_ns_prefix = namespace_prefix( xml, xml.root.namespace.href )
+  cpl_ns_prefix = namespace_prefix( xml, cpl_ns )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
   cpl_file = package dict[ cpl_id ]
 
