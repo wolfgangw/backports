@@ -2919,17 +2919,18 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
                 # Audio characteristics (Levels, RMS, silent channels)
                 audio_stats = NIL
+                dkdms = Hash.new
                 if options.full_audio_examination
                   if meta[ 'EncryptedEssence' ] == 'Yes'
                     if dkdms[ cpl_id ]
                       if dkdms[ cpl_id ][ asset_key_id ]
                         key = dkdms[ cpl_id ][ asset_key_id ]
                       else
-                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }"
+                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }: Not yet implemented"
                         key = NIL
                       end
                     else
-                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }"
+                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }: Not yet implemented"
                       key = NIL
                     end
                   else
