@@ -411,7 +411,7 @@ end
 
 
 def audio_characteristics( asset_file, key = NIL )
-  pid = Process.spawn( "asdcp-test -x #{ @asdcp_audio_prefix } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file }" )
+  pid = Process.spawn( "asdcp-test -x #{ @fifo_audio } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file }" )
   Process.detach pid
   system( 'sleep 0.2' )
   out, err, status = Open3.capture3( "sox #{ @fifo_audio } -n stats" )
