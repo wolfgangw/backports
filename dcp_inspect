@@ -2959,7 +2959,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                         @logger.cr "#{ cpl_reel }: Audio analysis ..."
                         audio_stats_for_reel[ reel_no ][ asset_id ] = audio_characteristics( asset_file, entry_point, duration, key )
                         @logger.info "#{ cpl_reel }: Audio analysis: Done"
-                        puts audio_stats_for_reel.inspect
                       end
 
                     else
