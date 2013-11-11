@@ -429,6 +429,11 @@ end
 
 # lib/mxf.rb
 module MxfTools
+  def asdcplib_version
+    out, err, status = Open3.capture3( 'asdcp-unwrap -V' )
+    major, minor, patchlevel = out.scan( /(\d)\.(\d+)\.(\d+)/ )[0].map { |e| e.to_i }
+  end
+
   def mxf_inspect( filename )
     list = Shell.asdcp_mxf_info( filename )
     if list =~ /EditRate and SampleRate do not match/ and list =~ /File may contain JPEG Interop stereoscopic images/
