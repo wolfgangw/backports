@@ -3405,23 +3405,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     cpl_errors = TRUE
   end
 
-  # Composition type SMPTE/Interop/Undetermined?
-  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
-  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
-    composition_type = cpl_referenced_assets_types.uniq.first
-    report << "Composition type: #{ composition_type }"
-  else
-    # FIXME Composition type Mixed error or hint?
-    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
-    report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
-    if broken_assets.size != 0
-      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
-      cpl_errors = TRUE
-    else
-      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
-    end
-  end
-
   # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
   # See SMPTE ST 429-2:2009 section 9.1 for the requirement
   reels_references.each_with_index do |reel_refs, index|
@@ -3451,15 +3434,15 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
 
   # Composition requires KDM?
   if cpl_referenced_assets_encrypted.size > 0
-    report << 'Composition requires KDM for playback'
+    report << 'Composition crypto: Requires KDM for playback'
     composition_requires_kdm = TRUE
     @encrypted_compositions += 1
   elsif cpl_referenced_assets_encrypted_inferred_from_key_id.size > 0
-    report << 'Composition requires KDM for playback'
+    report << 'Composition crypto: Requires KDM for playback'
     composition_requires_kdm = TRUE
     @encrypted_compositions += 1
   else
-    report << 'Composition is plaintext (no KDM required)'
+    report << 'Composition crypto: Plaintext (no KDM required)'
     composition_requires_kdm = FALSE
   end
 
@@ -3475,6 +3458,23 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     is_stereoscopic = TRUE
     errors << "CPL #{ cpl_id }: " + report.last
     cpl_errors = TRUE
+  end
+
+  # Composition type SMPTE/Interop/Undetermined?
+  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
+    composition_type = cpl_referenced_assets_types.uniq.first
+    report << "Composition type: #{ composition_type }"
+  else
+    # FIXME Composition type Mixed error or hint?
+    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
+    report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
+    if broken_assets.size != 0
+      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
+      cpl_errors = TRUE
+    else
+      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
+    end
   end
 
   # Naming convention
