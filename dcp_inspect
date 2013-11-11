@@ -190,8 +190,8 @@ class Options
     options.logfile_append = NIL
     options.logfile_autolog = FALSE
     options.overwrite_logfile = FALSE
-    options.full_image_examination = FALSE
-    options.full_audio_examination = FALSE
+    options.image_analysis = FALSE # not yet implemented
+    options.audio_analysis = TRUE
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'info', 'cpl', 'debug', 'trace_func' ]
 
     opts = OptionParser.new do |opts|
@@ -224,11 +224,11 @@ BANNER
       opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
       end
-      opts.on( '--fix', '--full-image-examination', 'Full image examination' ) do
-        options.full_image_examination = TRUE
+      opts.on( '--no-ia', '--no-image-analysis', 'No image analysis' ) do
+        options.full_image_examination = FALSE
       end
-      opts.on( '--fax', '--full-audio-examination', 'Full audio examination' ) do
-        options.full_audio_examination = TRUE
+      opts.on( '--no-aa', '--no-audio-analysis', 'No audio analysis' ) do
+        options.audio_analysis = FALSE
       end
       opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, hints, info, debug, cpl or trace_func (Default: debug)' ) do |p|
         if options.verbosity_choices.include?( p )
@@ -411,13 +411,13 @@ end
 
 
 def audio_characteristics( asset_file, entry_point, duration, key = NIL )
-  pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file } #{ @fifo_audio } 2>/dev/null" )
+  pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file } #{ @fifo } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.2' )
-  out, err, status = Open3.capture3( "sox #{ @fifo_audio } -n stats" )
-  puts
-  puts err
-  puts
+  out, err, status = Open3.capture3( "sox #{ @fifo } -n stats" )
+  #puts
+  #puts err
+  #puts
   parse_sox_stats( err )
 end
 
@@ -2924,7 +2924,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 # Audio characteristics (Levels, RMS, silent channels)
                 audio_stats_for_reel[ reel_no ] = Hash.new
                 dkdms = Hash.new
-                if options.full_audio_examination
+                if options.audio_analysis
                   if sane_IntrinsicDuration_EntryPoint_Duration
                     audio_stats_for_reel[ reel_no ][ asset_id ] = NIL
                     if meta[ 'EncryptedEssence' ] == 'Yes'
@@ -2932,11 +2932,11 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                         if dkdms[ cpl_id ][ asset_key_id ]
                           key = dkdms[ cpl_id ][ asset_key_id ]
                         else
-                          hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }: Not yet implemented"
+                          hints << "#{ cpl_reel }: MainSound: Audio analysis requested but got no key for asset #{ asset_id }: Not yet implemented"
                           key = NIL
                         end
                       else
-                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }: Not yet implemented"
+                        hints << "#{ cpl_reel }: MainSound: Audio analysis requested but got no DKDM for CPL #{ cpl_id }: Not yet implemented"
                         key = NIL
                       end
                     else
@@ -2946,11 +2946,14 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                       if key
                         audio_stats_for_reel[ reel_no ][ asset_id ] = audio_characteristics( asset_file, entry_point, duration, key )
                       elsif meta[ 'EncryptedEssence' ] == 'No'
+                        @logger.cr "#{ cpl_reel }: Audio analysis ..."
                         audio_stats_for_reel[ reel_no ][ asset_id ] = audio_characteristics( asset_file, entry_point, duration, key )
+                        @logger.info "#{ cpl_reel }: Audio analysis: Done"
+                        puts audio_stats_for_reel.inspect
                       end
 
                     else
-                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no temp location to write to"
+                      hints << "#{ cpl_reel }: MainSound: Audio analysis requested but got no temp location to write to"
                     end
                   end
                 end
@@ -4215,7 +4218,7 @@ end
 # Check required tools
 required_command_not_found = FALSE
 required_commands = [ 'asdcp-test', 'asdcp-unwrap', 'kmuuidgen' ]
-required_commands << 'sox' if options.full_audio_examination
+required_commands << 'sox' if options.audio_analysis
 required_commands.flatten.each do |command|
   if ! command_exists? command
     @logger.info "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually"
@@ -4279,11 +4282,11 @@ ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
 if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
 
   # Full audio/image examination?
-  if options.full_audio_examination # not implemented yet: or options.full_image_examination
+  if options.audio_analysis or options.image_analysis
     @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
-    @logger.info "Full audio examination: Setting up temp location at #{ @dcp_inspect_temp.path }"
-    @asdcp_audio_prefix = File.join( @dcp_inspect_temp.path, 'audio' )
-    @fifo_audio = @asdcp_audio_prefix + '_1.wav'
+    @logger.info "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
+    @logger.info 'Image analysis not yet implemented' if options.image_analysis
+    @fifo = File.join( @dcp_inspect_temp.path, 'asdcp-temp' )
     begin
       out, err, status = Open3.popen3( "mkfifo #{ @fifo_audio }" )
     rescue Exception => e
@@ -4331,7 +4334,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
 
   # Remove @dcp_inspect_temp
-  if options.full_audio_examination
+  if options.audio_analysis or options.image_analysis
     if @dcp_inspect_temp
       @dcp_inspect_temp.eject
     end
