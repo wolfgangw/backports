@@ -414,10 +414,15 @@ def audio_characteristics( asset_file, entry_point, duration, key = NIL )
   pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file } #{ @fifo } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.2' )
-  out, err, status = Open3.capture3( "sox #{ @fifo } -n stats" )
-  #puts
-  #puts err
-  #puts
+  # asdcp-unwrap behaviour change after 1.9.45
+  if File.exists?( @fifo + '_1.wav' )
+    asdcplib_outfile = @fifo + '_1.wav'
+  elsif File.exists? @fifo
+    asdcplib_outfile = @fifo
+  else # bummer
+    return {}
+  end
+  out, err, status = Open3.capture3( "sox #{ asdcplib_outfile } -n stats" )
   parse_sox_stats( err )
 end
 
