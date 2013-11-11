@@ -410,8 +410,8 @@ def parse_sox_stats( stats_str )
 end
 
 
-def audio_characteristics( asset_file, key = NIL )
-  pid = Process.spawn( "asdcp-test -x #{ @fifo_audio } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file }" )
+def audio_characteristics( asset_file, entry_point, duration, key = NIL )
+  pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? "-k #{ key }" : '' } #{ Shellwords.escape asset_file } #{ @fifo_audio } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.2' )
   out, err, status = Open3.capture3( "sox #{ @fifo_audio } -n stats" )
@@ -2663,6 +2663,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
   composition_aspect_ratios = Array.new
   composition_resolutions = Array.new
   composition_channel_counts = Array.new
+  audio_stats_for_reel = Hash.new
   supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0 }
 
   reels.each_with_index do |reel, index|
@@ -2807,19 +2808,22 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 cpl_errors = TRUE
               end
 
-              # IntrinsicDuration/EntryPoint/Duration sane?
+              # IntrinsicDuration / EntryPoint / Duration sane?
+              sane_IntrinsicDuration_EntryPoint_Duration = TRUE
               if intrinsic_duration - entry_point < duration
                 errors << "#{ cpl_reel }: Duration #{ duration } in #{ asset.node_name } does not compute: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
+                sane_IntrinsicDuration_EntryPoint_Duration = FALSE
                 cpl_errors = TRUE
-                extractable_duration = intrinsic_duration - entry_point
               end
               if entry_point >= intrinsic_duration
                 exceed_frames = entry_point + 1 - intrinsic_duration
                 errors << "#{ cpl_reel }: EntryPoint #{ entry_point } in #{ asset.node_name } exceeds IntrinsicDuration #{ intrinsic_duration } by #{ amount( 'frame', exceed_frames ) }"
+                sane_IntrinsicDuration_EntryPoint_Duration = FALSE
                 cpl_errors = TRUE
               end
               if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
                 errors << "#{ cpl_reel }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ].nil? ? '[NaN]' : meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
+                sane_IntrinsicDuration_EntryPoint_Duration = FALSE
                 cpl_errors = TRUE
               end
 
@@ -2918,48 +2922,53 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 end
 
                 # Audio characteristics (Levels, RMS, silent channels)
-                audio_stats = NIL
+                audio_stats_for_reel[ reel_no ] = Hash.new
                 dkdms = Hash.new
                 if options.full_audio_examination
-                  if meta[ 'EncryptedEssence' ] == 'Yes'
-                    if dkdms[ cpl_id ]
-                      if dkdms[ cpl_id ][ asset_key_id ]
-                        key = dkdms[ cpl_id ][ asset_key_id ]
+                  if sane_IntrinsicDuration_EntryPoint_Duration
+                    audio_stats_for_reel[ reel_no ][ asset_id ] = NIL
+                    if meta[ 'EncryptedEssence' ] == 'Yes'
+                      if dkdms[ cpl_id ]
+                        if dkdms[ cpl_id ][ asset_key_id ]
+                          key = dkdms[ cpl_id ][ asset_key_id ]
+                        else
+                          hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }: Not yet implemented"
+                          key = NIL
+                        end
                       else
-                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no key for asset #{ asset_id }: Not yet implemented"
+                        hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }: Not yet implemented"
                         key = NIL
                       end
                     else
-                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no DKDM for CPL #{ cpl_id }: Not yet implemented"
                       key = NIL
                     end
-                  else
-                    key = NIL
-                  end
-                  if @dcp_inspect_temp
-                    if key
-                      audio_stats = audio_characteristics( asset_file, key )
-                    elsif meta[ 'EncryptedEssence' ] == 'No'
-                      audio_stats = audio_characteristics( asset_file, key )
-                    end
+                    if @dcp_inspect_temp
+                      if key
+                        audio_stats_for_reel[ reel_no ][ asset_id ] = audio_characteristics( asset_file, entry_point, duration, key )
+                      elsif meta[ 'EncryptedEssence' ] == 'No'
+                        audio_stats_for_reel[ reel_no ][ asset_id ] = audio_characteristics( asset_file, entry_point, duration, key )
+                      end
 
-                  else
-                    hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no temp location to write to"
+                    else
+                      hints << "#{ cpl_reel }: MainSound: Full audio examination requested but got no temp location to write to"
+                    end
                   end
                 end
-              end
+
+
+              end # asset examination
 
               # This meta_report (and edit_rate) abomination below needs to go. Ugh
               meta_report = [
                 meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
                 meta[ 'ContainerDuration' ] ? meta[ 'EditRate' ] || meta[ 'SampleRate' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, asset_edit_rate ).to_s : '[NaN]' : 'ContainerDuration:' + MStr::AssetTypeUnknown,
-                meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'unencrypted' : 'Encrypted:' + MStr::AssetTypeUnknown,
+                meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'plaintext' : 'Encrypted:' + MStr::AssetTypeUnknown,
                 asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Sound/ ? ( amount( 'channel', meta[ 'ChannelCount' ].to_i ) || 'ChannelCount:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Sound/ ? audio_sampling_rate == '48000/1' ? '48 kHz' : audio_sampling_rate == '96000/1' ? '96 kHz' : audio_sampling_rate : '',
                 asset.node_name =~ /Sound/ ? ( meta[ 'QuantizationBits' ] || 'QuantizationBits:' + MStr::AssetTypeUnknown ) + ' bps' : '',
-                audio_stats ? asset.node_name =~ /Sound/ ? "RMS #{ audio_stats[ :rms_lev_db ][ :overall ] } dB"  : '' : '',
-                audio_stats ? asset.node_name =~ /Sound/ ? "Peak #{ audio_stats[ :pk_lev_db ][ :overall ] } dB"  : '' : '',
+                audio_stats_for_reel[ reel_no ] ? audio_stats_for_reel[ reel_no ][ asset_id ] ? asset.node_name =~ /Sound/ ? "RMS #{ audio_stats_for_reel[ reel_no ][ asset_id ][ :rms_lev_db ][ :overall ] } dB"  : '' : '' : '',
+                audio_stats_for_reel[ reel_no ] ? audio_stats_for_reel[ reel_no ][ asset_id ] ? asset.node_name =~ /Sound/ ? "Peak #{ audio_stats_for_reel[ reel_no ][ asset_id ][ :pk_lev_db ][ :overall ] } dB"  : '' : '' : '',
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
               ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
@@ -4205,7 +4214,7 @@ end
 
 # Check required tools
 required_command_not_found = FALSE
-required_commands = [ 'asdcp-test', 'kmuuidgen' ]
+required_commands = [ 'asdcp-test', 'asdcp-unwrap', 'kmuuidgen' ]
 required_commands << 'sox' if options.full_audio_examination
 required_commands.flatten.each do |command|
   if ! command_exists? command
