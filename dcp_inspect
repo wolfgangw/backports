@@ -3417,28 +3417,6 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
     cpl_errors = TRUE
   end
 
-  # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
-  # See SMPTE ST 429-2:2009 section 9.1 for the requirement
-  reels_references.each_with_index do |reel_refs, index|
-    if reel_refs[ :picture ] and reel_refs[ :sound ] # :picture covers both MainPicture and MainStereoscopicPicture
-      cpl_reels_references_complete << TRUE
-    else
-      reel_no = index + 1
-      assets_missing_refs = Array.new
-      assets_missing_refs << 'MainPicture or MainStereoscopicPicture' if ! reel_refs[ :picture ]
-      assets_missing_refs << 'MainSound' if ! reel_refs[ :sound ]
-      reels_report << "#{ composition_type }: Reel #{ reel_no }: Missing #{ amount( 'reference', assets_missing_refs ) }: #{ assets_missing_refs.join( ', ' ) }"
-      case composition_type
-      when MStr::AssetTypeSmpte
-        errors << "CPL #{ cpl_id }: #{ reels_report.last }"
-        cpl_errors = TRUE
-      else
-        hints << "CPL #{ cpl_id }: #{ reels_report.last }"
-      end
-      cpl_reels_references_complete << FALSE
-    end
-  end
-
   # Cosmetics: Interleave reels_report
   reels_report.each do |rp|
     report << rp
@@ -3486,6 +3464,28 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
       cpl_errors = TRUE
     else
       hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
+    end
+  end
+
+  # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
+  # See SMPTE ST 429-2:2009 section 9.1 for the requirement
+  reels_references.each_with_index do |reel_refs, index|
+    if reel_refs[ :picture ] and reel_refs[ :sound ] # :picture covers both MainPicture and MainStereoscopicPicture
+      cpl_reels_references_complete << TRUE
+    else
+      reel_no = index + 1
+      assets_missing_refs = Array.new
+      assets_missing_refs << 'MainPicture or MainStereoscopicPicture' if ! reel_refs[ :picture ]
+      assets_missing_refs << 'MainSound' if ! reel_refs[ :sound ]
+      reels_report << "#{ composition_type }: Reel #{ reel_no }: Missing #{ amount( 'reference', assets_missing_refs ) }: #{ assets_missing_refs.join( ', ' ) }"
+      case composition_type
+      when MStr::AssetTypeSmpte
+        errors << "CPL #{ cpl_id }: #{ reels_report.last }"
+        cpl_errors = TRUE
+      else
+        hints << "CPL #{ cpl_id }: #{ reels_report.last }"
+      end
+      cpl_reels_references_complete << FALSE
     end
   end
 
