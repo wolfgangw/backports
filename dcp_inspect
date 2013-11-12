@@ -4298,7 +4298,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
     @logger.info 'Image analysis not yet implemented' if options.image_analysis
     @fifo = File.join( @dcp_inspect_temp.path, 'asdcp-temp' )
     begin
-      out, err, status = Open3.popen3( "mkfifo #{ @fifo_audio }" )
+      out, err, status = Open3.popen3( "mkfifo #{ @fifo }" )
     rescue Exception => e
       @logger.info e.inspect
       @logger.info "Removing #{ @dcp_inspect_temp.path } ..."
