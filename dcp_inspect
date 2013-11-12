@@ -183,6 +183,8 @@ class Options
     options = OpenStruct.new
     options.check_hashes = TRUE
     options.check_hashes_limit = :no_limit
+    options.image_analysis = FALSE # not yet implemented
+    options.audio_analysis = TRUE
     options.validate = TRUE
     options.as_asset_store = FALSE
     options.verbosity = 'debug'
@@ -190,8 +192,6 @@ class Options
     options.logfile_append = NIL
     options.logfile_autolog = FALSE
     options.overwrite_logfile = FALSE
-    options.image_analysis = FALSE # not yet implemented
-    options.audio_analysis = TRUE
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'info', 'cpl', 'debug', 'trace_func' ]
 
     opts = OptionParser.new do |opts|
@@ -200,11 +200,17 @@ class Options
 Usage: #{ AppName } [options] <location>
 
 BANNER
-      opts.on( '--nh', '--no-hash', 'Skip asset hash checks' ) do
+      opts.on( '--nh', '--no-hash', 'No asset hash checks' ) do
         options.check_hashes = FALSE
       end
       opts.on( '--hl', '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 1GB (Default: No limit)' ) do |p|
         options.check_hashes_limit = p.downcase
+      end
+      opts.on( '--no-ia', '--no-image-analysis', 'No image analysis (Image analysis not yet implemented)' ) do
+        options.image_analysis = FALSE
+      end
+      opts.on( '--no-aa', '--no-audio-analysis', 'No audio analysis' ) do
+        options.audio_analysis = FALSE
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
         options.validate = FALSE
@@ -215,7 +221,7 @@ BANNER
       opts.on( '-l', '--logfile path', String, 'Write full report to logfile at path' ) do |p|
         options.logfile = p
       end
-      opts.on( '--logfile-append path', String, 'Append full report to logfile at path' ) do |p|
+      opts.on( '--la', '--logfile-append path', String, 'Append full report to logfile at path' ) do |p|
         options.logfile_append = p
       end
       opts.on( '--autolog', "Write full report to $DCP_INSPECT_DIR. (Default: Don't)" ) do
@@ -223,12 +229,6 @@ BANNER
       end
       opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
-      end
-      opts.on( '--no-ia', '--no-image-analysis', 'No image analysis' ) do
-        options.full_image_examination = FALSE
-      end
-      opts.on( '--no-aa', '--no-audio-analysis', 'No audio analysis' ) do
-        options.audio_analysis = FALSE
       end
       opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, hints, info, debug, cpl or trace_func (Default: debug)' ) do |p|
         if options.verbosity_choices.include?( p )
@@ -4205,6 +4205,7 @@ def dcp_inspect( options, arg )
   info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
   info << 'Schema checks skipped' unless options.validate
+  info << 'Audio analysis skipped' unless options.audio_analysis
   info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) } (#{ pkls_signature_info }), #{ amount( 'Composition', cpls ) } (#{ cpls_signature_info }, #{ cpls_encryption_info }"
   info << "#{ amount( 'Error', errors ) }, #{ amount( 'Hint', hints ) }"
 
