@@ -208,10 +208,10 @@ BANNER
       opts.on( '--hl', '--hash-limit limit', String, 'Limit asset hash checks to assets smaller than limit. E.g. 700KB, 50MB or 1GB (Default: No limit)' ) do |p|
         options.check_hashes_limit = p.downcase
       end
-      opts.on( '--no-ia', '--no-image-analysis', 'No image analysis (Image analysis not yet implemented)' ) do
+      opts.on( '--ni', '--no-image-analysis', 'No image analysis (Image analysis not yet implemented)' ) do
         options.image_analysis = FALSE
       end
-      opts.on( '--no-aa', '--no-audio-analysis', 'No audio analysis' ) do
+      opts.on( '--na', '--no-audio-analysis', 'No audio analysis' ) do
         options.audio_analysis = FALSE
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
