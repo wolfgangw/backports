@@ -146,6 +146,7 @@ ENV_DCP_INSPECT_DIR_NOT_SET = 13
 DCP_INSPECT_DIR_NOT_WRITABLE = 14
 AUTOLOGFILE_WRITE_ERROR = 15
 MKFIFO_FAIL = 16
+RMFIFO_FAIL = 17
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -474,6 +475,28 @@ def parse_sox_stats( stats_str )
 end
 
 
+def mkfifo( ramdisk, fifo_name )
+  begin
+    system( "mkfifo #{ fifo_name }" )
+  rescue Exception => e
+    @logger.info ''
+    @logger.info e.inspect
+    @logger.info "Removing #{ ramdisk.path } ..."
+    ramdisk.eject
+    exit MKFIFO_FAIL
+  end
+end
+def rmfifo( fifo_name )
+  begin
+    system( "rm #{ fifo_name }" )
+  rescue Exception => e
+    @logger.info ''
+    @logger.info e.inspect
+    exit RMFIFO_FAIL
+  end
+end
+
+
 def audio_characteristics( ramdisk, asset_file, entry_point, duration, key = NIL )
   asdcp_prefix_token = File.join( ramdisk.path, 'asdcp-temp' )
   major, minor, patchlevel = MxfTools.asdcplib_version
@@ -490,19 +513,15 @@ def audio_characteristics( ramdisk, asset_file, entry_point, duration, key = NIL
     return {}
   end
 
-  begin
-    out, err, status = Open3.popen3( "mkfifo #{ fifo_name }" )
-  rescue Exception => e
-    puts
-    @logger.info e.inspect
-    @logger.info "Removing #{ ramdisk.path } ..."
-    ramdisk.eject
-    exit MKFIFO_FAIL
-  end
+  mkfifo( ramdisk, fifo_name )
+
   pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? '-k ' + key : '' } #{ Shellwords.escape asset_file } #{ asdcp_prefix_token } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.2' )
   out, err, status = Open3.capture3( "sox -t wavpcm #{ fifo_name } -n stats" )
+
+  rmfifo( fifo_name )
+
   parse_sox_stats( err )
 end
 
