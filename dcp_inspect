@@ -3958,6 +3958,7 @@ def dcp_inspect( options, arg )
   end
   @logger.debug ''
 
+  # Process all PackingLists
   cpls = Array.new
   cpls_missing = Array.new
   packages_size_listed = 0
