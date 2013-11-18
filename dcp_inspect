@@ -508,8 +508,8 @@ def audio_characteristics( ramdisk, asset_file, entry_point, duration, key = NIL
       fifo_name = asdcp_prefix_token
     end
   else
-    puts
-    @logger.info "asdcplib major version #{ major } not supported"
+    @logger.info ''
+    @logger.info "Audio analysis: asdcplib version #{ [ major, minor, patchlevel ].join( '.' ) } not supported"
     return {}
   end
 
