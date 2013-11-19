@@ -2947,7 +2947,7 @@ def cpl_inspect_xml( xml, dict, package_dir, errors, hints, info, options )
                 # Sampling rate
                 audio_sampling_rate = meta[ 'AudioSamplingRate' ]
                 if audio_sampling_rate != '48000/1' and audio_sampling_rate != '96000/1'
-                  errors << "#{ cpl_reel }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48k or 96k"
+                  errors << "#{ cpl_reel }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48 kHz or 96 kHz"
                   cpl_errors = TRUE
                 end
 
@@ -3914,7 +3914,7 @@ def dcp_inspect( options, arg )
 
         # Check for whitespace in asset filename
         if path.scan( /\s+/ ).size != 0
-          hints << "AM #{ am_id }: Asset #{ listed_id }: Filename #{ path.inspect } contains whitespace"
+          hints << "AM #{ am_id }: Asset #{ listed_id }: Filename #{ path.inspect } contains whitespace. Avoid whitespace in filenames"
         end
 
       end
