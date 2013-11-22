@@ -2904,8 +2904,11 @@ def cpl_inspect_xml( xml, dict, audio_stats, image_stats, package_dir, errors, h
               end
               if intrinsic_duration != meta[ 'ContainerDuration' ].to_i
                 errors << "#{ cpl_reel }: IntrinsicDuration #{ intrinsic_duration } in #{ asset.node_name } does not match ContainerDuration #{ meta[ 'ContainerDuration' ].nil? ? '[NaN]' : meta[ 'ContainerDuration' ] } of asset #{ asset_id }"
-                sane_IntrinsicDuration_EntryPoint_Duration = FALSE
-                cpl_errors = TRUE
+                if meta[ 'ContainerDuration' ].to_i - entry_point < duration
+                  errors << "#{ cpl_reel }: Duration #{ duration } in #{ asset.node_name } does not compute: ContainerDuration #{ meta[ 'ContainerDuration' ] } of asset #{ asset_id } - EntryPoint #{ entry_point } < Duration #{ duration }"
+                  sane_IntrinsicDuration_EntryPoint_Duration = FALSE
+                  cpl_errors = TRUE
+                end
               end
               if sane_IntrinsicDuration_EntryPoint_Duration
                 asset_snippet = [ 'ask', entry_point.to_s, duration.to_s ].join( '_' ).to_sym
