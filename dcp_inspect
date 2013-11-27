@@ -189,7 +189,7 @@ class Options
     options.audio_analysis = TRUE
     options.validate = TRUE
     options.as_asset_store = FALSE
-    options.verbosity = 'debug'
+    options.verbosity = [ 'debug' ]
     options.logfile = NIL
     options.logfile_append = NIL
     options.logfile_autolog = FALSE
@@ -232,11 +232,15 @@ BANNER
       opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
       end
-      opts.on( '-v', '--verbosity level', String, 'Use quiet, errors, hints, info, debug, cpl or trace_func (Default: debug)' ) do |p|
-        if options.verbosity_choices.include?( p )
-          options.verbosity = p
-        else
-          options.verbosity = "info"
+      opts.on( '-v', '--verbosity cutout', Array, "Use quiet, errors, hints, info, debug, or cpl. Specify multiple items like e.g. '-v errors,info' (Default: debug)" ) do |p|
+        options.verbosity = [] # option was given so reset
+        p.each do |e|
+          if options.verbosity_choices.include?( e )
+            options.verbosity << e
+          end
+        end
+        if options.verbosity.empty?
+          options.verbosity = [ 'debug' ]
         end
       end
       opts.on_tail( '-h', '--help', 'Display this screen' ) do
@@ -264,21 +268,23 @@ class DLogger
     @prefix = prefix
     @full_log = ( options.logfile || options.logfile_autolog || options.logfile_append ? Array.new : NIL )
 
-    case options.verbosity
-    when 'quiet'  then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]
-    when 'errors' then @errors, @hints, @info, @debug, @cr, @cpl = [ TRUE, FALSE, FALSE, FALSE, FALSE, FALSE ]
-    when 'hints'  then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, TRUE, FALSE, FALSE, FALSE, FALSE ]
-    when 'info'   then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, TRUE, FALSE, FALSE, FALSE ]
-    when 'debug'  then @errors, @hints, @info, @debug, @cr, @cpl = [ TRUE, TRUE, TRUE, TRUE, TRUE, TRUE ]
-    when 'cpl'    then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, TRUE ]
-    when 'trace_func'
-                       @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]
-      set_trace_func proc { |event, file, line, id, binding, classname|
-        printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
-      }
+    @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]
+    options.verbosity.each do |cutout|
+      case cutout
+      when 'quiet'  then @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]; @is_quiet = TRUE; break
+      when 'debug'  then @errors, @hints, @info, @debug, @cr, @cpl = [ TRUE, TRUE, TRUE, TRUE, TRUE, TRUE ]; @is_quiet = FALSE; break
+      when 'errors' then @errors = TRUE
+      when 'hints'  then @hints = TRUE
+      when 'info'   then @info = TRUE
+      when 'cpl'    then @cpl = TRUE
+      when 'trace_func'
+        @errors, @hints, @info, @debug, @cr, @cpl = [ FALSE, FALSE, FALSE, FALSE, FALSE, FALSE ]
+        set_trace_func proc { |event, file, line, id, binding, classname|
+          printf "%8s %s:%-2d %10s %8s\n", event, file, line, id, classname
+        }
+      end
     end
 
-    @is_quiet = TRUE if options.verbosity == 'quiet'
     @writes_logfile = TRUE if options.logfile
     @writes_autolog = TRUE if options.logfile_autolog
     @logfile = options.logfile
@@ -4425,8 +4431,8 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
   # Full audio/image examination?
   if options.audio_analysis or options.image_analysis
     @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
-    @logger.info "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
-    @logger.info 'Image analysis not yet implemented' if options.image_analysis
+    @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
+    @logger.debug 'Image analysis not yet implemented' if options.image_analysis
   end
 
   # autolog?
@@ -4463,7 +4469,7 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
 
   # Inspection
   inspection = dcp_inspect( options, args[ 0 ] )
-  print_inspection_messages( inspection ) unless options.verbosity == 'quiet'
+  print_inspection_messages( inspection ) unless @logger.is_quiet
 
   # Remove @dcp_inspect_temp
   if options.audio_analysis or options.image_analysis
