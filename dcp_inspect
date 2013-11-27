@@ -530,6 +530,7 @@ def audio_characteristics( ramdisk, asset_file, entry_point, duration, key = NIL
     return {}
   end
 
+  rmfifo( fifo_name ) if File.exists?( fifo_name ) # might float from a previous non-terminating run
   mkfifo( ramdisk, fifo_name )
 
   pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? '-k ' + key : '' } #{ Shellwords.escape asset_file } #{ asdcp_prefix_token } 2>/dev/null" )
