@@ -232,7 +232,7 @@ BANNER
       opts.on( '-L', '--overwrite-logfile', 'Overwrite logfile (Default: Do not overwrite if logfile exists)' ) do
         options.overwrite_logfile = TRUE
       end
-      opts.on( '-v', '--verbosity cutout', Array, "Use quiet, errors, hints, info, debug, or cpl. Specify multiple items like e.g. '-v errors,info' (Default: debug)" ) do |p|
+      opts.on( '-v', '--verbosity cutout', Array, "Use quiet, errors, hints, info, debug or cpl. Specify multiple cutouts like '-v errors,info' (Default: debug)" ) do |p|
         options.verbosity = [] # option was given so reset
         p.each do |e|
           if options.verbosity_choices.include?( e )
