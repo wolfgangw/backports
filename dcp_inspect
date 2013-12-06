@@ -513,31 +513,31 @@ def rmfifo( fifo_name )
 end
 
 
-def audio_characteristics( ramdisk, asset_file, entry_point, duration, key = NIL )
-  asdcp_prefix_token = File.join( ramdisk.path, 'asdcp-temp' )
-  major, minor, patchlevel = MxfTools.asdcplib_version
-  case major
-  when 1
-    if minor <= 9
-      fifo_name = asdcp_prefix_token + '_1.wav'
-    else
-      fifo_name = asdcp_prefix_token
-    end
-  else
-    @logger.info ''
-    @logger.info "Audio analysis: asdcplib version #{ [ major, minor, patchlevel ].join( '.' ) } not supported"
-    return {}
+def audio_characteristics( ramdisk, asset_file, channel_count, quantization_bits, entry_point, duration, key = NIL )
+  fifo_tokens = Array.new
+  asdcp_prefix_token = File.join( ramdisk.path, 'asdcp-temp-audio' )
+  ( 1 .. channel_count ).each do |ch|
+    fifo_tokens << "#{ asdcp_prefix_token }_#{ ch }.wav"
   end
 
-  rmfifo( fifo_name ) if File.exists?( fifo_name ) # might float from a previous non-terminating run
-  mkfifo( ramdisk, fifo_name )
+  fifo_zombies = Dir.glob( "#{ asdcp_prefix_token }*" )
+  fifo_zombies.each do |fz|
+    rmfifo( fz )
+  end
+
+  fifo_tokens.each do |fifo|
+    mkfifo( ramdisk, fifo )
+  end
 
   pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? '-k ' + key : '' } #{ Shellwords.escape asset_file } #{ asdcp_prefix_token } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.1' )
   out, err, status = Open3.capture3( "sox -t wavpcm #{ fifo_name } -n stats" )
 
-  rmfifo( fifo_name )
+
+  fifo_tokens.each do |fifo|
+    rmfifo( fifo )
+  end
 
   parse_sox_stats( err )
 end
