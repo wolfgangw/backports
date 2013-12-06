@@ -2969,6 +2969,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
 
                 # Sampling rate
                 audio_sampling_rate = meta[ 'AudioSamplingRate' ]
+                audio_sampling_rate_f = audio_sampling_rate.to_r.to_f
                 if audio_sampling_rate != '48000/1' and audio_sampling_rate != '96000/1'
                   errors << "#{ cpl_reel }: MainSound sampling rate #{ audio_sampling_rate } Hz. Expected 48 kHz or 96 kHz"
                   cpl_errors = TRUE
