@@ -529,11 +529,11 @@ def audio_characteristics( ramdisk, asset_file, channel_count, quantization_bits
     mkfifo( ramdisk, fifo )
   end
 
-  pid = Process.spawn( "asdcp-unwrap -f #{ entry_point } -d #{ duration } #{ key ? '-k ' + key : '' } #{ Shellwords.escape asset_file } #{ asdcp_prefix_token } 2>/dev/null" )
+  pid = Process.spawn( "asdcp-unwrap -1 -f #{ entry_point } -d #{ duration } #{ key ? '-k ' + key : '' } #{ Shellwords.escape asset_file } #{ asdcp_prefix_token } 2>/dev/null" )
   Process.detach pid
   system( 'sleep 0.1' )
-  out, err, status = Open3.capture3( "sox -t wavpcm #{ fifo_name } -n stats" )
 
+  out, err, status = Open3.capture3( "sox -t wavpcm -M #{ fifo_tokens.join( ' ' ) } -n stats" )
 
   fifo_tokens.each do |fifo|
     rmfifo( fifo )
