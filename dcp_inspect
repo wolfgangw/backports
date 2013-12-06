@@ -368,6 +368,16 @@ module MxfTools
     major, minor, patchlevel = out.scan( /(\d)\.(\d+)\.(\d+)/ )[0].map { |e| e.to_i }
   end
 
+  def asdcplib_version_supported?
+    major, minor, patchlevel = asdcplib_version
+    case major
+    when 1
+      TRUE
+    else
+      FALSE
+    end
+  end
+
   def mxf_inspect( filename )
     list = Shell.asdcp_mxf_info( filename )
     if list =~ /EditRate and SampleRate do not match/ and list =~ /File may contain JPEG Interop stereoscopic images/
