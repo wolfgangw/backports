@@ -513,7 +513,7 @@ def rmfifo( fifo_name )
 end
 
 
-def audio_characteristics( ramdisk, asset_file, channel_count, quantization_bits, entry_point, duration, key = NIL )
+def audio_characteristics( ramdisk, asset_file, channel_count, entry_point, duration, key = NIL )
   fifo_tokens = Array.new
   asdcp_prefix_token = File.join( ramdisk.path, 'asdcp-temp-audio' )
   ( 1 .. channel_count ).each do |ch|
@@ -3044,10 +3044,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                         @logger.info "#{ cpl_reel }: Audio analysis: Seen #{ asset_id }:#{ entry_point }:#{ duration } before. Using previous result"
                       else
                         if key
-                          audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, entry_point, duration, key )
+                          audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, audio_channel_count, entry_point, duration, key )
                         elsif meta[ 'EncryptedEssence' ] == 'No'
                           @logger.cr "#{ cpl_reel }: Audio analysis ..."
-                          audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, entry_point, duration, key )
+                          audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, audio_channel_count, entry_point, duration, key )
                           @logger.info "#{ cpl_reel }: Audio analysis: Done"
                         end
                       end
