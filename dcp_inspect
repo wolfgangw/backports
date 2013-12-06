@@ -3072,8 +3072,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                   ( audio_sampling_rate == '48000/1' ? '48kHz' : audio_sampling_rate == '96000/1' ? '96kHz' : audio_sampling_rate ) + ' ' +
                   ( ( meta[ 'QuantizationBits' ] || 'QuantizationBits:' + MStr::AssetTypeUnknown ) + 'bps' )
                   : '',
-                asset.node_name =~ /Sound/ ? audio_stats[ asset_id ] ? audio_stats[ asset_id ][ asset_snippet ] ? "RMS #{ audio_stats[ asset_id ][ asset_snippet ][ :rms_lev_db ][ :overall ] } dBFS" + ' ' + bars( audio_stats[ asset_id ][ asset_snippet ][ :rms_lev_db ][ :channels ] ) : '' : '' : '',
-                asset.node_name =~ /Sound/ ? audio_stats[ asset_id ] ? audio_stats[ asset_id ][ asset_snippet ] ? "Peak #{ audio_stats[ asset_id ][ asset_snippet ][ :pk_lev_db ][ :overall ] } dBFS" + ' ' + bars( audio_stats[ asset_id ][ asset_snippet ][ :pk_lev_db ][ :channels ] ) : '' : '' : '',
+                asset.node_name =~ /Sound/ ? audio_stats[ asset_id ] ? audio_stats[ asset_id ][ asset_snippet ] ? audio_stats[ asset_id ][ asset_snippet ][ :rms_lev_db ] ? "RMS #{ audio_stats[ asset_id ][ asset_snippet ][ :rms_lev_db ][ :overall ] } dBFS" + ' ' + bars( audio_stats[ asset_id ][ asset_snippet ][ :rms_lev_db ][ :channels ] ) : '[FAIL]' : '' : '' : '',
+                asset.node_name =~ /Sound/ ? audio_stats[ asset_id ] ? audio_stats[ asset_id ][ asset_snippet ] ? audio_stats[ asset_id ][ asset_snippet ][ :pk_lev_db ] ? "Peak #{ audio_stats[ asset_id ][ asset_snippet ][ :pk_lev_db ][ :overall ] } dBFS" + ' ' + bars( audio_stats[ asset_id ][ asset_snippet ][ :pk_lev_db ][ :channels ] ) : '[FAIL]' : '' : '' : '',
                 meta[ 'EssenceType' ] || 'EssenceType:' + MStr::AssetTypeUnknown
               ].reject { |e| e.nil? or e.empty? }.join( ', ' )
 
