@@ -3543,6 +3543,83 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     cpl_errors = TRUE
   end
 
+  # Set up composition_aspect_ratio
+  composition_aspect_ratio = NIL
+  if composition_aspect_ratios.size == reels.size
+    if composition_aspect_ratios.uniq.size == 1
+      case composition_aspect_ratios.first
+      when 1.896
+        composition_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
+      when 1.85
+        composition_aspect_ratio = { :abbrev => 'F', :name => 'Flat' }
+      when 2.387
+        composition_aspect_ratio = { :abbrev => 'S', :name => 'Scope' }
+      when 1.778
+        composition_aspect_ratio = { :abbrev => 'HD', :name => 'HD' }
+      else
+        composition_aspect_ratio = { :abbrev => composition_aspect_ratios.first.to_s, :name => composition_aspect_ratios.first.to_s }
+      end
+      report << "Composition aspect: #{ composition_aspect_ratio[ :name ] }"
+    else
+      errors << "CPL #{ cpl_id }: Found different asset aspect ratios: #{ composition_aspect_ratios.inspect }"
+      cpl_errors = TRUE
+    end
+  else
+    expected_aspect_ratios = reels.size - supplemental_refs[ :main_picture ]
+    if expected_aspect_ratios > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'aspect ratio', expected_aspect_ratios ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_aspect_ratios.size }"
+      cpl_errors = TRUE
+    end
+  end
+
+  # Set up composition_resolution
+  composition_resolution = NIL
+  if composition_resolutions.size == reels.size
+    if composition_resolutions.uniq.size == 1
+      case composition_resolutions.first
+      when '2K'
+        case composition_edit_rate
+        when 48.0
+          composition_resolution = { :abbrev => '48' } # yeah, well. Look it up in 3.9, it's true :) (Changed in 8.2)
+        else
+          composition_resolution = { :abbrev => '2K' }
+        end
+      when '4K'
+        composition_resolution = { :abbrev => '4K' }
+      when 'HD'
+        composition_resolution = { :abbrev => 'HD' }
+      else
+        composition_resolution = { :abbrev => composition_resolutions.first }
+      end
+      report << "Composition resolution: #{ composition_resolution[ :abbrev ] }"
+    else
+      errors << "CPL #{ cpl_id }: Found different picture resolutions: #{ composition_resolutions.inspect }"
+      cpl_errors = TRUE
+    end
+  else
+    expected_picture_resolutions = reels.size - supplemental_refs[ :main_picture ]
+    if expected_picture_resolutions > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'picture resolution', expected_picture_resolutions ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_resolutions.size }"
+      cpl_errors = TRUE
+    end
+  end
+
+  # Set up composition_channel_count
+  composition_channel_count = NIL
+  if composition_channel_counts.size == reels.size
+    if composition_channel_counts.uniq.size == 1
+      composition_channel_count = { :abbrev => composition_channel_counts.uniq.first }
+    else
+      errors << "CPL #{ cpl_id }: Found different audio types: #{ composition_channel_counts.inspect }"
+    end
+  else
+    expected_audio_types = reels.size - supplemental_refs[ :main_sound ]
+    if expected_audio_types > 0
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
+      cpl_errors = TRUE
+    end
+  end
+
   # Composition type SMPTE/Interop/Undetermined?
   assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
   if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
@@ -3625,81 +3702,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   end
   if cpl_errors == TRUE
     report << "There were errors. See CPL #{ cpl_id } errors #{ error_output }"
-  end
-
-  # Set up composition_aspect_ratio
-  composition_aspect_ratio = NIL
-  if composition_aspect_ratios.size == reels.size
-    if composition_aspect_ratios.uniq.size == 1
-      case composition_aspect_ratios.first
-      when 1.896
-        composition_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
-      when 1.85
-        composition_aspect_ratio = { :abbrev => 'F', :name => 'Flat' }
-      when 2.387
-        composition_aspect_ratio = { :abbrev => 'S', :name => 'Scope' }
-      when 1.778
-        composition_aspect_ratio = { :abbrev => 'HD', :name => 'HD' }
-      else
-        composition_aspect_ratio = { :abbrev => composition_aspect_ratios.first.to_s, :name => composition_aspect_ratios.first.to_s }
-      end
-    else
-      errors << "CPL #{ cpl_id }: Found different asset aspect ratios: #{ composition_aspect_ratios.inspect }"
-      cpl_errors = TRUE
-    end
-  else
-    expected_aspect_ratios = reels.size - supplemental_refs[ :main_picture ]
-    if expected_aspect_ratios > 0
-      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'aspect ratio', expected_aspect_ratios ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_aspect_ratios.size }"
-      cpl_errors = TRUE
-    end
-  end
-
-  # Set up composition_resolution
-  composition_resolution = NIL
-  if composition_resolutions.size == reels.size
-    if composition_resolutions.uniq.size == 1
-      case composition_resolutions.first
-      when '2K'
-        case composition_edit_rate
-        when 48.0
-          composition_resolution = { :abbrev => '48' } # yeah, well. Look it up in 3.9, it's true :) (Changed in 8.2)
-        else
-          composition_resolution = { :abbrev => '2K' }
-        end
-      when '4K'
-        composition_resolution = { :abbrev => '4K' }
-      when 'HD'
-        composition_resolution = { :abbrev => 'HD' }
-      else
-        composition_resolution = { :abbrev => composition_resolutions.first }
-      end
-    else
-      errors << "CPL #{ cpl_id }: Found different picture resolutions: #{ composition_resolutions.inspect }"
-      cpl_errors = TRUE
-    end
-  else
-    expected_picture_resolutions = reels.size - supplemental_refs[ :main_picture ]
-    if expected_picture_resolutions > 0
-      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'picture resolution', expected_picture_resolutions ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_resolutions.size }"
-      cpl_errors = TRUE
-    end
-  end
-
-  # Set up composition_channel_count
-  composition_channel_count = NIL
-  if composition_channel_counts.size == reels.size
-    if composition_channel_counts.uniq.size == 1
-      composition_channel_count = { :abbrev => composition_channel_counts.uniq.first }
-    else
-      errors << "CPL #{ cpl_id }: Found different audio types: #{ composition_channel_counts.inspect }"
-    end
-  else
-    expected_audio_types = reels.size - supplemental_refs[ :main_sound ]
-    if expected_audio_types > 0
-      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
-      cpl_errors = TRUE
-    end
   end
 
   #
