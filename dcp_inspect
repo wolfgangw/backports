@@ -147,6 +147,7 @@ DCP_INSPECT_DIR_NOT_WRITABLE = 14
 AUTOLOGFILE_WRITE_ERROR = 15
 MKFIFO_FAIL = 16
 RMFIFO_FAIL = 17
+USER_SHUTDOWN = 18
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -4310,134 +4311,7 @@ def dcp_inspect( options, arg )
 end # dcp_inspect
 
 
-#
-# Prepare for main
-#
-options = Options.parse( ARGV )
-args = ARGV
-if ENV[ 'DCP_INSPECT_AUTOLOG' ]
-  options.logfile_autolog = TRUE
-end
-@logger = DLogger.new( prefix = '', options )
-@logger.debug "#{ AppName } #{ AppVersion }: #{ args }"
-
-
-# Check required tools
-required_command_not_found = FALSE
-required_commands = [ 'asdcp-test', 'asdcp-unwrap', 'kmuuidgen' ]
-required_commands << 'sox' if options.audio_analysis
-required_commands.flatten.each do |command|
-  if ! command_exists? command
-    @logger.info "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually"
-    required_command_not_found = TRUE
-  end
-end
-exit REQUIRED_COMMAND_NOT_FOUND if required_command_not_found
-
-
-# Check Nokogiri C14N support
-# Nokogiri git master (2012.01.11) implements interface to libxml2's C14N
-if Nokogiri::XML::Document.new.respond_to?( 'canonicalize' )
-  @c14n_available = TRUE
-else
-  @c14n_available = FALSE
-  @logger.info 'Signature verification: Installed version of Nokogiri does not support C14N. Signature verification will be skipped'
-  @logger.info 'Signature verification: Signature verification is a crucial component of full DCP validation'
-  @logger.info 'Signature verification: Please consider upgrading your Nokogiri installation'
-  @logger.info "Nokogiri: Installed version: #{ Nokogiri::VERSION_INFO }"
-end
-
-
-# Check --hash-limit argument
-@check_hashes_hits = 0
-@check_hashes_limit_hits = 0
-unless options.check_hashes_limit == :no_limit
-  if options.check_hashes_limit =~ /\d+(\.?\d+)?\s?(kb|mb|gb)?/
-    @check_hashes_limit_nice = bytes_from_nice_bytes( options.check_hashes_limit ).to_k
-    @logger.info "Will skip hash checks for files bigger than #{ @check_hashes_limit_nice }"
-  else
-    @check_hashes_limit_nice = NIL
-    @logger.info "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB"
-    exit BAD_HASH_LIMIT_ARG
-  end
-end
-
-
-# Set up local XML Catalog and patch its xml:base
-AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
-XSDDir = File.join( AppDir, 'xsd' )
-local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
-if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
-  if File.exists? local_xml_catalog
-    c = File.read local_xml_catalog
-    m = c.match( /xml:base="file:\/\/(.+)">/ )
-    if m[ 1 ] != File.join( XSDDir, '' )
-      File.write( local_xml_catalog, c.gsub( m[ 1 ], File.join( XSDDir, '' ) ) )
-    end
-  else
-    @logger.info "Local XML Catalog #{ local_xml_catalog } not found"
-    exit XML_CATALOG_NOT_FOUND
-  end
-else
-  @logger.info "Local XSD store #{ XSDDir } not found"
-  exit XSD_STORE_NOT_FOUND
-end
-ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
-
-
-# main
-if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
-
-  # Full audio/image examination?
-  if options.audio_analysis or options.image_analysis
-    @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
-    @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
-    @logger.debug 'Image analysis not yet implemented' if options.image_analysis
-  end
-
-  # autolog?
-  if options.logfile_autolog
-    if ENV[ 'DCP_INSPECT_DIR' ]
-      if ! confirm_or_create( ENV[ 'DCP_INSPECT_DIR' ] )
-        @logger.info "Cannot write to #{ ENV[ 'DCP_INSPECT_DIR' ].inspect }"
-        exit DCP_INSPECT_DIR_NOT_WRITABLE
-      end
-    else
-      @logger.info "Autolog requested but env DCP_INSPECT_DIR is not set"
-      @logger.info "Will not write autolog"
-      exit ENV_DCP_INSPECT_DIR_NOT_SET
-    end
-  end
-
-  # Check requested logfile early (exists? overwrite? writable?)
-  if options.logfile
-    if File.exists?( options.logfile )
-      puts " Requested logfile #{ options.logfile.inspect } exists. Will #{ options.overwrite_logfile ? '' : 'not ' }overwrite"
-      exit LOGFILE_EXISTS_ERROR unless options.overwrite_logfile
-    end
-    if ! confirm_or_create( File.dirname options.logfile )
-      puts " Cannot write requested logfile at #{ options.logfile.inspect }. Please specify another location"
-      exit LOGFILE_WRITE_ERROR
-    end
-  end
-  if options.logfile_append
-    if ! confirm_or_create( File.dirname options.logfile_append )
-      puts " Cannot append to requested logfile at #{ options.logfile_append }. Please specify another location"
-      exit LOGFILE_WRITE_ERROR
-    end
-  end
-
-  # Inspection
-  inspection = dcp_inspect( options, args[ 0 ] )
-  print_inspection_messages( inspection ) unless @logger.is_quiet
-
-  # Remove @dcp_inspect_temp
-  if options.audio_analysis or options.image_analysis
-    if @dcp_inspect_temp
-      @dcp_inspect_temp.eject
-    end
-  end
-
+def write_logfiles( options, args )
   # Write autolog
   if options.logfile_autolog
     autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ), RunDatetime.to_s.gsub( /\D/, '-' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + ".#{ AppName }" )
@@ -4469,22 +4343,166 @@ if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( a
       exit LOGFILE_WRITE_ERROR
     end
   end
+end
 
-  case inspection[ :errors ].size
-  when 0
-    exit DCP_OK
+#
+# Prepare for main
+#
+begin
+
+  options = Options.parse( ARGV )
+  args = ARGV
+  if ENV[ 'DCP_INSPECT_AUTOLOG' ]
+    options.logfile_autolog = TRUE
+  end
+  @logger = DLogger.new( prefix = '', options )
+  @logger.debug "#{ AppName } #{ AppVersion }: #{ args }"
+
+
+  # Check required tools
+  required_command_not_found = FALSE
+  required_commands = [ 'asdcp-test', 'asdcp-unwrap', 'kmuuidgen' ]
+  required_commands << 'sox' if options.audio_analysis
+  required_commands.flatten.each do |command|
+    if ! command_exists? command
+      @logger.info "Required command #{ command } not found. Please run digital-cinema-tools-setup or install the missing component manually"
+      required_command_not_found = TRUE
+    end
+  end
+  exit REQUIRED_COMMAND_NOT_FOUND if required_command_not_found
+
+
+  # Check Nokogiri C14N support
+  # Nokogiri git master (2012.01.11) implements interface to libxml2's C14N
+  if Nokogiri::XML::Document.new.respond_to?( 'canonicalize' )
+    @c14n_available = TRUE
   else
-    exit DCP_ERROR
+    @c14n_available = FALSE
+    @logger.info 'Signature verification: Installed version of Nokogiri does not support C14N. Signature verification will be skipped'
+    @logger.info 'Signature verification: Signature verification is a crucial component of full DCP validation'
+    @logger.info 'Signature verification: Please consider upgrading your Nokogiri installation'
+    @logger.info "Nokogiri: Installed version: #{ Nokogiri::VERSION_INFO }"
   end
 
-elsif args.size == 0
-  @logger.info "No volume or directory given. See #{ AppName } --help"
-  exit NO_ARG
-elsif args.size > 1
-  @logger.info "Too many arguments. See #{ AppName } --help"
-  exit TOO_MANY_ARGS
-else
-  @logger.info "Not a volume or directory. See #{ AppName } --help"
-  exit ARG_NOT_A_DIR
+
+  # Check --hash-limit argument
+  @check_hashes_hits = 0
+  @check_hashes_limit_hits = 0
+  unless options.check_hashes_limit == :no_limit
+    if options.check_hashes_limit =~ /\d+(\.?\d+)?\s?(kb|mb|gb)?/
+      @check_hashes_limit_nice = bytes_from_nice_bytes( options.check_hashes_limit ).to_k
+      @logger.info "Will skip hash checks for files bigger than #{ @check_hashes_limit_nice }"
+    else
+      @check_hashes_limit_nice = NIL
+      @logger.info "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB"
+      exit BAD_HASH_LIMIT_ARG
+    end
+  end
+
+
+  # Set up local XML Catalog and patch its xml:base
+  AppDir = File.dirname( Pathname.new( __FILE__ ).realpath )
+  XSDDir = File.join( AppDir, 'xsd' )
+  local_xml_catalog = File.join( XSDDir, 'catalog.xml' )
+  if File.exists?( XSDDir ) and File.ftype( XSDDir ) == 'directory'
+    if File.exists? local_xml_catalog
+      c = File.read local_xml_catalog
+      m = c.match( /xml:base="file:\/\/(.+)">/ )
+      if m[ 1 ] != File.join( XSDDir, '' )
+        File.write( local_xml_catalog, c.gsub( m[ 1 ], File.join( XSDDir, '' ) ) )
+      end
+    else
+      @logger.info "Local XML Catalog #{ local_xml_catalog } not found"
+      exit XML_CATALOG_NOT_FOUND
+    end
+  else
+    @logger.info "Local XSD store #{ XSDDir } not found"
+    exit XSD_STORE_NOT_FOUND
+  end
+  ENV[ 'XML_CATALOG_FILES' ] = local_xml_catalog
+
+
+  # main
+  if args.size == 1 and File.exists?( args[ 0 ] ) and File.directory?( Pathname( args[ 0 ] ).realpath )
+
+    # Full audio/image examination?
+    if options.audio_analysis or options.image_analysis
+      @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
+      @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
+      @logger.debug 'Image analysis not yet implemented' if options.image_analysis
+    end
+
+    # autolog?
+    if options.logfile_autolog
+      if ENV[ 'DCP_INSPECT_DIR' ]
+        if ! confirm_or_create( ENV[ 'DCP_INSPECT_DIR' ] )
+          @logger.info "Cannot write to #{ ENV[ 'DCP_INSPECT_DIR' ].inspect }"
+          exit DCP_INSPECT_DIR_NOT_WRITABLE
+        end
+      else
+        @logger.info "Autolog requested but env DCP_INSPECT_DIR is not set"
+        @logger.info "Will not write autolog"
+        exit ENV_DCP_INSPECT_DIR_NOT_SET
+      end
+    end
+
+    # Check requested logfile early (exists? overwrite? writable?)
+    if options.logfile
+      if File.exists?( options.logfile )
+        puts " Requested logfile #{ options.logfile.inspect } exists. Will #{ options.overwrite_logfile ? '' : 'not ' }overwrite"
+        exit LOGFILE_EXISTS_ERROR unless options.overwrite_logfile
+      end
+      if ! confirm_or_create( File.dirname options.logfile )
+        puts " Cannot write requested logfile at #{ options.logfile.inspect }. Please specify another location"
+        exit LOGFILE_WRITE_ERROR
+      end
+    end
+    if options.logfile_append
+      if ! confirm_or_create( File.dirname options.logfile_append )
+        puts " Cannot append to requested logfile at #{ options.logfile_append }. Please specify another location"
+        exit LOGFILE_WRITE_ERROR
+      end
+    end
+
+    # Inspection
+    inspection = dcp_inspect( options, args[ 0 ] )
+    print_inspection_messages( inspection ) unless @logger.is_quiet
+
+    # Remove @dcp_inspect_temp
+    if options.audio_analysis or options.image_analysis
+      if @dcp_inspect_temp
+        @dcp_inspect_temp.eject
+      end
+    end
+
+    # Write requested logfiles
+    write_logfiles( options, args )
+
+    case inspection[ :errors ].size
+    when 0
+      exit DCP_OK
+    else
+      exit DCP_ERROR
+    end
+
+  elsif args.size == 0
+    @logger.info "No volume or directory given. See #{ AppName } --help"
+    exit NO_ARG
+  elsif args.size > 1
+    @logger.info "Too many arguments. See #{ AppName } --help"
+    exit TOO_MANY_ARGS
+  else
+    @logger.info "Not a volume or directory. See #{ AppName } --help"
+    exit ARG_NOT_A_DIR
+  end
+
+rescue Interrupt => s
+  puts
+  @logger.info "Shutdown: #{ s.inspect }"
+  if @dcp_inspect_temp
+    @dcp_inspect_temp.eject
+  end
+  write_logfiles( options, args )
+  exit USER_SHUTDOWN
 end
 
