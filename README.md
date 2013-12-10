@@ -47,6 +47,8 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 If you prefer manual installation (you kind of don't) you will need the following:
 
+- Ruby (1.9 series)
+
 - [asdcplib and its cli tools](http://www.cinecert.com/asdcplib/)
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
