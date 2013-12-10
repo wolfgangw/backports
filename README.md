@@ -47,7 +47,7 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 If you prefer manual installation (you kind of don't) you will need the following:
 
-- Ruby (1.9 series)
+- Ruby (1.9.3 series. The 1.8 series is not supported)
 
 - [asdcplib and its cli tools](http://www.cinecert.com/asdcplib/)
 
