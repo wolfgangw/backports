@@ -148,6 +148,7 @@ AUTOLOGFILE_WRITE_ERROR = 15
 MKFIFO_FAIL = 16
 RMFIFO_FAIL = 17
 USER_SHUTDOWN = 18
+RUBY_VERSION_NOT_SUPPORTED = 19
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -4373,6 +4374,14 @@ begin
   end
   @logger = DLogger.new( prefix = '', options )
   @logger.debug "#{ AppName } #{ AppVersion }: #{ args }"
+
+
+  # Check ruby version. Versions < 1.9.3 not supported
+  if RUBY_VERSION < '1.9.3'
+    @logger.info "The installed ruby version #{ RUBY_VERSION } (released #{ RUBY_RELEASE_DATE }) is not supported"
+    @logger.info "Please install a ruby version >= 1.9.3"
+    exit RUBY_VERSION_NOT_SUPPORTED
+  end
 
 
   # Check required tools
