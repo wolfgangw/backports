@@ -3499,16 +3499,29 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
 
     total_duration += durations.min # FIXME ugh
     composition_edit_rate = edit_rates.min
+
   end # reels loop
 
+  # Setup composition summary one-liner
+  composition_summary = Hash.new
+
+
+  # Composition duration
   reels_report << 'Total duration:'
   begin
-    reels_report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : Timecode.new( total_duration, composition_edit_rate ) } @ #{ composition_edit_rate }" # FIXME edit_rate
+    total_duration_tc = Timecode.new( total_duration, composition_edit_rate )
   rescue Exception => e
     errors << "CPL #{ cpl_id }: Exception in reel report: #{ e.message }"
   end
   if composition_edit_rate == 0
     cpl_errors = TRUE
+  end
+  reels_report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : total_duration_tc } @ #{ composition_edit_rate }" # FIXME edit_rate
+  if total_duration_tc
+    composition_summary[ :duration ] = total_duration_tc.to_s
+    composition_summary[ :edit_rate ] = "#{ composition_edit_rate } fps"
+  else
+    composition_summary[ :duration ] = '[Duration does not compute]'
   end
 
   # Cosmetics: Interleave reels_report
@@ -3516,29 +3529,46 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     report << rp
   end
 
+  # Composition type SMPTE/Interop/Undetermined?
+  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
+    composition_type = cpl_referenced_assets_types.uniq.first
+    composition_summary[ :type ] = composition_type
+  else
+    # FIXME Composition type Mixed error or hint?
+    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
+    composition_summary[ :type ] = composition_type
+    if broken_assets.size != 0
+      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
+      cpl_errors = TRUE
+    else
+      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
+    end
+  end
+
   # Composition requires KDM?
   if cpl_referenced_assets_encrypted.size > 0
-    report << 'Composition crypto: Requires KDM for playback'
+    composition_summary[ :crypto ] = 'KDM required'
     composition_requires_kdm = TRUE
     @encrypted_compositions += 1
   elsif cpl_referenced_assets_encrypted_inferred_from_key_id.size > 0
-    report << 'Composition crypto: Requires KDM for playback'
+    composition_summary[ :crypto ] = 'KDM required'
     composition_requires_kdm = TRUE
     @encrypted_compositions += 1
   else
-    report << 'Composition crypto: Plaintext (no KDM required)'
+    composition_summary[ :crypto ] = 'Plaintext'
     composition_requires_kdm = FALSE
   end
 
   # Monoscopic/Stereoscopic composition?
   if is_stereoscopic.uniq.size == 1 and is_stereoscopic.uniq.first == TRUE
-    report << 'Composition kind: 3D/Stereoscopic'
+    composition_summary[ :spatiality ] = '3D'
     is_stereoscopic = TRUE
   elsif is_stereoscopic.uniq.size == 1 and is_stereoscopic.uniq.first == FALSE
-    report << 'Composition kind: 2D/Monoscopic'
+    composition_summary[ :spatiality ] = '2D'
     is_stereoscopic = FALSE
   elsif is_stereoscopic.uniq.size == 2
-    report << 'Composition references monoscopic and stereoscopic elements'
+    composition_summary[ :spatiality ] = '2D/3D'
     is_stereoscopic = TRUE
     errors << "CPL #{ cpl_id }: " + report.last
     cpl_errors = TRUE
@@ -3560,7 +3590,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       else
         composition_aspect_ratio = { :abbrev => composition_aspect_ratios.first.to_s, :name => composition_aspect_ratios.first.to_s }
       end
-      report << "Composition aspect: #{ composition_aspect_ratio[ :name ] }"
+      composition_summary[ :aspect ] = composition_aspect_ratio[ :name ]
     else
       errors << "CPL #{ cpl_id }: Found different asset aspect ratios: #{ composition_aspect_ratios.inspect }"
       cpl_errors = TRUE
@@ -3592,7 +3622,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       else
         composition_resolution = { :abbrev => composition_resolutions.first }
       end
-      report << "Composition resolution: #{ composition_resolution[ :abbrev ] }"
+      composition_summary[ :resolution ] = composition_resolution[ :abbrev ]
     else
       errors << "CPL #{ cpl_id }: Found different picture resolutions: #{ composition_resolutions.inspect }"
       cpl_errors = TRUE
@@ -3621,23 +3651,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     end
   end
 
-  # Composition type SMPTE/Interop/Undetermined?
-  assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
-  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == TRUE
-    composition_type = cpl_referenced_assets_types.uniq.first
-    report << "Composition type: #{ composition_type }"
-  else
-    # FIXME Composition type Mixed error or hint?
-    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( FALSE ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
-    report << "Composition type: #{ composition_type }: #{ cpl_referenced_assets_types.inspect }"
-    if broken_assets.size != 0
-      errors << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
-      cpl_errors = TRUE
-    else
-      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
-    end
-  end
-
   # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
   # See SMPTE ST 429-2:2009 section 9.1 for the requirement
   reels_references.each_with_index do |reel_refs, index|
@@ -3659,6 +3672,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       cpl_reels_references_complete << FALSE
     end
   end
+
+  # composition summary one-liner
+  report << "CPL #{ cpl_id }: Composition summary: " + [ [ :type, :crypto, :spatiality, :aspect, :resolution, :duration, :edit_rate ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ' ' )
 
   # Naming convention
   case composition_type
