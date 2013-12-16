@@ -147,8 +147,10 @@ DCP_INSPECT_DIR_NOT_WRITABLE = 14
 AUTOLOGFILE_WRITE_ERROR = 15
 MKFIFO_FAIL = 16
 RMFIFO_FAIL = 17
-USER_SHUTDOWN = 18
+USER_INTERRUPT = 18
 RUBY_VERSION_NOT_SUPPORTED = 19
+RUBY_TYPE_ERROR = 20
+RUBY_EXCEPTION = 21
 
 # Required gems
 if RUBY_VERSION <= '1.9'
@@ -4328,6 +4330,35 @@ def dcp_inspect( options, arg )
 end # dcp_inspect
 
 
+def print_internal_error_backtrace( result )
+  @logger.info "#{ result.class }: #{ result.message }"
+  result.backtrace[ 0 .. 4 ].each do |tracer|
+    @logger.info tracer
+  end
+end
+
+
+def dcp_inspect_crashed_get_in_touch
+  @logger.info ''
+  @logger.info "Sorry, #{ AppName } #{ AppVersion } crashed"
+  @logger.info "Please get in touch to help fix it"
+  @logger.info "See https://github.com/wolfgangw"
+  @logger.info "Your feedback is much appreciated. Thanks in advance"
+  @logger.info ''
+end
+
+
+def graceful_shutdown( options, args, crash = FALSE )
+  if @dcp_inspect_temp
+    @dcp_inspect_temp.eject
+  end
+  write_logfiles( options, args )
+  if crash
+    dcp_inspect_crashed_get_in_touch
+  end
+end
+
+
 def write_logfiles( options, args )
   # Write autolog
   if options.logfile_autolog
@@ -4521,13 +4552,15 @@ begin
     exit ARG_NOT_A_DIR
   end
 
-rescue Interrupt => s
+# Graceful shutdown
+rescue Interrupt => signal
   puts
-  @logger.info "Shutdown: #{ s.inspect }"
-  if @dcp_inspect_temp
-    @dcp_inspect_temp.eject
-  end
-  write_logfiles( options, args )
-  exit USER_SHUTDOWN
+  @logger.info "Shutdown: #{ signal.inspect }"
+  graceful_shutdown( options, args )
+  exit USER_INTERRUPT
+rescue TypeError => error
+  print_internal_error_backtrace( error )
+  graceful_shutdown( options, args, crash = TRUE )
+  exit RUBY_TYPE_ERROR
 end
 
