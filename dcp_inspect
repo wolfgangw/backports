@@ -3507,6 +3507,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
 
   # Setup composition summary one-liner
   composition_summary = Hash.new
+  composition_summary[ :content_title_text ] = content_title_text.inspect
 
 
   # Composition duration
@@ -3677,7 +3678,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   end
 
   # composition summary one-liner
-  report << "CPL #{ cpl_id }: Composition summary: " + [ [ :type, :crypto, :spatiality, :aspect, :resolution, :duration, :edit_rate ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ' ' )
+  report << "CPL #{ cpl_id }: Composition summary: " + [ [ :content_title_text, :type, :crypto, :spatiality, :aspect, :resolution, :duration, :edit_rate ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ', ' )
 
   # Naming convention
   case composition_type
