@@ -3260,18 +3260,18 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                         image_elements = TRUE
                         unless node.text.empty? # Checked above
                           asset_name = File.join( asset_id, node.text )
-                          if dict.values.include? asset_name
-                            unless File.exists?( package asset_name )
+                          asset_pick = dict.select { |k, v| v =~ Regexp.new( asset_name ) }
+
+                          if asset_pick.empty?
+                            errors << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not in AssetMap"
+                            cpl_errors = TRUE
+                          else
+                            unless File.exists?( package asset_pick.values.first ) # FIXME
                               errors << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not found on the medium"
                               cpl_errors = TRUE
                             end
-                          else
-                            errors << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not in AssetMap"
-                            cpl_errors = TRUE
-                            if File.exists?( package asset_name )
-                              hints << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not in AssetMap but present on the medium"
-                            end
                           end
+
                         end
                       end
                     end
