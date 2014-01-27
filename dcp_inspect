@@ -2599,7 +2599,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   # CPL:Id RFC-4122 compliant?
   if cpl_id !~ MStr::Uuid_rfc4122_re
     report << "CPL Id:           #{ cpl_id } [Not RFC-4122 compliant]"
-    errors << "CPL #{ cpl_id }: Value of CompositionPlaylist:Id is not RFC-422 compliant"
+    errors << "CPL #{ cpl_id }: Value of CompositionPlaylist:Id is not RFC-4122 compliant"
     cpl_errors = TRUE
   else
     report << "CPL Id:           #{ cpl_id }"
@@ -4240,7 +4240,7 @@ def dcp_inspect( options, arg )
             @logger.debug "CPL file present: #{ cpl_id }: #{ cpl_file }"
           else
             cpls_missing[ index ] << cpl_id
-            errors << "CPL file missing: #{ cpl_id }: #{ cpl_file }"
+            errors << "CPL #{ cpl_id }: CPL file missing: #{ cpl_file }"
             @logger.debug errors.last
             pkl_errors = TRUE
           end
@@ -4274,7 +4274,7 @@ def dcp_inspect( options, arg )
         if File.exists? cpl_file
           @logger.debug "CPL file present: #{ cpl_id }: #{ cpl_file }"
         else
-          errors << "CPL file missing: #{ cpl_id }: #{ cpl_file }"
+          errors << "CPL #{ cpl_id }: CPL file missing: #{ cpl_file }"
           @logger.debug errors.last
         end
       end
