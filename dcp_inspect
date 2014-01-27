@@ -4570,5 +4570,8 @@ rescue TypeError => error
   print_internal_error_backtrace( error )
   graceful_shutdown( options, args, crash = TRUE )
   exit RUBY_TYPE_ERROR
+rescue NameError => error
+  print_internal_error_backtrace( error )
+  graceful_shutdown( options, args, crash = TRUE )
 end
 
