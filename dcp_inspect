@@ -462,10 +462,10 @@ end
 
 def bars( list )
   level = '█▇▆▅▄▃▂▁'
-  '|' + list.inject( '' ) do |string, value|
+  '|' + list.inject( [] ) do |ary, value|
     case value
     when '-inf'
-      string += ' '
+      ary << '.'
     else
       case value.to_f.abs
       when 0.0
@@ -473,10 +473,10 @@ def bars( list )
       else
         level_index = [ 0, ( Math.log2 value.to_f.abs ).to_i.abs, level.size - 1 ].sort[ 1 ] # clamp between 0 and level.size - 1
       end
-      string += level[ level_index ]
+      ary << level[ level_index ]
     end
-    string
-  end + '|'
+    ary
+  end.join('|') + '|'
 end
 
 
