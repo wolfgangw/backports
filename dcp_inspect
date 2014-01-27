@@ -452,7 +452,7 @@ class Ramdisk
     when /linux/
       out, err, status = Open3.capture3( "mkdir #{ self.path }" )
       @device = self.path
-      TRUE # we just write to /dev/shm
+      TRUE
     else
       FALSE
     end
