@@ -4495,7 +4495,7 @@ begin
 
     # Full audio/image examination?
     if options.audio_analysis or options.image_analysis
-      @dcp_inspect_temp = Ramdisk.new( 'dcp_inspect_temp', 2048 )
+      @dcp_inspect_temp = Ramdisk.new( "dcp_inspect_temp_#{ rand( 2 ** 32 ).to_s( 16 ) }", 2048 )
       @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
       @logger.debug 'Image analysis not yet implemented' if options.image_analysis
     end
