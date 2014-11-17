@@ -3106,6 +3106,94 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                   end
                 end
 
+                #
+                # Check for content of ReelNumber element
+                #
+                if ( reelnumber_el = xml.xpath( '/DCSubtitle/ReelNumber' ) and reelnumber_el.size == 1 )
+                  if reelnumber_el.children.size == 1
+                    if reelnumber_el.children.first.class == Nokogiri::XML::Text
+                      reelnumber_el_content = reelnumber_el.children.first.content
+                      if reelnumber_el_content =~ /\s*?\d+\s*?/
+                        if reelnumber_el_content.to_i != reel_no
+                          errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber '#{ reelnumber_el_content.to_i }' does not match its CPL reel number '#{ reel_no }'"
+                          cpl_errors = TRUE
+                          report << errors.last
+                        end
+                      else
+                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber content is not numerical: #{ reelnumber_el_content.inspect }"
+                        cpl_errors = TRUE
+                        report << errors.last
+                      end
+                    else
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has unexpected content: #{ reelnumber_el.children.first.class }"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    end
+                  else
+                    if reelnumber_el.children.size == 0
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has no content"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    elsif reelnumber_el.children.size > 1
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has more than 1 subelement"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    end
+                  end
+                else
+                  if reelnumber_el.size == 0
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber element not found"
+                    cpl_errors = TRUE
+                    report << errors.last
+                  else
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: More than 1 ReelNumber element found"
+                    cpl_errors = TRUE
+                    report << errors.last
+                  end
+                end
+
+                #
+                # Check for content of Language element
+                #
+                if ( language_el = xml.xpath( '/DCSubtitle/Language' ) and language_el.size == 1 )
+                  if language_el.children.size == 1
+                    if language_el.children.first.class == Nokogiri::XML::Text
+                      language_el_content = language_el.children.first.content
+                      if language_el_content =~ /\s*?[:alpha:]\s*?/
+                        #
+                      else
+                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language content contains unexpected characters: #{ language_el_content.inspect }"
+                        cpl_errors = TRUE
+                        report << errors.last
+                      end
+                    else
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has unexpected content: #{ language_el.children.first.class }"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    end
+                  else
+                    if language_el.children.size == 0
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has no content"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    elsif language_el.children.size > 1
+                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has more than 1 subelement"
+                      cpl_errors = TRUE
+                      report << errors.last
+                    end
+                  end
+                else
+                  if language_el.size == 0
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language element not found"
+                    cpl_errors = TRUE
+                    report << errors.last
+                  else
+                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: More than 1 Language element found"
+                    cpl_errors = TRUE
+                    report << errors.last
+                  end
+                end
+
                 xml.remove_namespaces!
                 if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
 
