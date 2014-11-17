@@ -2230,32 +2230,34 @@ end
 # in addition to xml all kinds of stuff will be examined here
 # hence the hoopla to skip expected errors from non-xml.
 # still: what an appalling method
-def get_xml_of_type( asdcp_type, file )
+def get_xml_of_type( asdcp_type, file, errors, errors_status )
   begin
     xml = Nokogiri::XML( open file )
   rescue Exception => e
     @logger.info "#{ file }: #{ e.message }"
-    return FALSE
+    return FALSE, errors, errors_status
   end
 
   unless xml.errors.empty?
     xml.errors.each do |error|
       # expected errors from non-xml
       next if error.message =~ /Start tag expected/ or error.message =~ /Document is empty/
-      @logger.info "Syntax error: #{ file }: #{ error }"
+      errors << "Syntax error: #{ file }: #{ error }"
+      errors_status = TRUE
+      @logger.info errors.last
     end
-    return FALSE
+    return FALSE, errors, errors_status
   end
 
   if xml.root
     case xml.root.node_name
     when asdcp_type
-      return xml
+      return xml, errors, errors_status
     else
-      return FALSE
+      return FALSE, errors, errors_status
     end
   else
-    return FALSE
+    return FALSE, errors, errors_status
   end
 end
 
@@ -3084,7 +3086,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
 
             else
               # DCSubtitle?
-              xml = get_xml_of_type( 'DCSubtitle', asset_file )
+              xml, errors, cpl_errors = get_xml_of_type( 'DCSubtitle', asset_file, errors, cpl_errors )
               if xml
 
                 cpl_referenced_assets << { asset_id => TRUE }
@@ -3845,7 +3847,8 @@ def dcp_inspect( options, arg )
     am_candidates_tmp = am_candidates.dup
     am_candidates.each do |am_candidate|
       am_file = package am_candidate
-      xml = get_xml_of_type( 'AssetMap', am_file )
+      error_status = FALSE
+      xml, errors, error_status = get_xml_of_type( 'AssetMap', am_file, errors, error_status )
       if xml
 
         # Scrounge am id for reporting
@@ -4070,7 +4073,7 @@ def dcp_inspect( options, arg )
     am_pkls.each do |pkl_id|
       pkl_errors = FALSE
       pkl_file = package dict[ index ][ pkl_id ]
-      xml = get_xml_of_type( 'PackingList', pkl_file )
+      xml, errors, pkl_errors = get_xml_of_type( 'PackingList', pkl_file, errors, pkl_errors )
       if xml
 
         @logger.debug "PKL #{ pkl_id }: #{ pkl_file }"
@@ -4211,7 +4214,7 @@ def dcp_inspect( options, arg )
 
               # Pick CPLs
               if type =~ /text\/xml/
-                xml = get_xml_of_type( 'CompositionPlaylist', asset_file )
+                xml, errors, errors_status = get_xml_of_type( 'CompositionPlaylist', asset_file, errors, errors_status = FALSE )
                 if xml
                   pkl_cpls << id
                   cpls[ index ] << id
