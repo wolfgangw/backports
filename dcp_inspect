@@ -2637,7 +2637,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   content_kind_nodeset = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ContentKind" )
   content_kind = content_kind_nodeset.text
   content_kind_scope_is_default = FALSE
-  content_kind_scope = content_kind_nodeset.first.attributes[ 'scope' ]
+  if content_kind_nodeset.first
+    content_kind_scope = content_kind_nodeset.first.attributes[ 'scope' ]
+  end
   if content_kind.empty?
     hints << "CPL #{ cpl_id }: ContentKind is empty. May lead to display issues in player UIs"
     report << "ContentKind:      [Empty]"
