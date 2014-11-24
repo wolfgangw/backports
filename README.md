@@ -78,5 +78,5 @@ Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecod
 
 Runs on linux and Mac OS boxes.
 
-Wolfgang Woehl 2011-2013
+Wolfgang Woehl 2011-2014
 
