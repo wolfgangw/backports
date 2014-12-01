@@ -2184,8 +2184,13 @@ def validate_xml( xml, file )
     xsd = Nokogiri::XML::Schema( open File.join( XSDDir, xsd_file ) )
     validation_errors = xsd.validate( xml )
   else
-    errors << "Could not determine Schema for #{ xml.namespaces.inspect }"
-    return FALSE, errors
+    if xml.namespaces.empty?
+      errors << "Could not determine Schema (no namespace provided)"
+      return FALSE, errors
+    else
+      errors << "Could not determine Schema for #{ xml.namespaces.inspect }"
+      return FALSE, errors
+    end
   end
   if validation_errors.empty?
     return TRUE, errors
@@ -3978,12 +3983,33 @@ def dcp_inspect( options, arg )
     pkls_missing << Array.new
     am_base = File.dirname am_file
     xml = xml?( package am_file )
-    am_ns = xml.root.namespace.href
+    if xml.root.namespace
+      am_ns = xml.root.namespace.href
+    end
+
     # FIXME
     xml.remove_namespaces!
     am_id = get_asset_uuid( package am_file )
+
     if am_id
       ams << am_id
+
+      case am_ns
+      when MStr::Smpte_am
+        unless am_file == 'ASSETMAP.xml'
+          errors << "AM #{ am_id }: SMPTE Assetmap file cannot be named #{ am_file.inspect }. Must be named 'ASSETMAP.xml'"
+          am_errors = TRUE
+        end
+      when MStr::Interop_am
+        unless am_file == 'ASSETMAP'
+          errors << "AM #{ am_id }: Interop Assetmap file cannot be named #{ am_file.inspect }. Must be named 'ASSETMAP'"
+          am_errors = TRUE
+        end
+      else
+        errors << "AM #{ am_id } '#{ am_file }' has invalid namespace #{ am_ns.inspect }"
+        am_errors = TRUE
+      end
+
     else
       ams << NIL
       errors << "Assetmap '#{ am_file }' has no Id"
