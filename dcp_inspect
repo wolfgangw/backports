@@ -4072,17 +4072,22 @@ def dcp_inspect( options, arg )
 
       # PackingList?
       unless asset.xpath( 'PackingList' ).empty?
-        case am_ns
-        when MStr::Interop_am
-          pkls[ index ] << listed_id
-        when MStr::Smpte_am
-          if asset.xpath( 'PackingList' ).text == 'true'
+        if path
+          case am_ns
+          when MStr::Interop_am
             pkls[ index ] << listed_id
-          else
-            errors << "AM #{ am_id }: SMPTE AM requires a PackingList element to contain the value 'true' (value is missing). Continuing anyway"
-            am_errors = TRUE
-            pkls[ index ] << listed_id
+          when MStr::Smpte_am
+            if asset.xpath( 'PackingList' ).text == 'true'
+              pkls[ index ] << listed_id
+            else
+              errors << "AM #{ am_id }: SMPTE AM requires a PackingList element to contain the value 'true' (value is missing). Continuing anyway"
+              am_errors = TRUE
+              pkls[ index ] << listed_id
+            end
           end
+        else
+          errors << "AM #{ am_id }: Found alleged PackingList asset #{ listed_id } but Path element is empty. Not adding to dictionary"
+          am_errors = TRUE
         end
       end
 
