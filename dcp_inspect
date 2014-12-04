@@ -383,12 +383,24 @@ module MxfTools
   end
 
   def mxf_inspect( filename )
+    errors_present = FALSE
     list = Shell.asdcp_mxf_info( filename )
     if list =~ /EditRate and SampleRate do not match/ and list =~ /File may contain JPEG Interop stereoscopic images/
       list = Shell.asdcp_mxf_interop_stereoscopic_info( filename )
     end
-    if list.empty? or list =~ /Program stopped on error/
+    if list.empty?
       return nil
+    elsif list =~ /Program stopped on error/ # first item, due to our STDERR redirect
+      if list =~ /SeekToRIP failed/
+        return nil
+      elsif list =~ /File open failure/
+        return nil
+      elsif list =~ /essence type is/
+        # See e.g. Fox Format Test 2D-2k-50 (scope v1.0) (CPL 3452c9ed, MXF 20f97e4e)
+        # Remove the error message and carry on. Ugh but hey
+        errors_present = TRUE
+        list = list.split( "\n" )[ 1 .. -1 ].join( "\n" )
+      end
     end
     list = list.split( /\n\s*/ ).collect { |line| line.split( ': ' ) }
     et = [ 'EssenceType',
