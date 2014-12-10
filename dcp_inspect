@@ -4008,17 +4008,17 @@ def dcp_inspect( options, arg )
 
       case am_ns
       when MStr::Smpte_am
-        unless am_file == 'ASSETMAP.xml'
-          errors << "AM #{ am_id }: SMPTE Assetmap file cannot be named #{ am_file.inspect }. Must be named 'ASSETMAP.xml'"
+        unless File.basename( am_file ) == 'ASSETMAP.xml'
+          errors << "AM #{ am_id }: #{ am_file.inspect }: SMPTE Assetmap file cannot be named #{ File.basename( am_file ).inspect }. Must be named \"ASSETMAP.xml\""
           am_errors = TRUE
         end
       when MStr::Interop_am
-        unless am_file == 'ASSETMAP'
-          errors << "AM #{ am_id }: Interop Assetmap file cannot be named #{ am_file.inspect }. Must be named 'ASSETMAP'"
+        unless File.basename( am_file ) == 'ASSETMAP'
+          errors << "AM #{ am_id }: #{ am_file.inspect }: Interop Assetmap file cannot be named #{ File.basename( am_file ).inspect }. Must be named \"ASSETMAP\""
           am_errors = TRUE
         end
       else
-        errors << "AM #{ am_id } '#{ am_file }' has invalid namespace #{ am_ns.inspect }"
+        errors << "AM #{ am_id }: #{ am_file.inspect }: Alleged AM file has invalid namespace #{ am_ns.inspect }"
         am_errors = TRUE
       end
 
