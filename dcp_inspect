@@ -3728,7 +3728,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     end
   else
     expected_aspect_ratios = reels.size - supplemental_refs[ :main_picture ]
-    if expected_aspect_ratios > 0
+    if expected_aspect_ratios != composition_aspect_ratios.size
       errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'aspect ratio', expected_aspect_ratios ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_aspect_ratios.size }"
       cpl_errors = TRUE
     end
@@ -3760,7 +3760,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     end
   else
     expected_picture_resolutions = reels.size - supplemental_refs[ :main_picture ]
-    if expected_picture_resolutions > 0
+    if expected_picture_resolutions != composition_resolutions.size
       errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'picture resolution', expected_picture_resolutions ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_resolutions.size }"
       cpl_errors = TRUE
     end
@@ -3776,7 +3776,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     end
   else
     expected_audio_types = reels.size - supplemental_refs[ :main_sound ]
-    if expected_audio_types > 0
+    if expected_audio_types != composition_channel_counts.size
       errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
       cpl_errors = TRUE
     end
