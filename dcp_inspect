@@ -2862,9 +2862,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       entry_point = asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i
       duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
       if asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns )
-        key_id = asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns ).text.split( ':' ).last
+        cpl_key_id = asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns ).text.split( ':' ).last
       else
-        key_id = NIL
+        cpl_key_id = NIL
       end
 
       # FIXME Timecode will die on edit_rate == 0
@@ -2929,10 +2929,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                 if meta[ 'EncryptedEssence' ] == 'Yes'
                   if meta[ 'CryptographicKeyID' ]
                     asset_key_id = meta[ 'CryptographicKeyID' ]
-                    if asset_key_id == key_id
+                    if asset_key_id == cpl_key_id
                       cpl_referenced_assets_encrypted << asset_id
                     else
-                      case key_id
+                      case cpl_key_id
                       when NIL
                         errors << "#{ cpl_reel }: #{ asset.node_name }: References encrypted asset but KeyId is [NIL]: #{ asset_id }"
                         cpl_errors = TRUE
@@ -3548,7 +3548,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                 meta_report = 'File found but not AS-DCP MXF'
 
                 # We don't have meta. Infer encryption from presence of KeyId
-                if key_id
+                if cpl_key_id
                   cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
                 end
 
@@ -3563,7 +3563,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
             meta_report = "Referenced asset file missing: #{ dict[ asset_id ] }"
 
             # Infer encryption from presence of KeyId
-            if key_id
+            if cpl_key_id
               cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
             end
 
@@ -3596,7 +3596,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
             end
 
             # Infer encryption from presence of KeyId
-            if key_id
+            if cpl_key_id
               cpl_referenced_assets_encrypted_inferred_from_key_id << asset_id
             end
 
