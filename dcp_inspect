@@ -2725,9 +2725,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       end
       if issue_date_dt
         if issue_date_dt >= now_dt
-          info << "CPL #{ cpl_id }: Composition #{ content_title_text.empty? ? '[ContentTitleText empty]' : content_title_text } was issued in the future: IssueDate #{ issue_date.text.inspect } ahead of now (#{ now_dt.to_s }) by #{ distance_of_time_in_words( issue_date_dt, now_dt ) }"
+          info << "CPL #{ cpl_id }: Composition #{ content_title_text.empty? ? '[ContentTitleText empty]' : content_title_text.inspect } was issued in the future: IssueDate #{ issue_date.text.inspect } ahead of now (#{ now_dt.to_s }) by #{ distance_of_time_in_words( issue_date_dt, now_dt ) }"
         elsif issue_date_dt < now_dt
-          info << "CPL #{ cpl_id }: Composition #{ content_title_text.empty? ? '[ContentTitleText empty]' : content_title_text } was issued #{ distance_of_time_in_words( issue_date_dt, now_dt ) } ago"
+          info << "CPL #{ cpl_id }: Composition #{ content_title_text.empty? ? '[ContentTitleText empty]' : content_title_text.inspect } was issued #{ distance_of_time_in_words( issue_date_dt, now_dt ) } ago"
         end
         issue_date_friendly = datetime_friendly( issue_date_dt )
         report << "IssueDate:        #{ issue_date.text } (#{ issue_date_friendly })"
