@@ -403,27 +403,28 @@ module MxfTools
 
   def mxf_inspect( filename )
     errors_present = FALSE
-    list = Shell.asdcp_mxf_info( filename )
-    if list =~ /EditRate and SampleRate do not match/ and list =~ /File may contain JPEG Interop stereoscopic images/
-      list = Shell.asdcp_mxf_interop_stereoscopic_info( filename )
+    out, err, status = Shell.asdcp_mxf_info( filename )
+    if out =~ /EditRate and SampleRate do not match/ and out =~ /File may contain JPEG Interop stereoscopic images/
+      # With 1.12.58 this is not required anymore. Keep it for backwards compat
+      out, err, status = Shell.asdcp_mxf_interop_stereoscopic_info( filename )
     end
-    if list.empty?
+
+    if out.empty?
       return nil
-    elsif list =~ /Program stopped on error/ # first item, due to our STDERR redirect
-      if list =~ /SeekToRIP failed/
+    elsif err =~ /Program stopped on error/
+      if err =~ /SeekToRIP failed/
         return nil
-      elsif list =~ /File open failure/
+      elsif err =~ /File open failure/
         return nil
-      elsif list =~ /essence type is/
+      elsif out =~ /essence type is/
         # See e.g. Fox Format Test 2D-2k-50 (scope v1.0) (CPL 3452c9ed, MXF 20f97e4e)
-        # Remove the error message and carry on. Ugh but hey
         errors_present = TRUE
-        list = list.split( "\n" )[ 1 .. -1 ].join( "\n" )
       end
     end
-    list = list.split( /\n\s*/ ).collect { |line| line.split( ': ' ) }
+
+    out = out.split( /\n\s*/ ).collect { |line| line.split( ': ' ) }
     et = [ 'EssenceType',
-           case list.first.to_s
+           case out.first.to_s
            when /#{ MStr::Stereoscopic_pictures }/
              MStr::Stereoscopic_pictures
            when /#{ MStr::Pictures }/
@@ -440,7 +441,7 @@ module MxfTools
              nil
            end
     ]
-    return Hash[ list << et ]
+    return Hash[ out << et ]
   end
 end
 include MxfTools
@@ -663,10 +664,14 @@ module Shell
       `kmuuidgen -n`
     end
     def asdcp_mxf_info( filename )
-      `asdcp-info -v -i -d #{ Shellwords.shellescape filename } 2>&1`.chomp
+      out, err, status = Open3.capture3( "asdcp-info -v -i -d -r #{ Shellwords.shellescape filename }" )
+      out = out.chomp
+      return out, err, status
     end
     def asdcp_mxf_interop_stereoscopic_info( filename )
-      `asdcp-info -3 -v -i -d #{ Shellwords.shellescape filename } 2>&1`.chomp
+      out, err, status = Open3.capture3( "asdcp-info -3 -v -i -d -r #{ Shellwords.shellescape filename }" )
+      out = out.chomp
+      return out, err, status
     end
   end
 end
