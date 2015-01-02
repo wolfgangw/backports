@@ -2341,6 +2341,7 @@ def get_asset_uuid( file )
           id = xml.xpath( '//MetadataID' ).text # PCF, DCMetadata
         end
       end
+      id = id.strip
 
     else # not xml
       meta = MxfTools.mxf_inspect( file )

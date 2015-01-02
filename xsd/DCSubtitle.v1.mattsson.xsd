@@ -188,7 +188,7 @@
   </xs:element>
   <xs:simpleType name="UUIDType">
     <xs:restriction base="xs:string">
-      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+      <xs:pattern value="\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*"/>
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="yesNoType">
