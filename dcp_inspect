@@ -454,8 +454,8 @@ include MxfTools
 
 class Ramdisk
   attr_reader :device
-  def initialize( diskname, size )
-    @diskname = diskname
+  def initialize( size )
+    @diskname = "#{ AppName }_#{ rand( 2 ** 32 ).to_s( 16 ) }"
     @size = size
     @device = NIL
     result = make_ramdisk
@@ -484,7 +484,7 @@ class Ramdisk
   def make_ramdisk
     case RUBY_PLATFORM
     when /darwin/
-      out, err, status = Open3.capture3( "hdiutil attach -nomount ram://#{ @size }" )
+      out, err, status = Open3.capture3( "hdiutil attach -nobrowse -nomount ram://#{ @size }" )
       @device = out.chomp
       out, err, status = Open3.capture3( "diskutil erasevolume HFS+ '#{ @diskname }' #{ @device }" )
       TRUE
@@ -4703,7 +4703,7 @@ begin
 
     # Full audio/image examination?
     if options.audio_analysis or options.image_analysis
-      @dcp_inspect_temp = Ramdisk.new( "dcp_inspect_temp_#{ rand( 2 ** 32 ).to_s( 16 ) }", 2048 )
+      @dcp_inspect_temp = Ramdisk.new( 2048 )
       @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
       @logger.debug 'Image analysis not yet implemented' if options.image_analysis
     end
