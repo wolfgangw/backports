@@ -152,6 +152,7 @@ RUBY_VERSION_NOT_SUPPORTED = 19
 RUBY_TYPE_ERROR = 20
 RUBY_EXCEPTION = 21
 GRACEFUL_SHUTDOWN = 22
+LIB_LOAD_ERROR = 23
 
 # Constants
 PictureBitrateMaxLegacy = 250.0 # Mb/s
@@ -159,16 +160,8 @@ PictureBitrateMaxLegacySafetyMargin = 2.0 # percent
 PictureBitrateMaxLegacySafe = ( PictureBitrateMaxLegacy / 100 * ( 100 - PictureBitrateMaxLegacySafetyMargin ) ).round( 2 )
 PictureBitrateMax2ndGen = 500.0 # Mb/s
 
-# Required gems
-if RUBY_VERSION <= '1.9'
-  begin
-    require 'rubygems'
-  rescue LoadError
-  end
-end
+# Internal
 [
-  'nokogiri',
-  'ttfunk',
   'optparse',
   'ostruct',
   'pathname',
@@ -177,12 +170,24 @@ end
   'base64',
   'stringio',
   'fileutils',
-  'open3'
+  'open3',
+].each do |lib|
+  begin
+    require lib
+  rescue LoadError => e
+    puts e.inspect
+    exit LIB_LOAD_ERROR
+  end
+end
+# External
+[
+  'nokogiri',
+  'ttfunk'
 ].each do |gem|
   begin
     require gem
   rescue LoadError => e
-    puts e.message
+    puts e.inspect
     puts "Please run 'gem install #{ gem }' (without the quotes) and try again"
     exit GEM_LOAD_ERROR
   end
