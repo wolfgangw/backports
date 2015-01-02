@@ -3814,8 +3814,12 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   end
 
   # Composition picture bitrate (weighted mean)
-  composition_picture_bitrate_avg = ( composition_picture_bitrates_avg.map { |w| w[ :duration ] * w[ :picture_bitrate_avg_mbs ] }.inject( 0, :+ ) / composition_picture_bitrates_avg.map { |w| w[ :duration ] }.inject( 0, :+ ) ).round( 2 )
-  composition_summary[ :picture_bitrate_avg ] = "#{ composition_picture_bitrate_avg } Mb/s"
+  if composition_picture_bitrates_avg.size > 0
+    composition_picture_bitrate_avg = ( composition_picture_bitrates_avg.map { |w| w[ :duration ] * w[ :picture_bitrate_avg_mbs ] }.inject( 0, :+ ) / composition_picture_bitrates_avg.map { |w| w[ :duration ] }.inject( 0, :+ ) ).round( 2 )
+    composition_summary[ :picture_bitrate_avg ] = "#{ composition_picture_bitrate_avg } Mb/s"
+  else
+    composition_summary[ :picture_bitrate_avg ] = "[NaN Mb/s]"
+  end
 
   # Set up composition_channel_count
   composition_channel_count = NIL
