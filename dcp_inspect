@@ -409,7 +409,7 @@ module MxfTools
   def mxf_inspect( filename )
     errors_present = FALSE
     out, err, status = Shell.asdcp_mxf_info( filename )
-    if out =~ /EditRate and SampleRate do not match/ and out =~ /File may contain JPEG Interop stereoscopic images/
+    if err =~ /EditRate and SampleRate do not match/ and err =~ /File may contain JPEG Interop stereoscopic images/
       # With 1.12.58 this is not required anymore. Keep it for backwards compat
       out, err, status = Shell.asdcp_mxf_interop_stereoscopic_info( filename )
     end
