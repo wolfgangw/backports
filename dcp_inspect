@@ -3008,7 +3008,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                 when 2.387 # Scope
                   picture_aspect_ratio_moniker = 'S'
                 when 1.778 # HD
-                  picture_aspect_ratio_moniker = 'HD'
+                  picture_aspect_ratio_moniker = '16:9'
                   hints << "#{ cpl_reel }: #{ asset.node_name } has non-DCI aspect ratio #{ picture_aspect_ratio } (#{ picture_dimensions }, #{ picture_aspect_ratio_moniker }): Playback with proper non-standard masking recommended"
                 else
                   picture_aspect_ratio_moniker = picture_aspect_ratio.to_s
