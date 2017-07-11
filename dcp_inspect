@@ -594,7 +594,7 @@ module MStr
   Interop_am  = 'http://www.digicine.com/PROTO-ASDCP-AM-20040311#'
   Interop_pkl = 'http://www.digicine.com/PROTO-ASDCP-PKL-20040311#'
   Interop_cpl = 'http://www.digicine.com/PROTO-ASDCP-CPL-20040511#'
-  Composition_metadata_href = 'http://isdcf.com/schemas/draft/2011/cpl-metadata'
+  Composition_metadata_href = [ 'http://isdcf.com/schemas/draft/2011/cpl-metadata', 'http://www.smpte-ra.org/schemas/429-16/2014/CPL-Metadata' ]
 
   Ns_Xmldsig  = 'http://www.w3.org/2000/09/xmldsig#'
 
@@ -2581,6 +2581,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   cpl_reels_references_complete = Array.new
 
   ns = xml.collect_all_namespaces_href_keys
+  @logger.dev "CPL all namespaces href keys: #{ ns }"
   cpl_ns = xml.root.namespace.href
   cpl_ns_prefix = namespace_prefix( xml, cpl_ns )
   cpl_id = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:Id" ).text.split( ':' ).last
@@ -2782,11 +2783,15 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   # Metadata // CMA
   # FIXME: For now this is merely a printout. We don't check against actual asset metadata
   #
-  if ns.keys.include? MStr::Composition_metadata_href
-    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', 'meta' => MStr::Composition_metadata_href )
+  @logger.dev "CPL ns keys: #{ ns.keys }"
+  if ( ns.keys & MStr::Composition_metadata_href ).any?
+    cma_href_match = ( ns.keys & MStr::Composition_metadata_href ).first
+    @logger.dev "CPL We have CompositionMetadataAsset: #{ cma_href_match }"
+    cma = xml.xpath( '//meta:CompositionMetadataAsset/meta:*', 'meta' => cma_href_match )
     if cma
       report << 'CompositionMetadataAsset:'
       cma.each do |e|
+        @logger.dev "                  #{ e.node_name }: #{ e.text }"
         report << "                  #{ e.node_name }: #{ e.text }"
       end
     end
@@ -3629,6 +3634,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
             markers.each do |marker|
               label = marker.xpath( "#{ cpl_ns_prefix }:Label" ).text
             end
+            @logger.dev "CPL We have MainMarkers"
             meta_report = "We have MainMarkers"
           else
 
@@ -3665,6 +3671,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       end
 
       if meta
+        @logger.dev "#{ asset.node_name }: #{ asset_file } #{ asset.namespaces }"
         case asset.node_name
         when 'MainStereoscopicPicture'
           unless meta[ 'EssenceType' ] == MStr::Stereoscopic_pictures
