@@ -153,6 +153,8 @@ RUBY_TYPE_ERROR = 20
 RUBY_EXCEPTION = 21
 GRACEFUL_SHUTDOWN = 22
 LIB_LOAD_ERROR = 23
+RUBY_NAME_ERROR = 24
+RUBY_ARGUMENT_ERROR = 25
 
 # Constants
 PictureBitrateMaxDCI = 250.0 # Mb/s
@@ -4867,6 +4869,11 @@ rescue TypeError => error
   exit RUBY_TYPE_ERROR
 rescue NameError => error
   print_internal_error_backtrace( error )
-  graceful_shutdown( options, args, crash = TRUE )
+  graceful_shutdown( options, args, crash = true )
+  exit RUBY_NAME_ERROR
+rescue ArgumentError => error
+  print_internal_error_backtrace( error )
+  graceful_shutdown( options, args, crash = true )
+  exit RUBY_ARGUMENT_ERROR
 end
 
