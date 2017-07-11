@@ -51,7 +51,7 @@ AppStartSeconds = Time.now
 #
 # - Checks and verifies signatures
 #
-# - Reports detailed composition overviews
+# - Reports detailed composition information
 #
 # - Deep-inspects compositions. This includes composition type consistency
 #   and completeness checks. dcp_inspect goes through some lengths to determine
