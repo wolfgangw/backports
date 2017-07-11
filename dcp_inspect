@@ -647,7 +647,7 @@ module MStr
 
   Cpl_content_kind_default_scope = 'http://www.smpte-ra.org/schemas/429-7/2006/CPL#standard-content'
   Cpl_standard_content = [ 'feature', 'trailer', 'test', 'teaser', 'rating', 'advertisement', 'short', 'transitional', 'psa', 'policy' ]
-  Cpl_standard_content_moniker_map = { :ftr => :feature, :tlr => :trailer, :tst => :test, :tsr => :teaser, :rtg => :rating, :pol => :policy, :adv => :advertisement, :shr => :short, :xsn => :transitional, :psa => :psa, :pol => :policy  }
+  Cpl_standard_content_moniker_map = { :ftr => :feature, :tlr => :trailer, :tst => :test, :tsr => :teaser, :rtg => :rating, :pol => :policy, :adv => :advertisement, :shr => :short, :xsn => :transitional, :psa => :psa }
 
   #
   # RFC-4122:
