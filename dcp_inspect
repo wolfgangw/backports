@@ -2807,11 +2807,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   broken_assets = Array.new
   reels_references = Array.new
   is_stereoscopic = Array.new # build a flag for naming convention checks
-  composition_aspect_ratios = Array.new
-  composition_resolutions = Array.new
+  composition_picture_aspect_ratios = Array.new
+  composition_picture_resolutions = Array.new
+  composition_picture_decomposition_levels = Array.new
   composition_picture_bitrates_max = Array.new
   composition_picture_bitrates_avg = Array.new
-  composition_channel_counts = Array.new
+  composition_sound_channel_formats = Array.new
+  composition_sound_channel_counts = Array.new
+  composition_sound_samplerates = Array.new
   supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0 }
 
   reels.each_with_index do |reel, index|
@@ -2985,9 +2988,24 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
               # Check picture
               case asset.node_name
               when 'MainPicture', 'MainStereoscopicPicture'
+
+                # decomposition levels
+                if meta[ 'DecompositionLevels' ]
+                  picture_decomposition_levels = meta[ 'DecompositionLevels' ].to_i
+                  composition_picture_decomposition_levels << picture_decomposition_levels
+                else
+                  picture_decomposition_levels = nil
+                  composition_picture_decomposition_levels << nil
+                  errors << "#{ cpl_reel }: Expected to read image DecompositionLevels value but got nil"
+                  cpl_errors = true
+                end
+
+                # width and height
                 picture_stored_width, picture_stored_height = meta[ 'StoredWidth' ], meta[ 'StoredHeight' ]
                 picture_dimensions = "#{ picture_stored_width }x#{ picture_stored_height }"
                 picture_aspect_ratio = ( picture_stored_width.to_f / picture_stored_height.to_f ).round( 3 )
+
+                # avg and max bitrate
                 if meta[ 'Max BitRate' ]
                   picture_bitrate_max_mbs = meta[ 'Max BitRate' ].split( ' ' )[0].to_f
                 else
@@ -3066,6 +3084,17 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
               # Check audio
               case asset.node_name
               when 'MainSound'
+
+                # channel format
+                if meta[ 'ChannelFormat' ]
+                  audio_channel_format = meta[ 'ChannelFormat' ].to_i
+                  composition_sound_channel_formats << audio_channel_format
+                else
+                  audio_channel_format = nil
+                  composition_sound_channel_formats << nil
+                  errors << "#{ cpl_reel }: Expected to read sound ChannelFormat but got nil"
+                  cpl_errors = true
+                end
 
                 # Sampling rate
                 audio_sampling_rate = meta[ 'AudioSamplingRate' ]
@@ -3764,14 +3793,25 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     composition_summary[ :spatiality ] = '2D/3D'
     is_stereoscopic = true
     errors << "CPL #{ cpl_id }: " + report.last
-    cpl_errors = TRUE
+    cpl_errors = true
   end
 
-  # Set up composition_aspect_ratio
-  composition_aspect_ratio = NIL
-  if composition_aspect_ratios.size == reels.size
-    if composition_aspect_ratios.uniq.size == 1
-      case composition_aspect_ratios.first
+  # Check consistency of decomposition levels in picture essence
+  if composition_picture_decomposition_levels.uniq.size == 1 and composition_picture_decomposition_levels.first != nil
+    # we're good
+  elsif composition_picture_decomposition_levels.uniq.size == 1 and composition_picture_decomposition_levels.first == nil
+    errors << "CPL #{ cpl_id }: Failed to read DecompositionLevels from picture essence. Should not happen"
+    cpl_errors = true
+  else
+    errors << "CPL #{ cpl_id }: Found inconsistent image DecompositionLevels values across the composition (#{ composition_picture_decomposition_levels.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). This will produce visual artefacts in reel transitions"
+    cpl_errors = true
+  end
+
+  # Set up composition_picture_aspect_ratio
+  composition_picture_aspect_ratio = nil
+  if composition_picture_aspect_ratios.size == reels.size
+    if composition_picture_aspect_ratios.uniq.size == 1
+      case composition_picture_aspect_ratios.first
       when 1.896
         composition_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
       when 1.85
@@ -3840,11 +3880,22 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     composition_summary[ :picture_bitrate_avg ] = "Avg [NaN Mb/s]"
   end
 
-  # Set up composition_channel_count
-  composition_channel_count = NIL
-  if composition_channel_counts.size == reels.size
-    if composition_channel_counts.uniq.size == 1
-      composition_channel_count = { :abbrev => composition_channel_counts.uniq.first }
+  # Check consistency of ChannelFormat
+  if composition_sound_channel_formats.uniq.size == 1 and composition_sound_channel_formats.first != nil
+    # we're good
+  elsif composition_sound_channel_formats.uniq.size == 1 and composition_sound_channel_formats.first == nil
+    errors << "CPL #{ cpl_id }: Failed to read sound ChannelFormat values from sound essence. Should not happen"
+    cpl_errors = true
+  else
+    errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback will fail completely"
+    cpl_errors = true
+  end
+
+  # Set up composition_sound_channel_count
+  composition_sound_channel_count = nil
+  if composition_sound_channel_counts.size == reels.size
+    if composition_sound_channel_counts.uniq.size == 1
+      composition_sound_channel_count = { :abbrev => composition_sound_channel_counts.uniq.first }
     else
       errors << "CPL #{ cpl_id }: Found different audio types: #{ composition_channel_counts.inspect }"
     end
