@@ -3032,7 +3032,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                   picture_aspect_ratio_moniker = picture_aspect_ratio.to_s
                   hints << "#{ cpl_reel }: #{ asset.node_name } has non-DCI aspect ratio #{ picture_aspect_ratio } (#{ picture_dimensions }, #{ picture_aspect_ratio_moniker }): Playback with proper non-standard masking recommended"
                 end
-                composition_aspect_ratios << picture_aspect_ratio
+                composition_picture_aspect_ratios << picture_aspect_ratio
 
                 # dimensions
                 case picture_dimensions
@@ -3049,7 +3049,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                   errors << "#{ cpl_reel }: #{ asset.node_name } has non-DCI pixel dimensions (#{ picture_dimensions })"
                   cpl_errors = true
                 end
-                composition_resolutions << picture_dimensions_moniker
+                composition_picture_resolutions << picture_dimensions_moniker
 
                 # bitrate
                 if picture_bitrate_max_mbs
@@ -3130,7 +3130,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                 else
                   audio_channel_count_moniker = audio_channel_count.to_s
                 end
-                composition_channel_counts << audio_channel_count_moniker
+                composition_sound_channel_counts << audio_channel_count_moniker
 
                 # Block align
                 audio_block_align = meta[ 'BlockAlign' ].to_i
@@ -3813,17 +3813,17 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     if composition_picture_aspect_ratios.uniq.size == 1
       case composition_picture_aspect_ratios.first
       when 1.896
-        composition_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
+        composition_picture_aspect_ratio = { :abbrev => 'C', :name => 'Full Container' }
       when 1.85
-        composition_aspect_ratio = { :abbrev => 'F', :name => 'Flat' }
+        composition_picture_aspect_ratio = { :abbrev => 'F', :name => 'Flat' }
       when 2.387
-        composition_aspect_ratio = { :abbrev => 'S', :name => 'Scope' }
+        composition_picture_aspect_ratio = { :abbrev => 'S', :name => 'Scope' }
       when 1.778
-        composition_aspect_ratio = { :abbrev => 'HD', :name => 'HD' }
+        composition_picture_aspect_ratio = { :abbrev => 'HD', :name => 'HD' }
       else
-        composition_aspect_ratio = { :abbrev => composition_aspect_ratios.first.to_s, :name => composition_aspect_ratios.first.to_s }
+        composition_picture_aspect_ratio = { :abbrev => composition_picture_aspect_ratios.first.to_s, :name => composition_picture_aspect_ratios.first.to_s }
       end
-      composition_summary[ :aspect ] = composition_aspect_ratio[ :name ]
+      composition_summary[ :aspect ] = composition_picture_aspect_ratio[ :name ]
     else
       errors << "CPL #{ cpl_id }: Found different asset aspect ratios: #{ composition_picture_aspect_ratios.inspect }"
       cpl_errors = true
@@ -3836,26 +3836,26 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     end
   end
 
-  # Set up composition_resolution
-  composition_resolution = NIL
-  if composition_resolutions.size == reels.size
-    if composition_resolutions.uniq.size == 1
-      case composition_resolutions.first
+  # Set up composition_picture_resolution
+  composition_picture_resolution = nil
+  if composition_picture_resolutions.size == reels.size
+    if composition_picture_resolutions.uniq.size == 1
+      case composition_picture_resolutions.first
       when '2K'
         case composition_edit_rate
         when 48.0
-          composition_resolution = { :abbrev => '48' } # yeah, well. Look it up in 3.9, it's true :) (Changed in 8.2)
+          composition_picture_resolution = { :abbrev => '48' } # yeah, well. Look it up in 3.9, it's true :) (Changed in 8.2)
         else
-          composition_resolution = { :abbrev => '2K' }
+          composition_picture_resolution = { :abbrev => '2K' }
         end
       when '4K'
-        composition_resolution = { :abbrev => '4K' }
+        composition_picture_resolution = { :abbrev => '4K' }
       when 'HD'
-        composition_resolution = { :abbrev => 'HD' }
+        composition_picture_resolution = { :abbrev => 'HD' }
       else
-        composition_resolution = { :abbrev => composition_resolutions.first }
+        composition_picture_resolution = { :abbrev => composition_picture_resolutions.first }
       end
-      composition_summary[ :resolution ] = composition_resolution[ :abbrev ]
+      composition_summary[ :resolution ] = composition_picture_resolution[ :abbrev ]
     else
       errors << "CPL #{ cpl_id }: Found different picture resolutions: #{ composition_picture_resolutions.inspect }"
       cpl_errors = true
@@ -3897,13 +3897,13 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
     if composition_sound_channel_counts.uniq.size == 1
       composition_sound_channel_count = { :abbrev => composition_sound_channel_counts.uniq.first }
     else
-      errors << "CPL #{ cpl_id }: Found different audio types: #{ composition_channel_counts.inspect }"
+      errors << "CPL #{ cpl_id }: Found different sound channel configurations: #{ composition_sound_channel_counts.inspect }"
     end
   else
     expected_audio_types = reels.size - supplemental_refs[ :main_sound ]
-    if expected_audio_types != composition_channel_counts.size
-      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_channel_counts.size }"
-      cpl_errors = TRUE
+    if expected_audio_types != composition_sound_channel_counts.size
+      errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_sound_channel_counts.size }"
+      cpl_errors = true
     end
   end
 
@@ -3991,8 +3991,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   #
   # Aspect ratio
   if naming_matches[ :aspect_ratio ]
-    if composition_aspect_ratio
-      if naming_matches[ :aspect_ratio ] != composition_aspect_ratio[ :abbrev ]
+    if composition_picture_aspect_ratio
+      if naming_matches[ :aspect_ratio ] != composition_picture_aspect_ratio[ :abbrev ]
         case naming_matches[ :aspect_ratio ]
         when 'C'
           aspect_ratio_claim = 'Full Container'
@@ -4003,15 +4003,15 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
         else
           aspect_ratio_claim = naming_matches[ :aspect_ratio ]
         end
-        hints << "CPL #{ cpl_id }: Naming convention: Part aspect_ratio claims #{ aspect_ratio_claim } but composition aspect ratio is #{ composition_aspect_ratio[ :name ] }"
+        hints << "CPL #{ cpl_id }: Naming convention: Part aspect_ratio claims #{ aspect_ratio_claim } but composition aspect ratio is #{ composition_picture_aspect_ratio[ :name ] }"
       end
     end
   end
   #
   # Resolution (with a little composition_edit_rate tango because of the 2K@48fps hoopla in 3.9)
   if naming_matches[ :resolution ]
-    if composition_resolution
-      if naming_matches[ :resolution ] != composition_resolution[ :abbrev ]
+    if composition_picture_resolution
+      if naming_matches[ :resolution ] != composition_picture_resolution[ :abbrev ]
         case naming_matches[ :resolution ]
         when '48'
           if composition_edit_rate != 48.0
@@ -4019,7 +4019,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
           end
         else
           resolution_claim = naming_matches[ :resolution ]
-          hints << "CPL #{ cpl_id }: Naming convention: Part resolution claims #{ resolution_claim } but composition resolution is #{ composition_resolution[ :abbrev ] }"
+          hints << "CPL #{ cpl_id }: Naming convention: Part resolution claims #{ resolution_claim } but composition resolution is #{ composition_picture_resolution[ :abbrev ] }"
         end
       end
     end
@@ -4027,10 +4027,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   #
   # Audio channels
   if naming_matches[ :audio_type ]
-    if composition_channel_count
-      if naming_matches[ :audio_type ].split( '-' ).first != composition_channel_count[ :abbrev ]
+    if composition_sound_channel_count
+      if naming_matches[ :audio_type ].split( '-' ).first != composition_sound_channel_count[ :abbrev ]
         channel_count_claim = naming_matches[ :audio_type ].split( '-' ).first
-        hints << "CPL #{ cpl_id }: Naming convention: Part audio type claims #{ channel_count_claim } but composition audio type is #{ composition_channel_count[ :abbrev ] }"
+        hints << "CPL #{ cpl_id }: Naming convention: Part audio type claims #{ channel_count_claim } but composition audio type is #{ composition_sound_channel_count[ :abbrev ] }"
       end
     end
   end
