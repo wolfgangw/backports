@@ -7,7 +7,7 @@
         <xs:element name="MovieTitle" type="xs:string"/>
         <xs:element name="ReelNumber" type="xs:string"/>
         <xs:element name="Language" type="xs:string"/>
-        <xs:element ref="LoadFont" minOccurs="0"/>
+        <xs:element ref="LoadFont" minOccurs="0" maxOccurs="unbounded"/>
         <xs:element ref="Font" minOccurs="0" maxOccurs="unbounded"/>
         <xs:element ref="Subtitle" minOccurs="0" maxOccurs="unbounded"/>
       </xs:sequence>
@@ -21,18 +21,22 @@
       </xs:attribute>
     </xs:complexType>
   </xs:element>
-  <xs:element name="LoadFont">
-    <xs:complexType>
-      <xs:attribute name="Id" use="required" type="xs:string"/>
-      <xs:attribute name="URI" use="required" type="xs:anyURI"/>
-    </xs:complexType>
-  </xs:element>
+   <xs:element name="LoadFont">
+     <xs:complexType>
+      <xs:simpleContent>
+        <xs:extension base="spaceType">
+          <xs:attribute name="Id" use="required" type="xs:string"/>
+          <xs:attribute name="URI" use="required" type="xs:anyURI"/>
+        </xs:extension>
+      </xs:simpleContent>
+     </xs:complexType>
+   </xs:element>
   <xs:element name="Font">
     <xs:complexType mixed="true">
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Subtitle"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Text"/>
+        <xs:element ref="Font"/>
+        <xs:element ref="Subtitle"/>
+        <xs:element ref="Text"/>
         <xs:element ref="Image"/>
       </xs:choice>
       <xs:attribute name="Id" type="xs:string"/>
@@ -81,8 +85,8 @@
   <xs:element name="Subtitle">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Text"/>
+        <xs:element ref="Font"/>
+        <xs:element ref="Text"/>
         <xs:element ref="Image"/>
       </xs:choice>
       <xs:attribute name="SpotNumber" use="required" type="xs:string"/>
@@ -94,8 +98,8 @@
   </xs:element>
   <xs:element name="Text">
     <xs:complexType mixed="true">
-      <xs:choice minOccurs="0">
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="Font"/>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="Ruby"/>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="Space"/>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="HGroup"/>
@@ -111,8 +115,8 @@
       </xs:attribute>
       <xs:attribute name="HAlign" type="hAlignType"/>
       <xs:attribute name="HPosition" type="positionType"/>
-      <xs:attribute name="VAlign" type="vAlignType" use="required"/>
-      <xs:attribute name="VPosition" use="required" type="positionType"/>
+      <xs:attribute name="VAlign" type="vAlignType" />
+      <xs:attribute name="VPosition" type="positionType"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="Ruby">
@@ -186,6 +190,11 @@
       </xs:simpleContent>
     </xs:complexType>
   </xs:element>
+  <xs:simpleType name="spaceType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\s*"/>
+    </xs:restriction>
+  </xs:simpleType>
   <xs:simpleType name="UUIDType">
     <xs:restriction base="xs:string">
       <xs:pattern value="\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*"/>
