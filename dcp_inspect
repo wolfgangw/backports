@@ -2822,7 +2822,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   composition_sound_channel_formats = Array.new
   composition_sound_channel_counts = Array.new
   composition_sound_samplerates = Array.new
-  supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0 }
+  supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0, :aux_data => 0 }
 
   reels.each_with_index do |reel, index|
     reel_no = index + 1
@@ -3653,6 +3653,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
               supplemental_refs[ :main_subtitle ] += 1
             when 'MainCaption'
               supplemental_refs[ :main_caption ] += 1
+            when 'AuxData'
+              supplemental_refs[ :aux_data ] += 1
             end
 
             # Infer encryption from presence of KeyId
