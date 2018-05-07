@@ -2116,7 +2116,7 @@ class Eta
   end
 
   def percentage_pad
-    "%3s%" % @percentage
+    "%3s%%" % @percentage
   end
 
   def inner_bar
