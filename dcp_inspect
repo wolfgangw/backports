@@ -4499,9 +4499,11 @@ def dcp_inspect( options, arg )
                         end
                       else
                         @check_hashes_limit_hits += 1
-                        @logger.debug "#{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit"
-                        hints << "PKL #{ pkl_id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit: Asset #{ id }: #{ asset_file }"
+                        @logger.debug "#{ id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit: Path: #{ asset_file }, Expected hash: #{ hash_listed }"
+                        hints << "PKL #{ pkl_id }: Hash check skipped: File size #{ size_asset.to_k } > #{ bytes_from_nice_bytes( options.check_hashes_limit ).to_k } limit: Asset #{ id }, Path #{ asset_file }, Expected hash: #{ hash_listed }"
                       end
+                    else
+                      @logger.debug "#{ id }: Hash check skipped: Path: #{ asset_file }, Expected hash: #{ hash_listed }"
                     end
                   end
                 end
