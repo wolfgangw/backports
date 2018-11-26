@@ -3591,6 +3591,13 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
                     end
                   end
 
+                  #
+                  # Check DCSubtitle's edit rate and nag about non-24-fps rates
+                  #
+                  if edit_rate != 24.0
+                    hints << "#{ cpl_reel }: DCSubtitle: EditRate != 24 fps: #{ edit_rate } fps. Playback may fail"
+                  end
+
                   # DCSubtitle meta report
                   meta_report = "DCSubtitle, #{ amount( 'subtitle', subtitles.to_a ) }, #{ first_time_in } '#{ first_time_in_text.nil? ? '[nil]' : first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text.nil? ? '[nil]' : last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
 
