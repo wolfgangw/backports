@@ -3668,7 +3668,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       end # if dict
 
       begin
-        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  #{ asset_id.split( '-' ).first }  #{ asset.node_name }\t(#{ meta_report })"
+        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  Entry #{ Timecode.new( entry_point, edit_rate ) }  #{ asset_id.split( '-' ).first }  #{ asset.node_name }\t(#{ meta_report })"
       rescue Exception => e
         errors << "#{ cpl_reel }: Duration #{ duration }: EditRate #{ edit_rate }: #{ e.message }"
         cpl_errors = true
