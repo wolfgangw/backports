@@ -559,10 +559,15 @@ end
 
 
 def audio_characteristics( ramdisk, asset_file, channel_count, entry_point, duration, key = nil )
+  @logger.debug "ASDCPVersion: #{ASDCPVersion}"
   fifo_tokens = Array.new
   asdcp_prefix_token = File.join( ramdisk.path, 'asdcp-temp-audio' )
   ( 1 .. channel_count ).each do |ch|
-    fifo_tokens << "#{ asdcp_prefix_token }_#{ ch.to_s.rjust( 2, '0' ) }.wav"
+    if ASDCPVersion <= "1.12.58"
+      fifo_tokens << "#{ asdcp_prefix_token }_#{ ch }.wav"
+    else
+      fifo_tokens << "#{ asdcp_prefix_token }_#{ ch.to_s.rjust( 2, '0' ) }.wav"
+    end
   end
 
   fifo_zombies = Dir.glob( "#{ asdcp_prefix_token }*" )
