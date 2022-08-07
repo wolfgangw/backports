@@ -206,6 +206,7 @@ class Options
     options.image_analysis = false # not yet implemented
     options.audio_analysis = true
     options.validate = true
+    options.full_ids = false
     options.as_asset_store = false
     options.verbosity = [ 'debug', 'dev' ]
     options.logfile = nil
@@ -234,6 +235,9 @@ BANNER
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
         options.validate = false
+      end
+      opts.on( '--full-ids', 'Print full asset IDs in reel reports' ) do
+        options.full_ids = true
       end
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = true
@@ -3688,7 +3692,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
       end # if dict
 
       begin
-        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  Entry #{ Timecode.new( entry_point, edit_rate ) }  #{ asset_id.split( '-' ).first }  #{ asset.node_name }\t(#{ meta_report })"
+        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  Entry #{ Timecode.new( entry_point, edit_rate ) }  #{ options.full_ids ? asset_id : asset_id.split( '-' ).first }  #{ asset.node_name }#{ options.full_ids && asset.node_name.length < 10 ? "\t" : "" }\t(#{ meta_report })"
       rescue Exception => e
         errors << "#{ cpl_reel }: Duration #{ duration }: EditRate #{ edit_rate }: #{ e.message }"
         cpl_errors = true
