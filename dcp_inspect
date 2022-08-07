@@ -3833,7 +3833,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   elsif composition_picture_decomposition_levels.uniq.size == 1 and composition_picture_decomposition_levels.first == nil
     errors << "CPL #{ cpl_id }: Failed to read DecompositionLevels from picture essence. Should not happen"
     cpl_errors = true
-  else
+  elsif composition_picture_decomposition_levels.uniq.size != 0
     errors << "CPL #{ cpl_id }: Found inconsistent image DecompositionLevels values across the composition (#{ composition_picture_decomposition_levels.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). This will produce visual artefacts in reel transitions"
     cpl_errors = true
   end
@@ -3917,7 +3917,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   elsif composition_sound_channel_formats.uniq.size == 1 and composition_sound_channel_formats.first == nil
     errors << "CPL #{ cpl_id }: Failed to read sound ChannelFormat values from sound essence. Should not happen"
     cpl_errors = true
-  else
+  elsif composition_sound_channel_formats.uniq.size != 0
     errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback will fail completely"
     cpl_errors = true
   end
