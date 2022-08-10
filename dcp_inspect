@@ -1029,8 +1029,8 @@ class Timecode
     # Validate the passed atoms for the concrete framerate
     def validate_atoms!(hrs, mins, secs, frames, with_fps)
       case true
-        when hrs > 999
-          raise RangeError, "There can be no more than 999 hours, got #{hrs}"
+        when hrs > 99999
+          raise RangeError, "There can be no more than 99999 hours, got #{hrs}"
         when mins > 59
           raise RangeError, "There can be no more than 59 minutes, got #{mins}"
         when secs > 59
