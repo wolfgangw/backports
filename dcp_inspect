@@ -207,6 +207,7 @@ class Options
     options.audio_analysis = true
     options.validate = true
     options.as_asset_store = false
+    options.naming_hints = true
     options.verbosity = [ 'debug', 'dev' ]
     options.logfile = nil
     options.logfile_append = nil
@@ -237,6 +238,9 @@ BANNER
       end
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = true
+      end
+      opts.on( '--nn', '--no-naming-hints', 'Skip naming convention checks' ) do
+        options.naming_hints = false
       end
       opts.on( '-l', '--logfile path', String, 'Write full report to logfile at path' ) do |p|
         options.logfile = p
@@ -3964,19 +3968,24 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   report << "CPL #{ cpl_id }: Composition summary: " + [ [ :content_title_text, :type, :crypto, :spatiality, :aspect, :resolution, :picture_bitrate_avg, :duration, :edit_rate ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ', ' )
 
   # Naming convention
-  case composition_type
-  when MStr::AssetTypeInterop
-    naming_i3d_specs_required = true
-  when MStr::AssetTypeUndetermined
-    if cpl_referenced_assets_types.include?( MStr::AssetTypeInterop )
+  if options.naming_hints
+    case composition_type
+    when MStr::AssetTypeInterop
       naming_i3d_specs_required = true
+    when MStr::AssetTypeUndetermined
+      if cpl_referenced_assets_types.include?( MStr::AssetTypeInterop )
+        naming_i3d_specs_required = true
+      else
+        naming_i3d_specs_required = false
+      end
     else
       naming_i3d_specs_required = false
     end
+    hints, naming_matches, naming_misses = naming_convention_compliant?( cpl_id, content_title_text, is_stereoscopic, naming_i3d_specs_required, hints )
   else
-    naming_i3d_specs_required = false
+    naming_matches = Hash.new
+    naming_misses = Hash.new
   end
-  hints, naming_matches, naming_misses = naming_convention_compliant?( cpl_id, content_title_text, is_stereoscopic, naming_i3d_specs_required, hints )
 
   # Composition completeness
   if assets_status_list.include?( false )
