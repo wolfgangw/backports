@@ -2178,7 +2178,7 @@ end
 
 def digest_with_etabar( digest_algorithm, title, file, pbar_width, looks_like, options, logger )
   size = File.size file
-  chunksize = 4096
+  chunksize = 25000000 # had this at 4096 since forever which is ~30 times slower on my system -_-
   chunks = size / chunksize + ( size % chunksize > 0 ? 1 : 0 )
   chunks_per_percent = chunks / 100 + 1
 
