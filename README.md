@@ -4,7 +4,7 @@
 
 See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect) page for some of the things it can do. Also see [How to use Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools)' section for [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect).
 
-### Usage
+### Usage examples
 
         dcp_inspect --help
         dcp_inspect <path>
@@ -31,7 +31,7 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 - Deep-inspects compositions
 
-    This includes timeline integrity, composition type consistency and completeness checks.
+    This includes composition type consistency and completeness checks.
 
 - Deep-inspects DCSubtitle
 
@@ -45,15 +45,13 @@ See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-d
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included). Run the setup occasionally to keep up-to-date.
 
-If you prefer manual installation (you kind of don't) you will need the following:
+If you prefer manual installation you will need the following:
 
-- Ruby (1.9.3 series. The 1.8 series is not supported)
+- Ruby
 
 - [asdcplib and its cli tools](http://www.cinecert.com/asdcplib/)
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
-
-    For signature verification dcp_inspect requires a recent Nokogiri version with C14N support.
 
 - dcp_inspect requires xsd/ next to it.
 
@@ -78,5 +76,5 @@ Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecod
 
 Runs on linux and Mac OS boxes.
 
-Wolfgang Woehl 2011-2014
+Wolfgang Woehl 2011-2023
 
