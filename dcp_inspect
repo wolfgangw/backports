@@ -4118,7 +4118,7 @@ def dcp_inspect( options, arg )
   #
   am_candidates = find_assetmap_candidates( package_dir_tree, options )
   if am_candidates.empty?
-    errors << 'No Assetmap candidates found'
+    info << 'No Assetmap candidates found'
   else
     @logger.debug "Found #{ amount( 'Assetmap candidate', am_candidates ) }: #{ am_candidates.inspect }"
     @logger.debug "Found #{ amount( 'file', package_dir_tree ) } in total"
