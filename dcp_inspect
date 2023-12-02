@@ -3183,14 +3183,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
 
                     if @dcp_inspect_temp
                       if audio_stats[ asset_id ][ asset_snippet ]
-                        @logger.info "#{ cpl_reel }: Audio analysis: Seen #{ asset_id }:#{ entry_point }:#{ duration } before. Using previous result ✅"
+                        @logger.info "#{ cpl_reel }: Audio analysis: Seen #{ asset_id }:#{ entry_point }:#{ duration } before. Using previous result"
                       else
                         if key
                           audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, audio_channel_count, entry_point, duration, key )
                         elsif meta[ 'EncryptedEssence' ] == 'No'
                           @logger.cr "#{ cpl_reel }: Audio analysis ..."
                           audio_stats[ asset_id ][ asset_snippet ] = audio_characteristics( @dcp_inspect_temp, asset_file, audio_channel_count, entry_point, duration, key )
-                          @logger.info "#{ cpl_reel }: Audio analysis: Done ✅"
+                          @logger.info "#{ cpl_reel }: Audio analysis: Done"
                         end
                       end
                     else
