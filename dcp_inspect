@@ -882,6 +882,7 @@ def print_inspection_messages( inspection )
 end
 
 
+#
 # lib/timecode-ticks_tc.rb (Julik's timecode -- https://github.com/guerilla-di/timecode + parse_with_ticks)
 # Timecode is a convenience object for calculating SMPTE timecode natively. 
 # The promise is that you only have to store two values to know the timecode - the amount
@@ -891,11 +892,6 @@ end
 # You can calculate in timecode objects as well as with conventional integers and floats.
 # Timecode is immutable and can be used as a value object. Timecode objects are sortable.
 #
-# Here's how to use it with ActiveRecord (your column names will be source_tc_frames_total and tape_fps)
-#
-#   composed_of :source_tc, :class_name => 'Timecode',
-#     :mapping => [%w(source_tc_frames total), %w(tape_fps fps)]
-
 class Timecode
   VERSION = '1.0.0'
 
@@ -1267,6 +1263,7 @@ class Timecode
     @value ||= validate!
   end
 end # Timecode
+
 
 # TC helper: parse both hh:mm:ss:ttt and hh:mm:ss.sss TC formats used in DCSubtitle
 def parse_dcsubtitle_tc_string( tc_string, fps )
