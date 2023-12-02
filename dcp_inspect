@@ -4426,7 +4426,7 @@ def dcp_inspect( options, arg )
             # See e.g. dcp_2/V174* for a serial mismatch
             if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
               if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
-                errors << "PKL #{ pkl_id }: Signer serial mismatch: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
+                errors << "PKL #{ pkl_id }: Signer serial mismatch ❌: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
                 pkl_errors = true
                 @logger.debug errors.last
               end
@@ -4483,7 +4483,7 @@ def dcp_inspect( options, arg )
               # Check listed and actual asset size
               if size_listed
                 if size_listed != size_asset
-                  errors << "PKL #{ pkl_id }: Size mismatch: #{ id }: PKL: #{ size_listed } (#{ size_listed.to_k }) Asset: #{ size_asset } (#{ size_asset.to_k })"
+                  errors << "PKL #{ pkl_id }: Size mismatch ❌: #{ id }: PKL: #{ size_listed } (#{ size_listed.to_k }) Asset: #{ size_asset } (#{ size_asset.to_k })"
                   pkl_errors = true
                 end
                 package_size_listed += size_listed
@@ -4510,7 +4510,7 @@ def dcp_inspect( options, arg )
                         hash_check = Base64.encode64( hash_check ).chomp
                         if hash_listed != hash_check
                           eta.preserve_terminal_title_with_message( "Mismatch (#{ time_string( eta.elapsed ) })" )
-                          errors << "PKL #{ pkl_id }: Hash mismatch: #{ id }: PKL: #{ hash_listed } Asset: #{ hash_check }"
+                          errors << "PKL #{ pkl_id }: Hash mismatch ❌: #{ id }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                           pkl_errors = true
                         else
                           eta.preserve_terminal_title_with_message( "OK ✅ (#{ time_string( eta.elapsed ) })" )
