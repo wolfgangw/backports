@@ -7,9 +7,10 @@ See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-fr
 ### Usage examples
 
         dcp_inspect --help
-        dcp_inspect <path>
-        dcp_inspect <path> --no-hash
-        dcp_inspect <path> --as-asset-store --hash-limit <limit> --logfile <path>
+        dcp_inspect <path to directory>
+        dcp_inspect <path to directory> --no-hash --no-audio-analysis
+        dcp_inspect <path to directory> --nh --na
+        dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
 ### Installation
 
@@ -53,7 +54,7 @@ If you prefer manual installation you will need the following:
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
 
-- dcp_inspect requires xsd/ next to it.
+- [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) requires xsd/ next to it.
 
     Clone the whole repository to put everything in place:
 
