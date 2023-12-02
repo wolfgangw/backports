@@ -53,7 +53,7 @@ If you prefer manual installation you will need the following:
 
 - [Nokogiri, a ruby wrapper for libxml2](http://nokogiri.org/tutorials/installing_nokogiri.html)
 
-- dcp_inspect requires xsd/ next to it.
+- [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) requires xsd/ next to it.
 
     Clone the whole repository to put everything in place:
 
