@@ -4509,7 +4509,7 @@ def dcp_inspect( options, arg )
                         hash_check, eta = digest_with_etabar( digest_algorithm = 'sha1', title = etabar_title, file = asset_file, width = 20, looks_like = '[= ]', opts = options, logger = @logger )
                         hash_check = Base64.encode64( hash_check ).chomp
                         if hash_listed != hash_check
-                          eta.preserve_terminal_title_with_message( "Mismatch (#{ time_string( eta.elapsed ) })" )
+                          eta.preserve_terminal_title_with_message( "Mismatch ❌ (#{ time_string( eta.elapsed ) })" )
                           errors << "PKL #{ pkl_id }: Hash mismatch ❌: #{ id }: PKL: #{ hash_listed } Asset: #{ hash_check }"
                           pkl_errors = true
                         else
