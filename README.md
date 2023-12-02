@@ -7,9 +7,10 @@ See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-fr
 ### Usage examples
 
         dcp_inspect --help
-        dcp_inspect <path>
-        dcp_inspect <path> --no-hash
-        dcp_inspect <path> --as-asset-store --hash-limit <limit> --logfile <path>
+        dcp_inspect <path to directory>
+        dcp_inspect <path to directory> --no-hash --no-audio-analysis
+        dcp_inspect <path to directory> --nh --na
+        dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
 ### Installation
 
