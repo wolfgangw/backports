@@ -128,6 +128,10 @@ AppStartSeconds = Time.now
 # on a Windows system (it executed but the libxml infrastructure required for
 # schema validation did not work. Wip)
 #
+
+# ruby version and platform
+RubyVersionPlatform = [ RUBY_ENGINE, RUBY_VERSION, RUBY_PLATFORM ].join( ' ' )
+
 # Exit codes
 DCP_OK = 0
 DCP_ERROR = 1
@@ -162,39 +166,54 @@ PictureBitrateMaxDCISafetyMargin = 2.0 # percent
 PictureBitrateMaxDCISafe = ( PictureBitrateMaxDCI / 100 * ( 100 - PictureBitrateMaxDCISafetyMargin ) ).round( 2 )
 PictureBitrateMaxHFR = 400.0 # Mb/s
 
-# Internal
-[
+# Required libs
+required_libs = [
   'optparse',
   'ostruct',
   'pathname',
   'shellwords',
   'openssl',
-  'base64',
   'stringio',
   'fileutils',
   'open3',
-].each do |lib|
+]
+if RUBY_VERSION < '3.4'
+  required_libs << 'base64'
+end
+missing_libs = []
+required_libs.each do |lib|
   begin
     require lib
   rescue LoadError => e
     puts e.inspect
-    exit LIB_LOAD_ERROR
+    missing_libs << lib
   end
 end
-# External
-[
+if missing_libs.any?
+  puts "Ruby installation (#{ RubyVersionPlatform }) is missing required libraries (#{ missing_libs.join( ', ' ) })"
+  exit LIB_LOAD_ERROR
+end
+# Required gems
+required_gems = [
   'nokogiri',
-  'ttfunk'
-].each do |gem|
+  'ttfunk',
+]
+if RUBY_VERSION >= '3.4'
+  required_gems << 'base64'
+end
+missing_gems = []
+required_gems.each do |gem|
   begin
     require gem
   rescue LoadError => e
     puts e.inspect
-    puts "Please run 'gem install #{ gem }' (without the quotes) and try again"
-    exit GEM_LOAD_ERROR
+    missing_gems << gem
   end
 end
-
+if missing_gems.any?
+  puts "Please run 'gem install #{ missing_gems.join( ' ' ) }' (without the quotes) and try again"
+  exit GEM_LOAD_ERROR
+end
 
 # lib/options.rb
 class Options
@@ -4759,10 +4778,6 @@ begin
 
   # asdcplib version
   ASDCPVersion = MxfTools.asdcplib_version.join '.'
-
-
-  # ruby version and platform
-  RubyVersionPlatform = [ RUBY_ENGINE, RUBY_VERSION, RUBY_PLATFORM ].join( ' ' )
 
 
   @logger.debug "#{ AppName } #{ AppVersion } (asdcplib #{ ASDCPVersion }, #{ RubyVersionPlatform }): #{ args }"
