@@ -32,14 +32,11 @@ AppStartSeconds = Time.now
 #
 #   dcp_inspect --help
 #   dcp_inspect /path/to/dir
-#   dcp_inspect /path/to/dir --no-hash
-#
 #
 # Installation:
 #
 #   See https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki
 #   for an easy-to-use setup script. This will install everything required.
-#
 #
 # Features:
 #
@@ -66,54 +63,22 @@ AppStartSeconds = Time.now
 #
 # See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect).
 #
-#
 # Manual installation / Requirements:
 #
 #   If you prefer manual installation you will need the following:
 #
 #  - $ git clone git://github.com/wolfgangw/backports.git
 #  - asdcplib and its cli tools (http://www.cinecert.com/asdcplib/)
-#  - Nokogiri, a ruby wrapper for libxml2
-#     (http://nokogiri.org/tutorials/installing_nokogiri.html)
-#     For signature verification dcp_inspect requires a recent
-#     (post 2012.01.11) Nokogiri version with C14N support.
+#  - Nokogiri, a ruby wrapper for libxml2 (gem install nokogiri)
 #  - dcp_inspect requires xsd/ next to it.
-#     Clone the whole repository to put everything in place:
-#       $ git clone git://github.com/wolfgangw/backports.git
 #
 #   Run
 #     $ git pull
 #   in backports to keep up-to-date.
 #
 #
-# And then what?
-#
-#   - If you get errors go bug someone:
-#
-#       Either me (https://github.com/wolfgangw/backports/issues) if you
-#       suspect dcp_inspect to report a false positive or negative
-#
-#       or the author/vendor of the DCP's authoring app.
-#
-#       We all write bugs all the time and your feedback is much appreciated.
-#
-#   - If you get hints think about bugging someone. Try and make an informed
-#     decision whether the issues hinted at might lead to trouble in the field.
-#     Some hints will recommend fixing the issue (e.g. empty Text or Image
-#     elements in DCSubtitle). Other hints will be purely informational
-#
-#   - If all you get is info and 0 errors:
-#
-#       Either your package is perfectly ok
-#
-#       or you might still run into issues on a system in the field
-#
-#       or you ran into a dcp_inspect bug :) Again, get in touch if you suspect
-#       the latter (https://github.com/wolfgangw/backports/issues).
-#
-#
 # Thanks to the Nokogiri team. You're a wicked crew.
-# Thanks to Julik for his Timecode library
+# Thanks to Julik for his Timecode library.
 #   https://github.com/guerilla-di/timecode
 # Thanks to Mattias Mattsson for DCSubtitle.v1.mattsson.xsd and
 #   great feedback from Göteborg International Film Festival.
@@ -123,11 +88,8 @@ AppStartSeconds = Time.now
 #   which clearly exceeded what can safely be called a gesture.
 #   Appreciated and you rock.
 # Thanks to Adrianne Jorge for a great user report from Sundance and Sarasota.
-#
-# Tested on linux and Mac OS boxes. Thanks to Terrence Meiczinger for trying
-# on a Windows system (it executed but the libxml infrastructure required for
-# schema validation did not work. Wip)
-#
+# Thanks to Terrence Meiczinger.
+# 
 
 # ruby version and platform
 RubyVersionPlatform = [ RUBY_ENGINE, RUBY_VERSION, RUBY_PLATFORM ].join( ' ' )
