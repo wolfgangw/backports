@@ -3802,15 +3802,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, errors, hints, info, o
   # Check consistency of decomposition levels in picture essence
   if composition_picture_decomposition_levels.uniq.size == 1 and composition_picture_decomposition_levels.first != nil
     # we're good
-  elsif composition_picture_decomposition_levels.size == 0
-    errors << "CPL #{ cpl_id }: No picture essence present ❌"
-    cpl_errors = true
   elsif composition_picture_decomposition_levels.uniq.size == 1 and composition_picture_decomposition_levels.first == nil
     errors << "CPL #{ cpl_id }: Failed to read DecompositionLevels from picture essence. Should not happen ❌"
     cpl_errors = true
   else
-    errors << "CPL #{ cpl_id }: Found inconsistent image DecompositionLevels values across the composition (#{ composition_picture_decomposition_levels.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). This will produce visual artefacts in reel transitions ❌"
-    cpl_errors = true
+    unless composition_picture_decomposition_levels.size == 0 # Supplemental/VF/External
+      errors << "CPL #{ cpl_id }: Found inconsistent image DecompositionLevels values across the composition (#{ composition_picture_decomposition_levels.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). This will produce visual artefacts in reel transitions ❌"
+      cpl_errors = true
+    end
   end
 
   # Set up composition_picture_aspect_ratio
