@@ -4611,7 +4611,7 @@ def dcp_inspect( options, arg )
 
             composition_summary, report, errors, hints, info = cpl_inspect_xml( xml, dictionary, audio_stats, @package_dir, composition_summaries, errors, hints, info, options )
           else
-            errors << "PKL listed CPL is not XML: #{ cpl_file }: #{ cpl_id }"
+            errors << "PKL listed CPL is not XML ❌: #{ cpl_file }: #{ cpl_id }"
           end
         else
           report << "CPL file missing ❌: #{ cpl_file }"
