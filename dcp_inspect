@@ -3917,15 +3917,17 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     composition_summary[ :picture_bitrate_avg ] = "Avg [NaN Mb/s]"
   end
 
-  # Check consistency of ChannelFormat
+  # Check consistency of channel formats in sound essence
   if composition_sound_channel_formats.uniq.size == 1 and composition_sound_channel_formats.first != nil
     # we're good
   elsif composition_sound_channel_formats.uniq.size == 1 and composition_sound_channel_formats.first == nil
     errors << "CPL #{ cpl_id }: Failed to read sound ChannelFormat values from sound essence. Should not happen"
     cpl_errors = true
   else
-    errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback will fail completely"
-    cpl_errors = true
+    unless composition_sound_channel_formats.size == 0 # Supplemental/VF/External
+      errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback will fail completely"
+      cpl_errors = true
+    end
   end
 
   # Set up composition_sound_channel_count
