@@ -188,6 +188,7 @@ class Options
     options.audio_analysis = true
     options.validate = true
     options.as_asset_store = false
+    options.follow_symlinks = false
     options.verbosity = [ 'debug', 'dev' ]
     options.logfile = nil
     options.logfile_append = nil
@@ -218,6 +219,9 @@ BANNER
       end
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = true
+      end
+      opts.on( '--symlinks', 'Follow symlinks when searching for files' ) do
+        options.follow_symlinks = true
       end
       opts.on( '-l', '--logfile path', String, 'Write full report to logfile at path' ) do |p|
         options.logfile = p
@@ -4078,10 +4082,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   return composition_summary, report, errors, hints, info
 end # cpl_inspect_xml
 
-def dir_tree( arg )
+def dir_tree( arg, follow_symlinks )
   package_dir_tree = Array.new
   begin
-    Dir.chdir( arg ) { |d| package_dir_tree = Dir[ "**/*" ] }
+    Dir.chdir( arg ) { |d| package_dir_tree = Dir[ follow_symlinks ? "**{,/*/**}/*" : "**/*" ] }
     #
     # Alternatively consider
     #
@@ -4126,7 +4130,7 @@ def dcp_inspect( options, arg )
   # collect all files dangling below arg
   #
   @package_dir = arg
-  package_dir_tree = dir_tree( @package_dir )
+  package_dir_tree = dir_tree( @package_dir, options.follow_symlinks )
 
   #
   # Find files called what Assetmap(s) would be called.
