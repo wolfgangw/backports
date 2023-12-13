@@ -2287,6 +2287,7 @@ def errors_signature_verification( errors, error_status, signature_result, id, f
   return errors, error_status
 end
 
+# FIXME
 # returns xml or false.
 # in addition to xml all kinds of stuff will be examined here
 # hence the hoopla to skip expected errors from non-xml.
@@ -4372,8 +4373,9 @@ def dcp_inspect( options, arg )
   #
   if options.as_asset_store
     dict_tmp = Array.new << Hash.new
-    dict.map { |d| dict_tmp.first.merge!( d ) { |k, v1, v2| hints << "Experimental option --as-asset-store: Duplicate key: #{ k } => #{ v1 == v2 ? 'v1 == v2' : "\n\t\tv1: #{ v1 || 'nil' }\n\t\tv2: #{ v2 || 'nil' }" }"; v1 || v2 } }
-    dict = dict_tmp
+    # dict.map { |d| dict_tmp.first.merge!( d ) { |k, v1, v2| hints << "Experimental option --as-asset-store: Duplicate key: #{ k } => #{ v1 == v2 ? 'v1 == v2' : "\n\t\tv1: #{ v1 || 'nil' }\n\t\tv2: #{ v2 || 'nil' }" }"; v1 || v2 } }
+    dict.map { |d| dict_tmp.first.merge!( d ) { |k, v1, v2| v1 || v2 } }
+    dict = dict_tmp 
     pkls = Array.new << pkls.flatten
   end
 
@@ -4745,6 +4747,7 @@ end
 #
 # Prepare for main
 #
+
 begin
 
   options = Options.parse( ARGV )
