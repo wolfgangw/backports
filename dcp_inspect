@@ -1852,8 +1852,10 @@ class DC_Signature_Verification
     sig_algo = doc_signature_method_algorithm( doc, sig_ns, prefix )
     sig_digest_algo = sig_algo.split( 'rsa-' ).last
     signature_value_doc = extract_signature_value( doc, sig_ns, prefix )
-    if signature_value_doc.size != pub_k.n.to_i.size
-      @messages << "Invalid signature ❌: sig_doc: #{ signature_value_doc.size } octets (RSA modulus: #{ pub_k.n.to_i.size } octets)"
+    signature_value_doc_octets = signature_value_doc.size
+    pub_k_octets = pub_k.n.to_i.size
+    if signature_value_doc_octets != pub_k_octets
+      @messages << "Invalid signature ❌: decoded SignatureValue has #{ signature_value_doc.size } octets (should have #{ pub_k.n.to_i.size } RSA modulus octets)"
       return false
     end
     signed_info_c14n_xml = signed_info_c14n( doc, sig_ns, prefix )
