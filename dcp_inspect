@@ -2648,8 +2648,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     if cma
       report << 'CompositionMetadataAsset:'
       cma.each do |e|
-        @logger.dev "                  #{ e.node_name }: #{ e.text }"
-        report << "                  #{ e.node_name }: #{ e.text }"
+        @logger.dev "                  #{ e.node_name }: #{ e.text.strip.gsub( /\n\s*/, ' ' ) }"
+        report << "                  #{ e.node_name }: #{ e.text.strip.gsub( /\n\s*/, ' ' ) }"
       end
     end
   end
