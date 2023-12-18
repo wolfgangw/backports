@@ -3589,7 +3589,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     else
       reel_duration = durations.first / edit_rates.min # seconds. gets it done but ugh
       total_duration += durations.first # frames
-      puts "----- reel_duration #{reel_duration.inspect} durations #{durations.inspect}"
       if edit_rates.min > 0 and reel_duration < 1
         reels_report << "\tReel duration less than 1 second ❌"
         errors << "#{ cpl_reel }: Reel duration less than 1 second (#{ "%0.3f" % reel_duration } seconds, #{ amount( 'frame', durations.first.to_i ) }@#{ edit_rates.min } fps) ❌"
@@ -3676,7 +3675,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   elsif is_stereoscopic.uniq.size == 2
     composition_summary[ :spatiality ] = '2D/3D'
     is_stereoscopic = true
-    errors << "CPL #{ cpl_id }: " + report.last
+    errors << "CPL #{ cpl_id }: " + report.last # ? FIXME
     cpl_errors = true
   end
 
@@ -3815,6 +3814,12 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       end
       cpl_reels_references_complete << false
     end
+  end
+
+  # Fire off a hint wrt Interop composition and non-24 fps composition edit rate
+  if composition_type = 'Interop' && composition_edit_rate != 24.0
+    report << "Interop composition with non-24 fps edit rate (#{ composition_edit_rate })"
+    hints << "CPL #{ cpl_id }: Interop composition with non-24 fps edit rate (#{ composition_edit_rate }). Playback may fail on very old legacy systems"
   end
 
   # composition summary one-liner
