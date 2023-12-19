@@ -3817,7 +3817,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   end
 
   # Fire off a hint wrt Interop composition and non-24 fps composition edit rate
-  if composition_type = 'Interop' && composition_edit_rate != 24.0
+  if composition_type == 'Interop' && composition_edit_rate != 24.0
     report << "Interop composition with non-24 fps edit rate (#{ composition_edit_rate })"
     hints << "CPL #{ cpl_id }: Interop composition with non-24 fps edit rate (#{ composition_edit_rate }). Playback may fail on very old legacy systems"
   end
