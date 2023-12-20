@@ -4408,7 +4408,7 @@ def dcp_inspect( options, arg )
   end
 
 
-  # Info summary block
+  # prep for Info summary block
   pkls = pkls.flatten
   cpls = cpls.flatten
   execution_time_seconds = Time.now - AppStartSeconds
@@ -4417,6 +4417,11 @@ def dcp_inspect( options, arg )
   pkls_signature_info = "#{ @signed_pkls_count } signed#{ @signed_pkls_count > 0 ? '/' + @signed_pkls_verified_count.to_s + ' verified' : '' }"
   cpls_signature_info = "#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }"
   cpls_encryption_info = "#{ cpls.size - @encrypted_compositions > 0 ? ( cpls.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
+
+  # Info summary block
+  composition_summaries.each do |composition_summary|
+    info << composition_summary_oneliner( composition_summary )
+  end
   info << "#{ AppName } #{ AppVersion } (asdcplib #{ ASDCPVersion }, #{ RubyVersionPlatform }) on #{ RunDatetime_friendly } (#{ execution_time })"
   info << "Inspected: #{ Pathname( arg ).realpath }"
   info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
@@ -4425,9 +4430,6 @@ def dcp_inspect( options, arg )
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
   info << 'Schema checks skipped' unless options.validate
   info << 'Audio analysis skipped' unless options.audio_analysis
-  composition_summaries.each do |composition_summary|
-    info << composition_summary_oneliner( composition_summary )
-  end
   info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) } (#{ pkls_signature_info }), #{ amount( 'Composition', cpls ) } (#{ cpls_signature_info }, #{ cpls_encryption_info }"
   info << "#{ amount( 'Error', errors ) }#{ errors.size == 0 ? ' ✅' : ' ❌' }, #{ amount( 'Hint', hints ) }"
 
