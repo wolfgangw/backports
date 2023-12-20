@@ -194,8 +194,8 @@ class Options
     opts = OptionParser.new do |opts|
       opts.banner = <<BANNER
 #{ AppName } #{ AppVersion }
-Usage: #{ AppName } [options] <location>
-
+Usage: #{ AppName } [options] <path>
+ 
 BANNER
       opts.on( '--nh', '--no-hash', 'No asset hash checks' ) do
         options.check_hashes = false
@@ -4660,7 +4660,8 @@ begin
     @logger.info "No volume or directory given. See #{ AppName } --help"
     exit NO_ARG
   elsif args.size > 1
-    @logger.info "Too many arguments. See #{ AppName } --help"
+    @logger.info "Too many arguments: #{ args.inspect }"
+    @logger.info "#{ AppName } wants 1 path/argument. See #{ AppName } --help"
     exit TOO_MANY_ARGS
   else
     @logger.info "Not a volume or directory. See #{ AppName } --help"
