@@ -3866,7 +3866,7 @@ def find_assetmap_candidates( package_dir )
     am_candidates, err, status = Open3.capture3( "fdfind --type f --hidden --no-ignore '^ASSETMAP$|^ASSETMAP.xml$' #{ package_dir }" )
     am_candidates = am_candidates.split( "\n" )
   rescue Exception => e
-    @logger.debug e.message
+    @logger.info e.message
     exit FILE_ACCESS_ERROR
   end
   return am_candidates
