@@ -3863,7 +3863,7 @@ end # cpl_inspect_xml
 
 def find_assetmap_candidates( package_dir )
   begin
-    am_candidates, err, status = Open3.capture3( "fdfind ASSETMAP #{ package_dir }" )
+    am_candidates, err, status = Open3.capture3( "#{ @fdfind } ASSETMAP #{ package_dir }" )
     am_candidates = am_candidates.split( "\n" )
   rescue Exception => e
     @logger.info e.message
@@ -4528,7 +4528,12 @@ begin
 
   # Check required tools
   required_command_not_found = false
-  required_commands = [ 'asdcp-info', 'asdcp-unwrap', 'kmuuidgen', 'fdfind' ]
+  if RubyVersionPlatform =~ /linux/
+    @fdfind = 'fdfind'
+  elsif RubyVersionPlatform =~ /darwin/
+    @fdfind = 'fd'
+  end
+  required_commands = [ 'asdcp-info', 'asdcp-unwrap', 'kmuuidgen', @fdfind ]
   required_commands << 'sox' if options.audio_analysis
   required_commands.flatten.each do |command|
     if ! command_exists? command
@@ -4536,7 +4541,9 @@ begin
       required_command_not_found = true
     end
   end
-  exit REQUIRED_COMMAND_NOT_FOUND if required_command_not_found
+  if required_command_not_found
+    exit REQUIRED_COMMAND_NOT_FOUND
+  end
 
 
   # asdcplib version
