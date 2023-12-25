@@ -4466,7 +4466,6 @@ def graceful_shutdown( options, args, crash = false )
   if crash
     dcp_inspect_crashed_get_in_touch
   end
-  exit GRACEFUL_SHUTDOWN
 end
 
 
