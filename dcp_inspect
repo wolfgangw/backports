@@ -3893,7 +3893,10 @@ def dcp_inspect( options, arg )
   if am_candidates.empty?
     info << 'No Assetmap candidates found'
   else
-    @logger.debug "Found #{ amount( 'Assetmap candidate', am_candidates ) } ✅: #{ am_candidates.inspect }"
+    @logger.debug "Found #{ amount( 'Assetmap candidate', am_candidates ) } ✅:"
+    am_candidates.each do |am_candidate|
+      @logger.debug am_candidate
+    end
   end
 
   # Check XML for Assetmap content
@@ -4540,7 +4543,8 @@ begin
   ASDCPVersion = MxfTools.asdcplib_version.join '.'
 
 
-  @logger.debug "#{ AppName } #{ AppVersion } (asdcplib #{ ASDCPVersion }, #{ RubyVersionPlatform }): #{ args }"
+  # Hello
+  @logger.debug "#{ AppName } #{ AppVersion } (asdcplib #{ ASDCPVersion }, #{ RubyVersionPlatform })"
 
 
   # Check Nokogiri C14N support
@@ -4600,7 +4604,7 @@ begin
     if options.audio_analysis or options.image_analysis
       @dcp_inspect_temp = Ramdisk.new( 2048 )
       @logger.debug "Image/audio analysis: Setting up temp location at #{ @dcp_inspect_temp.path }"
-      @logger.debug 'Image analysis not yet implemented' if options.image_analysis
+      @logger.debug 'Image analysis not implemented yet' if options.image_analysis
     end
 
     # autolog?
@@ -4609,6 +4613,8 @@ begin
         if ! confirm_or_create( ENV[ 'DCP_INSPECT_DIR' ] )
           @logger.info "Cannot write to #{ ENV[ 'DCP_INSPECT_DIR' ].inspect }"
           exit DCP_INSPECT_DIR_NOT_WRITABLE
+        else
+          @logger.info "Will write autolog to #{ ENV[ 'DCP_INSPECT_DIR' ] }"
         end
       else
         @logger.info "Autolog requested but env DCP_INSPECT_DIR is not set"
@@ -4622,6 +4628,8 @@ begin
       if File.exist?( options.logfile )
         puts " Requested logfile #{ options.logfile.inspect } exists. Will #{ options.overwrite_logfile ? '' : 'not ' }overwrite"
         exit LOGFILE_EXISTS_ERROR unless options.overwrite_logfile
+      else
+        @logger.info "Will write logfile to #{ options.logfile }"
       end
       if ! confirm_or_create( File.dirname options.logfile )
         puts " Cannot write requested logfile at #{ options.logfile.inspect }. Please specify another location"
@@ -4634,6 +4642,9 @@ begin
         exit LOGFILE_WRITE_ERROR
       end
     end
+
+    # Searching at
+    @logger.info "Searching Assetmaps at #{ args[ 0 ] }"
 
     # Inspection
     inspection = dcp_inspect( options, args[ 0 ] )
