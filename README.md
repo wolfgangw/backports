@@ -1,10 +1,10 @@
-## dcp_inspect
+# dcp_inspect
 
 [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) is a tool for deep inspection and validation of digital cinema packages (DCP, SMPTE and Interop). This includes integrity checks, asset inspection, schema validation, signature and certificate verification and composition summarization. Basically anyone who needs to establish the validity of a digital cinema package can put [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) to good use.
 
 See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect) page for some of the things it can do. Also see [How to use Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools)' section for [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect).
 
-### Usage examples
+# Usage examples
 
         dcp_inspect --help
         dcp_inspect <path to directory>
@@ -12,11 +12,11 @@ See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-fr
         dcp_inspect <path to directory> --nh --na
         dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
-### Installation
+# Installation
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required.
 
-### Features
+# Features
 
 - Will find and check all DCPs in a filesystem tree
 
@@ -36,13 +36,11 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
 - Deep-inspects DCSubtitle
 
-- Checks a composition's naming and cross-checks with metadata and asset properties
-
 - Reports in detail all errors encountered
 
-See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect).
+See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect). See [What's missing](#whats-missing).
 
-### Requirements
+# Requirements
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required (batteries included). Run the setup occasionally to keep up-to-date.
 
@@ -66,16 +64,21 @@ Run
 
 in backports to keep up-to-date.
 
-### Todo
+# What's missing
 
+- Composition metadata (CMA)
+- Cross-check of updated naming convention with CMA / claimed asset properties / actual asset properties
+- Deep inspection of j2c markers/codestreams
 - Deep inspection of SMPTE timed text trackfiles
+- Better audio analysis wrt loudness
 - Assetmap options chunks, offsets, volume indices
-- Marker lists
+- Markers
 - Check Signer.X509IssuerSerial issuer name
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
+Thanks to all the awesome people who tested, provided test materials, discussed and contributed. `dcp_inspect` wouldn't be a thing without you.
 
-Runs on linux and Mac OS boxes.
+Runs on linux, macOS and windows (WSL) boxes.
 
 Wolfgang Woehl 2011-2023
 
