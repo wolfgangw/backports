@@ -75,6 +75,8 @@ in backports to keep up-to-date.
 - Markers
 - Check Signer.X509IssuerSerial issuer name
 
+# Thank you
+
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
 Thanks to all the awesome people who tested, provided test materials, discussed and contributed. `dcp_inspect` wouldn't be a thing without you.
 
