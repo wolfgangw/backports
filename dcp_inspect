@@ -2050,6 +2050,7 @@ class Eta
 end # Eta
 
 
+# FIXME ugh, this seems clonky
 def command_exists?( command )
   ENV[ 'PATH' ].split( File::PATH_SEPARATOR ).any? { |d| File.exist? File.join( d, command ) }
 end
