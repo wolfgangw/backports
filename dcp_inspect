@@ -3155,7 +3155,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                     first_time_in_text = '[No child element]'
                     hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: First Subtitle element has neither Text nor Image"
                   else
-                    first_time_in_text = truncate( nodeset.first.text.gsub( /^\s+|\s+$/, '' ), 3 ) # first line
+                    first_time_in_text = truncate( nodeset.first.text.strip, 3 ) # first line
                   end
                   subtitles[ 1 .. -1 ].each do |sub|
                     if first_time_in < sub.attributes[ 'TimeIn' ].value
@@ -3172,7 +3172,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                     last_time_out_text = '[No child element]'
                     hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last Subtitle element has neither Text nor Image"
                   else
-                    last_time_out_text = truncate( nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 )
+                    last_time_out_text = truncate( nodeset.last.text.strip, 3 )
                   end
                   subtitles.reverse[ 1 .. -1 ].each do |sub|
                     if last_time_out > sub.attributes[ 'TimeOut' ].value
@@ -3184,7 +3184,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                       last_time_out_text = '[No child element]'
                       hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last to-be-displayed Subtitle element has neither Text nor Image"
                     else
-                      last_time_out_text = truncate( nodeset.last.text.gsub( /^\s+|\s+$/, '' ), 3 ) # last line
+                      last_time_out_text = truncate( nodeset.last.text.strip, 3 ) # last line
                     end
                   end
 
@@ -3262,7 +3262,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                       case node.name
                       when 'Text'
                         text_elements = true
-                        text_elements_values << { :number => spot_number, :text => node.text.gsub( /^\s+|\s+$/, '' ) }
+                        text_elements_values << { :number => spot_number, :text => node.text.strip }
                       when 'Image'
                         image_elements = true
                         unless node.text.empty? # Checked above
@@ -3346,7 +3346,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                         hints << "#{ cpl_reel }: DCSubtitle: Found multiple LoadFont elements. Playback will use 1st: #{ load_font_uri }"
                       end
                     end
-                  end
+                  end # text_elements
 
                   # Check LoadFont / Font Id dependency
                   # See https://github.com/wolfgangw/digital_cinema_tools_distribution/issues/15 for discussion
