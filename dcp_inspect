@@ -2403,8 +2403,8 @@ def build_signer_issuer_short_report( xml, signature_result, sig_info, type_moni
     signer_not_after_dt = time_to_datetime( signature_result.crypto.context[0].not_after )
     issuer_not_before_dt = time_to_datetime( signature_result.crypto.context[1].not_before )
     issuer_not_after_dt = time_to_datetime( signature_result.crypto.context[1].not_after )
-    report << "#{ type_moniker } Signer:       (#{ datetime_friendly_mmmddyyyy signer_not_before_dt }-#{ datetime_friendly_mmmddyyyy signer_not_after_dt }) #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
-    report << "#{ type_moniker } Issuer:       (#{ datetime_friendly_mmmddyyyy issuer_not_before_dt }-#{ datetime_friendly_mmmddyyyy issuer_not_after_dt }) #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
+    report << "#{ type_moniker } Signer:        (#{ datetime_friendly_mmmddyyyy signer_not_before_dt }-#{ datetime_friendly_mmmddyyyy signer_not_after_dt }) #{ sig_info[ :signer_name ] }" if sig_info[ :signer_name ]
+    report << "#{ type_moniker } Signer Issuer: (#{ datetime_friendly_mmmddyyyy issuer_not_before_dt }-#{ datetime_friendly_mmmddyyyy issuer_not_after_dt }) #{ sig_info[ :signer_issuer_name ] }" if sig_info[ :signer_issuer_name ]
   else # should not happen
     report = []
   end
