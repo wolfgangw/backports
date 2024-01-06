@@ -3956,7 +3956,7 @@ def dcp_inspect( options, arg )
   unless am_candidates.empty?
     am_candidates_tmp = am_candidates.dup
     am_candidates_rejects = Array.new
-    
+
     am_candidates.each do |am_candidate|
       am_file = package am_candidate
       error_status = false
