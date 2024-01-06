@@ -3915,9 +3915,15 @@ end # cpl_inspect_xml
 
 
 def find_assetmap_candidates( package_dir )
+  am_candidates = Array.new
   begin
-    am_candidates, err, status = Open3.capture3( "#{ @fdfind } ASSETMAP '#{ package_dir }'" )
-    am_candidates = am_candidates.split( "\n" ).sort_by( &:downcase )
+    IO.popen( "#{ @fdfind } ASSETMAP '#{ package_dir }' 2> /dev/null" ) do |io|
+      while ( am_candidate = io.gets ) do
+        am_candidates << am_candidate.chomp
+        @logger.debug am_candidate.chomp
+      end
+    end
+    am_candidates.sort_by!( &:downcase )
   rescue Exception => e
     @logger.info e.message
     exit FILE_ACCESS_ERROR
@@ -3943,19 +3949,16 @@ def dcp_inspect( options, arg )
   # Don't assume they're actually Assetmaps before checking.
   #
   am_candidates = find_assetmap_candidates( @package_dir )
+  am_candidates_rejects = Array.new
   if am_candidates.empty?
     info << 'No Assetmap candidates found'
   else
     @logger.debug "Found #{ amount( 'Assetmap candidate', am_candidates ) } ✅:"
-    am_candidates.each do |am_candidate|
-      @logger.debug am_candidate
-    end
   end
 
   # Check for Assetmap content
   unless am_candidates.empty?
     am_candidates_tmp = am_candidates.dup
-    am_candidates_rejects = Array.new
 
     am_candidates.each do |am_candidate|
       am_file = package am_candidate
