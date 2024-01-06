@@ -3932,7 +3932,6 @@ def dcp_inspect( options, arg )
   siginfo = Array.new
   info = Array.new
   composition_summaries = Array.new
-  hints << 'Schema checks were skipped' unless options.validate
 
   #
   # collect all files dangling below arg
@@ -3956,6 +3955,8 @@ def dcp_inspect( options, arg )
   # Check for Assetmap content
   unless am_candidates.empty?
     am_candidates_tmp = am_candidates.dup
+    am_candidates_rejects = Array.new
+    
     am_candidates.each do |am_candidate|
       am_file = package am_candidate
       error_status = false
@@ -3977,7 +3978,14 @@ def dcp_inspect( options, arg )
 
       else
         @logger.debug "Assetmap candidate: #{ am_file }: Not XML"
+        am_candidates_rejects << am_candidate
         am_candidates_tmp.delete( am_candidate )
+      end
+    end
+
+    if am_candidates_rejects.any?
+      am_candidates_rejects.each do |am_candidates_reject|
+        @logger.debug "Not AM: #{ am_candidates_reject }"
       end
     end
     am_candidates = am_candidates_tmp.dup
@@ -4239,7 +4247,7 @@ def dcp_inspect( options, arg )
       end
     end
   end
-  @logger.debug ''
+  @logger.debug '' unless pkls.empty?
 
   # Process all PackingLists
   cpls = Array.new
@@ -4476,7 +4484,7 @@ def dcp_inspect( options, arg )
       end
     end
   else
-    @logger.info 'Found no compositions'
+    @logger.info 'Found 0 Compositions'
   end
   @logger.debug ''
 
@@ -4516,20 +4524,27 @@ def dcp_inspect( options, arg )
   cpls_signature_info = "#{ @signed_cpls_count } signed#{ @signed_cpls_count > 0 ? '/' + @signed_cpls_verified_count.to_s + ' verified' : '' }"
   cpls_signature_info += ' ❌' unless @signed_cpls_verified_count == @signed_cpls_count
   cpls_encryption_info = "#{ cpls.size - @encrypted_compositions > 0 ? ( cpls.size - @encrypted_compositions ).to_s + ' plaintext/' : '' }#{ amount( 'KDM', @encrypted_compositions ) } required)"
+  am_info =  "#{ amount( 'Assetmap', am_files ) }#{ am_candidates_rejects.any? ? ' (' + amount( 'candidate', am_files.size + am_candidates_rejects.size ) + '/' + amount( 'reject', am_candidates_rejects ) + ')' : '' }"
+  pkl_info =  "#{ amount( 'Package', pkls ) } (#{ pkls_signature_info })"
+  cpl_info =  "#{ amount( 'Composition', cpls ) } (#{ cpls_signature_info }, #{ cpls_encryption_info }"
 
   # Info summary block
   composition_summaries.each do |composition_summary|
     info << composition_summary_oneliner( composition_summary )
   end
   info << "#{ AppName } #{ AppVersion } (asdcplib #{ ASDCPVersion }, #{ RubyVersionPlatform }) on #{ RunDatetime_friendly } (#{ execution_time })"
-  info << "Inspected: #{ Pathname( arg ).realpath }"
+  info << "Inspected #{ Pathname( arg ).realpath }"
   info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
-  info << 'Hash checks skipped' if options.check_hashes == false
+  info << 'Hash checks skipped' if ( options.check_hashes == false && pkls.size > 0 )
   info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
-  info << 'Schema checks skipped' unless options.validate
-  info << 'Audio analysis skipped' unless options.audio_analysis
-  info << "Found #{ amount( 'Assetmap', am_files ) }, #{ amount( 'Package', pkls ) } (#{ pkls_signature_info }), #{ amount( 'Composition', cpls ) } (#{ cpls_signature_info }, #{ cpls_encryption_info }"
+  if options.validate == false
+    info << 'Schema checks skipped' unless am_files.empty?
+  end
+  if options.audio_analysis == false
+    info << 'Audio analysis skipped' unless cpls.empty?
+  end
+  info << 'Found ' + [ am_info, pkl_info, cpl_info ].join( ', ' )
   info << "#{ amount( 'Error', errors ) }#{ errors.size == 0 ? ' ✅' : ' ❌' }, #{ amount( 'Hint', hints ) }"
 
   return { :errors => errors, :hints => hints, :siginfo => siginfo, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
