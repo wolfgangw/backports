@@ -1,8 +1,8 @@
 # dcp_inspect
 
-[dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) is a tool for deep inspection and validation of digital cinema packages (DCP, SMPTE and Interop). This includes integrity checks, asset inspection, schema validation, signature and certificate verification and composition summarization. Basically anyone who needs to establish the validity of a digital cinema package can put [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) to good use.
+[dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) is a tool for deep inspection and validation of digital cinema packages (DCP, SMPTE and Interop). This includes integrity checks, asset inspection, schema validation, signature verification and certificate checks, and composition summarization. Basically anyone who needs to establish the validity of a digital cinema package can put [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect) to good use.
 
-See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect) page for some of the things it can do. Also see [How to use Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools)' section for [dcp_inspect](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools#wiki-dcp-inspect).
+See the [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-dcp_inspect) page for some of the things it can do. Also see [How to use Digital Cinema Tools](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/How-to-use-Digital-Cinema-Tools).
 
 # Usage examples
 
@@ -78,7 +78,7 @@ in backports to keep up-to-date.
 # Thank you
 
 Thanks to Julik for his Timecode library (https://github.com/guerilla-di/timecode).
-Thanks to all the awesome people who tested, provided test materials, discussed and contributed. `dcp_inspect` wouldn't be a thing without you.
+Thanks to all the awesome people who test, provide test materials, discuss and contribute. `dcp_inspect` wouldn't be a thing without you.
 
 Runs on linux, macOS and windows (WSL) boxes.
 
