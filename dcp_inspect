@@ -3917,7 +3917,7 @@ end # cpl_inspect_xml
 def find_assetmap_candidates( package_dir )
   begin
     am_candidates, err, status = Open3.capture3( "#{ @fdfind } ASSETMAP '#{ package_dir }'" )
-    am_candidates = am_candidates.split( "\n" )
+    am_candidates = am_candidates.split( "\n" ).sort_by( &:downcase )
   rescue Exception => e
     @logger.info e.message
     exit FILE_ACCESS_ERROR
