@@ -4201,6 +4201,40 @@ def dcp_inspect( options, arg )
 
       end # assets.each
 
+      # Check for files outside of AM's scope
+      # FIXME Consider unmapped files which are valid DC XML (ASSETMAP~)
+      # FIXME and may cause trouble when agnostic Dolbys pick them up
+      am_base_absolute = File.expand_path( am_base, @package_dir )
+
+      dcp_files = dict[ index ].values
+      dcp_files << am_file
+      # In the words of the immortal Noel Gallagher:
+      # "Exactly noone gives a hoot about VOLINDEX."
+      [ 'VOLINDEX', 'VOLINDEX.xml' ].each do |v|
+        if File.exist?( File.join( am_base_absolute, v ) )
+          dcp_files << File.join( am_base_absolute, v )
+        end
+      end
+      dcp_files = dcp_files.map { |path| File.expand_path( path, @package_dir ) }
+      dcp_files.sort_by!( &:downcase )
+
+      files_in_am_base = Array.new
+      IO.popen( "#{ @fdfind } -t f -H -I '' '#{ am_base_absolute }' 2> /dev/null" ) do |io|
+        while ( file = io.gets ) do
+          files_in_am_base << file.chomp
+        end
+      end
+      files_in_am_base.sort_by!( &:downcase )
+
+      outsider_files = files_in_am_base - dcp_files
+      outsider_files = outsider_files.map { |path| path.split( am_base_absolute + '/' )[1] }
+
+      if outsider_files.any?
+        hints << "AM #{ am_id }: Found #{ amount( 'file', outsider_files ) } outside of AM (#{ File.basename am_base }): #{ outsider_files.map { |path| path.inspect }.join( ', ' ) }"
+        @logger.debug hints.last
+      end
+
+
     else
       ams << nil
       errors << "Assetmap '#{ am_file }' has no Id"
