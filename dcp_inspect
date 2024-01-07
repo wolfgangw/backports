@@ -533,8 +533,8 @@ module MStr
 
   Tkr_attr = 'x-TKR'
 
-  AssetTypeInterop      = 'Interop'
   AssetTypeSmpte        = 'SMPTE'
+  AssetTypeInterop      = 'Interop'
   AssetTypeUnknown      = 'Unknown'
   AssetTypeMixed        = 'Mixed'
   AssetTypeUndetermined = 'Undetermined'
@@ -2496,11 +2496,11 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
   case cpl_ns
   when MStr::Smpte_cpl
-    cpl_type = 'SMPTE'
+    cpl_type = MStr::AssetTypeSmpte
   when MStr::Interop_cpl
-    cpl_type = 'Interop'
+    cpl_type = MStr::AssetTypeInterop
   else
-    cpl_type = 'Unknown'
+    cpl_type = MStr::AssetTypeUnknown
     errors << "CPL #{ cpl_id }: Default namespace unknown ❌: #{ cpl_ns }: #{ cpl_file }"
     errors << "CPL #{ cpl_id }: Default namespace unknown ❌: This might be a dcp_inspect bug. If you think it is ..."
     errors << "CPL #{ cpl_id }: Default namespace unknown ❌: ... please file an issue at https://github.com/wolfgangw/backports/issues/new"
@@ -2720,7 +2720,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   #
   # A composition can be "incomplete" in different ways:
   #   - referenced assets can exist outside of a given package (ok case)
-  #   - referenced assets can be invalid/damaged/missing (fail case)
+  #   - referenced assets can be invalid/damaged/empty/missing (fail case)
   # Collecting fail case id's in broken_assets to later on figure out
   # which case we're looking at.
   #
@@ -3690,18 +3690,33 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
   # Composition type SMPTE/Interop/Undetermined?
   assets_status_list = cpl_referenced_assets.map { |e| e.values }.flatten
-  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.uniq.first == true
+  if cpl_referenced_assets_types.uniq.size == 1 and assets_status_list.uniq.size == 1 and assets_status_list.first == true
     composition_type = cpl_referenced_assets_types.uniq.first
     composition_summary[ :type ] = composition_type
   else
     # FIXME Composition type Mixed error or hint?
-    composition_type = ( cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown ) ? MStr::AssetTypeUndetermined : assets_status_list.include?( false ) ? MStr::AssetTypeUndetermined : MStr::AssetTypeMixed )
+    if cpl_referenced_assets_types.include?( MStr::AssetTypeUnknown )
+      composition_type = MStr::AssetTypeUndetermined
+    else
+      if assets_status_list.include?( false )
+        composition_type = MStr::AssetTypeUndetermined
+      else
+        composition_type = MStr::AssetTypeMixed
+      end
+    end
+
     composition_summary[ :type ] = composition_type
-    if broken_assets.size != 0
+    if broken_assets.size > 0
       errors << "CPL #{ cpl_id }: Composition type ❌: #{ composition_type }"
       cpl_errors = true
     else
-      hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }: Supplemental/VF/External"
+      case cpl_type
+      when MStr::AssetTypeSmpte
+        errors << "CPL #{ cpl_id }: Composition type ❌: #{ composition_type }"
+        cpl_errors = true
+      when MStr::AssetTypeInterop
+        hints << "CPL #{ cpl_id }: Composition type: #{ composition_type }"
+      end
     end
   end
 
