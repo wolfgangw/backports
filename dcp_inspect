@@ -3849,7 +3849,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     cpl_errors = true
   else
     unless composition_sound_channel_formats.size == 0 # Supplemental/VF/External
-      errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback will fail completely"
+      errors << "CPL #{ cpl_id }: Found inconsistent sound ChannelFormat values across the composition (#{ composition_sound_channel_formats.each_with_index.map { |v, index| 'Reel ' + ( index + 1 ).to_s + ': ' + v.to_s }.join( ', ' ) }). Playback may fail"
       cpl_errors = true
     end
   end
