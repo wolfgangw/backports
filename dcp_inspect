@@ -3621,6 +3621,12 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
             errors << "#{ cpl_reel }: " + reels_report.last
             cpl_errors = true
           end
+        when 'ClosedCaption'
+          unless meta[ 'EssenceType' ] == MStr::Timed_text
+            reels_report << "Essence type mismatch ❌: Expected ClosedCaption, got #{ meta[ 'EssenceType' ] || '[nil]' }"
+            errors << "#{ cpl_reel }: " + reels_report.last
+            cpl_errors = true
+          end
         end
       end
 
