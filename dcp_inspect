@@ -3162,7 +3162,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                   if reelnumber_el.children.size == 1
                     if reelnumber_el.children.first.class == Nokogiri::XML::Text
                       reelnumber_el_content = reelnumber_el.children.first.content
-                      if reelnumber_el_content =~ /\s*?\d+\s*?/
+                      if reelnumber_el_content.strip =~ /\d+/
                         if reelnumber_el_content.to_i != reel_no
                           hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber '#{ reelnumber_el_content.to_i }' does not match its CPL reel number '#{ reel_no }'"
                           report << hints.last
@@ -3415,6 +3415,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                     if load_font_el.empty?
                       hints << "#{ cpl_reel }: DCSubtitle: No LoadFont element found. Playback will use a default font"
                     else
+                      # FIXME 1 LoadFont element
                       load_font_uri = load_font_el.first.attributes[ 'URI' ].value
                       font_asset = File.join( asset_id, File.basename( load_font_uri ) )
                       font_path = nil
@@ -3905,7 +3906,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       report << "Composition incomplete: Supplemental/VF/External"
       hints << "CPL #{ cpl_id }: #{ cpl_file }: Composition incomplete: Supplemental/VF/External"
     end
-    # FIXME cpl_reels_references_complete.size == reels.size (and thus > 0) only in all-SMPTE CPLs
   elsif cpl_reels_references_complete.include?( false )
     incomplete_reels = Array.new
     cpl_reels_references_complete.each_with_index do |e, i| incomplete_reels << ( i + 1 ).to_s if e == false end
