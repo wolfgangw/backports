@@ -183,7 +183,7 @@ class Options
     options.check_hashes_limit = :no_limit
     options.image_analysis = false # not yet implemented
     options.audio_analysis = true
-    options.validate = true
+    options.schema_validate = true
     options.as_asset_store = false
     options.verbosity = [ 'debug', 'dev' ]
     options.logfile = nil
@@ -211,7 +211,7 @@ BANNER
         options.audio_analysis = false
       end
       opts.on( '--no-schema', 'Skip schema checks' ) do
-        options.validate = false
+        options.schema_validate = false
       end
       opts.on( '-s', '--as-asset-store', 'Simulate asset store by merging all collected AM dictionaries' ) do
         options.as_asset_store = true
@@ -2196,7 +2196,7 @@ def namespace_prefix( doc, ns )
   end
 end
 
-def validate_xml( xml, file )
+def schema_validate_xml( xml, file )
   errors = Array.new
   asdcp_type = xml.root.node_name
   # find schema match
@@ -2235,8 +2235,8 @@ def validate_xml( xml, file )
   end
 end
 
-def validation( errors, error_status, xml, source_file, id, type_indicator )
-  valid, validation_errors = validate_xml( xml, source_file )
+def schema_validation( errors, error_status, xml, source_file, id, type_indicator )
+  valid, validation_errors = schema_validate_xml( xml, source_file )
   if valid == false
     validation_errors.each do |e|
       errors << "#{ type_indicator } #{ id }: #{ e }"
@@ -2507,9 +2507,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   cpl_referenced_assets_types << cpl_type
 
   # Check schema
-  if options.validate
+  if options.schema_validate
     begin
-      valid, errors, cpl_errors = validation( errors, cpl_errors, xml, cpl_file, cpl_id, 'CPL' )
+      valid, errors, cpl_errors = schema_validation( errors, cpl_errors, xml, cpl_file, cpl_id, 'CPL' )
       report << "CPL #{ cpl_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }"
     rescue Exception => e
       errors << "CPL #{ cpl_id }: Exception in Schema check ❌: #{ e.message }"
@@ -3139,9 +3139,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                 #
                 # DCSubtitle Schema validation
                 #
-                if options.validate
+                if options.schema_validate
                   begin
-                    valid, errors, cpl_errors = validation( errors, cpl_errors, xml, asset_file, asset_id, 'DCSubtitle' )
+                    valid, errors, cpl_errors = schema_validation( errors, cpl_errors, xml, asset_file, asset_id, 'DCSubtitle' )
                     report << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }"
                   rescue Exception => e
                     errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Exception in Schema check ❌: #{ e.message }"
@@ -3978,9 +3978,9 @@ def dcp_inspect( options, arg )
 
         # Schema validation
         am_id = get_asset_uuid( am_file )
-        if options.validate
+        if options.schema_validate
           begin
-            valid, errors, error_status = validation( errors, true, xml, am_file, am_id, 'AM' )
+            valid, errors, error_status = schema_validation( errors, true, xml, am_file, am_id, 'AM' )
             @logger.debug "AM #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }: #{ am_file }"
           rescue Exception => e
             errors << "AM #{ am_id.nil? ? am_id.inspect : am_id }: Exception in Schema check ❌: #{ e.message }"
@@ -4315,9 +4315,9 @@ def dcp_inspect( options, arg )
 
         @logger.debug "PKL #{ pkl_id }: #{ pkl_file }"
 
-        if options.validate
+        if options.schema_validate
           begin
-            valid, errors, pkl_errors = validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
+            valid, errors, pkl_errors = schema_validation( errors, pkl_errors, xml, pkl_file, pkl_id, 'PKL' )
             @logger.debug "PKL #{ pkl_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }"
           rescue Exception => e
             errors << "PKL #{ pkl_id }: Exception in Schema check ❌: #{ e.message }"
@@ -4587,7 +4587,7 @@ def dcp_inspect( options, arg )
   info << 'Hash checks skipped' if ( options.check_hashes == false && pkls.size > 0 )
   info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
   info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
-  if options.validate == false
+  if options.schema_validate == false
     info << 'Schema checks skipped' unless am_files.empty?
   end
   if options.audio_analysis == false
