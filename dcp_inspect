@@ -3958,6 +3958,9 @@ def dcp_inspect( options, arg )
   # Find files called what Assetmap(s) would be called.
   # Don't assume they're actually Assetmaps before checking.
   #
+  # Searching at
+  @logger.info "Searching Assetmaps at #{ @package_dir }"
+
   am_candidates = find_assetmap_candidates( @package_dir )
   am_candidates_rejects = Array.new
   if am_candidates.empty?
@@ -3981,7 +3984,7 @@ def dcp_inspect( options, arg )
         if options.schema_validate
           begin
             valid, errors, error_status = schema_validation( errors, true, xml, am_file, am_id, 'AM' )
-            @logger.debug "AM #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }: #{ am_file }"
+            @logger.debug "AM candidate #{ am_id.nil? ? am_id.inspect : am_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }: #{ am_file }"
           rescue Exception => e
             errors << "AM #{ am_id.nil? ? am_id.inspect : am_id }: Exception in Schema check ❌: #{ e.message }"
             error_status = true
@@ -3990,7 +3993,7 @@ def dcp_inspect( options, arg )
         end
 
       else
-        @logger.debug "Assetmap candidate: #{ am_file }: Not XML"
+        @logger.debug "AM candidate #{ am_file.inspect }: Not XML"
         am_candidates_rejects << am_candidate
         am_candidates_tmp.delete( am_candidate )
       end
@@ -4808,9 +4811,6 @@ begin
         exit LOGFILE_WRITE_ERROR
       end
     end
-
-    # Searching at
-    @logger.info "Searching Assetmaps at #{ args[ 0 ] }"
 
     # Inspection
     inspection = dcp_inspect( options, args[ 0 ] )
