@@ -1401,7 +1401,7 @@ class DC_Signer_Crypto_Compliance
 
       # 2.1.6 Deleted (in CTP 1.1) section
 
-      # 2.1.7 Validity present (not before, not after)
+      # 2.1.7 Validity field (not before, not after)
       #
       # Note on Ruby version 1.8.7:
       #
