@@ -191,6 +191,7 @@ class Options
     options.logfile_autolog = nil
     options.overwrite_logfile = false
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'siginfo', 'info', 'cpl', 'debug', 'dev', 'trace_func' ]
+    options.debug = false
 
     opts = OptionParser.new do |opts|
       opts.banner = <<BANNER
@@ -237,6 +238,15 @@ BANNER
         end
         if options.verbosity.empty?
           options.verbosity = [ 'debug' ]
+        end
+      end
+      opts.on( '-d', '--debug', 'Run in debugger (requires gem \'debug\')' ) do
+        options.debug = true
+        begin
+          require 'debug'
+        rescue Exception => e
+          puts e.message
+          exit GEM_LOAD_ERROR
         end
       end
       opts.on_tail( '-h', '--help', 'Display this screen' ) do
@@ -4673,6 +4683,8 @@ end
 begin
 
   options = Options.parse( ARGV )
+  binding.irb if options.debug
+
   args = ARGV
   if ENV[ 'DCP_INSPECT_AUTOLOG' ]
     options.logfile_autolog = true
