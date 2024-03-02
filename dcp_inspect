@@ -117,6 +117,7 @@ GRACEFUL_SHUTDOWN = 22
 LIB_LOAD_ERROR = 23
 RUBY_NAME_ERROR = 24
 RUBY_ARGUMENT_ERROR = 25
+REQUIRED_COMMAND_FDFIND_VERSION_TOO_OLD = 26
 
 # Constants
 PictureBitrateMaxDCI = 250.0 # Mb/s
@@ -4717,6 +4718,14 @@ begin
   end
   if required_command_not_found
     exit REQUIRED_COMMAND_NOT_FOUND
+  end
+  # Check fdfind version (required option --base-directory in >= 7.5)
+  required_commands_fdfind_version_minimum = "7.5.0"
+  out, status = Open3.capture2( "#{ @fdfind } --version" )
+  fdfind_version = out.chomp.split( ' ' ).last
+  if fdfind_version < required_commands_fdfind_version_minimum
+    @logger.info "#{ @fdfind } version >= #{ required_commands_fdfind_version_minimum } required (your version is #{ fdfind_version })"
+    exit REQUIRED_COMMAND_FDFIND_VERSION_TOO_OLD
   end
 
 
