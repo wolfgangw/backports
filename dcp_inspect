@@ -4703,10 +4703,12 @@ begin
 
   # Check required tools
   required_command_not_found = false
-  if RubyVersionPlatform =~ /linux/
+  if command_exists? 'fdfind'
     @fdfind = 'fdfind'
-  elsif RubyVersionPlatform =~ /darwin/
+  elsif command_exists? 'fd'
     @fdfind = 'fd'
+  else
+    @fdfind = 'fd-or-fdfind'
   end
   required_commands = [ 'asdcp-info', 'asdcp-unwrap', 'kmuuidgen', @fdfind ]
   required_commands << 'sox' if options.audio_analysis
