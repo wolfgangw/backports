@@ -118,6 +118,7 @@ LIB_LOAD_ERROR = 23
 RUBY_NAME_ERROR = 24
 RUBY_ARGUMENT_ERROR = 25
 REQUIRED_COMMAND_FDFIND_VERSION_TOO_OLD = 26
+NO_VALID_AUTOLOG_FILENAME = 27
 
 # Constants
 PictureBitrateMaxDCI = 250.0 # Mb/s
@@ -4646,7 +4647,23 @@ end
 def write_logfiles( options, args )
   # Write autolog
   if options.logfile_autolog
-    autologfile = File.join( ENV[ 'DCP_INSPECT_DIR' ], [ Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ).gsub( /\s/, '_' ), RunDatetime.to_s.gsub( /\D/, '-' ), AppVersion.split( '.' ).join, rand( 65536 ).to_s( 16 ) ].join( '_' ) + ".#{ AppName }" )
+    if ENV[ 'DCP_INSPECT_AUTOLOG_NAME_IS_BASENAME' ]
+      autologfile = File.join(
+        ENV[ 'DCP_INSPECT_DIR' ],
+        Pathname( args[ 0 ] ).basename.to_s
+      )
+    else
+      autologfile = File.join(
+        ENV[ 'DCP_INSPECT_DIR' ],
+        [
+          Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ).gsub( /\s/, '_' ),
+          RunDatetime.to_s.gsub( /\D/, '-' ),
+          AppVersion.split( '.' ).join,
+          rand( 65536 ).to_s( 16 )
+        ].join( '_' ) + ".#{ AppName }"
+      )
+    end
+
     begin
       File.write( autologfile, @logger.full_log_blob )
       @logger.info "See autolog at #{ autologfile }"
@@ -4806,12 +4823,18 @@ begin
           @logger.info "Cannot write to #{ ENV[ 'DCP_INSPECT_DIR' ].inspect }"
           exit DCP_INSPECT_DIR_NOT_WRITABLE
         else
-          @logger.info "Will write autolog to #{ ENV[ 'DCP_INSPECT_DIR' ] }"
+          @logger.info "Can write autolog to #{ ENV[ 'DCP_INSPECT_DIR' ] }"
         end
       else
         @logger.info "Autolog requested but env DCP_INSPECT_DIR is not set"
-        @logger.info "Will not write autolog"
+        @logger.info "Can not write autolog"
         exit ENV_DCP_INSPECT_DIR_NOT_SET
+      end
+      if ENV[ 'DCP_INSPECT_AUTOLOG_NAME_IS_BASENAME' ]
+        if [ '.', './', '..', '../' ].include? args[ 0 ]
+          @logger.info "Can not build autolog filename from #{ args[ 0 ] }"
+          exit NO_VALID_AUTOLOG_FILENAME
+        end
       end
     end
 
