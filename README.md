@@ -82,5 +82,5 @@ Thanks to all the awesome people who test, provide test materials, discuss and c
 
 Runs on linux, macOS and windows (WSL) boxes.
 
-Wolfgang Woehl 2011-2023
+Wolfgang Woehl 2011-2025
 
