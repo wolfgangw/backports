@@ -4216,7 +4216,7 @@ def dcp_inspect( options, arg )
       end # assets.each
 
       # Check for files outside of AM's scope
-      # FIXME Consider unmapped files which are valid DC XML (ASSETMAP~)
+      # FIXME Consider unmapped files which are valid DC XML (e.g. 'ASSETMAP~'')
       # FIXME and may cause trouble when agnostic Dolbys pick them up
       am_base_absolute = File.expand_path( am_base, @package_dir )
 
