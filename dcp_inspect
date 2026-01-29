@@ -4773,12 +4773,12 @@ begin
   @check_hashes_hits = 0
   @check_hashes_limit_hits = 0
   unless options.check_hashes_limit == :no_limit
-    if options.check_hashes_limit =~ /\d+(\.?\d+)?\s?(kb|mb|gb)?/
+    if options.check_hashes_limit =~ /\d+(\.?\d+)?(kb|mb|gb)/
       @check_hashes_limit_nice = bytes_from_nice_bytes( options.check_hashes_limit ).to_k
       @logger.info "Will skip hash checks for files bigger than #{ @check_hashes_limit_nice }"
     else
       @check_hashes_limit_nice = nil
-      @logger.info "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB symbol, e.g. 700KB or 1.5GB"
+      @logger.info "Option --hash-limit argument #{ options.check_hashes_limit.inspect } does not compute.\nUse integer or decimal plus an optional KB, MB or GB specifier, e.g. 700KB or 1.5GB"
       exit BAD_HASH_LIMIT_ARG
     end
   end
