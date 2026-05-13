@@ -2302,7 +2302,7 @@ def signature_verification_siginfo( siginfo, signature_result, id, file, type )
   end
   if signature_result.crypto.siginfo[ :expired_certs ].any?
     amount_expired = signature_result.crypto.siginfo[ :expired_certs ].size
-    siginfo << "#{ type } #{ id }: Signature: #{ type } has #{ amount_expired } expired #{ plural( 'certificate', amount_expired ) }. On overzealous systems this may result in playback failure".bold
+    siginfo << "#{ type } #{ id }: Signature: #{ type } has #{ amount_expired } expired #{ plural( 'certificate', amount_expired ) }. This is not an error".bold
   end
   return siginfo
 end
