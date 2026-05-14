@@ -13,6 +13,7 @@
     <public publicId="http://www.smpte-ra.org/schemas/429-8/2007/PKL" uri="SMPTE-429-8-2006-PKL.xsd"/>
     <public publicId="http://www.smpte-ra.org/schemas/429-7/2006/CPL" uri="SMPTE-429-7-2006-CPL.xsd"/>
     <public publicId="http://www.smpte-ra.org/schemas/429-10/2008/Main-Stereo-Picture-CPL" uri="SMPTE-429-10-2008-Main-Stereo-Picture-CPL.xsd"/>
+    <public publicId="http://www.smpte-ra.org/schemas/428-7/2010/DCST" uri="DCDMSubtitle-2010.xsd"/>
 
     <public publicId="http://www.w3.org/XML/1998/namespace" uri="xml.xsd"/>
     <system systemId="http://www.w3.org/2001/03/xml.xsd" uri="xml.xsd"/>
