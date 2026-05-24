@@ -190,6 +190,7 @@ class Options
     options.verbosity = [ 'debug', 'dev' ]
     options.logfile = nil
     options.logfile_append = nil
+    options.json_output = false
     options.logfile_autolog = nil
     options.overwrite_logfile = false
     options.verbosity_choices = [ 'quiet', 'errors', 'hints', 'siginfo', 'info', 'cpl', 'debug', 'dev', 'trace_func' ]
@@ -224,6 +225,9 @@ BANNER
       end
       opts.on( '--la', '--logfile-append path', String, 'Append full report to logfile at path' ) do |p|
         options.logfile_append = p
+      end
+      opts.on( '--json', 'Emit structured JSON to stdout (suppresses normal output)' ) do
+        options.json_output = true
       end
       opts.on( '--autolog', "Write full report to $DCP_INSPECT_DIR. (Default: Don't)" ) do
         options.logfile_autolog = true
@@ -753,6 +757,12 @@ class String
   def underline;      "\e[4m#{self}\e[24m" end
   def blink;          "\e[5m#{self}\e[25m" end # temptingudontknowhow
   def invert;  "\e[7m#{self}\e[27m" end
+end
+
+# strips ANSI color codes from a string
+# used for json output
+def strip_ansi( str )
+  str.gsub( /\e\[[0-9;]*m/, '' )
 end
 
 # turn items like '100KB' or '1.5 GB' to bytes
@@ -4611,7 +4621,7 @@ def dcp_inspect( options, arg )
   info << 'Found ' + [ am_info, pkl_info, cpl_info ].join( ', ' )
   info << "#{ amount( 'Error', errors ) }#{ errors.size == 0 ? ' ✅' : ' ❌' }, #{ amount( 'Hint', hints ) }"
 
-  return { :errors => errors, :hints => hints, :siginfo => siginfo, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing }
+  return { :errors => errors, :hints => hints, :siginfo => siginfo, :info => info, :am_files => am_files, :pkls => pkls, :cpls => cpls, :pkls_missing => pkls_missing, :cpls_missing => cpls_missing, :composition_summaries => composition_summaries, :packages_size_bytes => packages_size_actual }
 end # dcp_inspect
 
 
@@ -4706,6 +4716,14 @@ begin
   args = ARGV
   if ENV[ 'DCP_INSPECT_AUTOLOG' ]
     options.logfile_autolog = true
+  end
+  if options.json_output
+    options.verbosity      = [ 'quiet' ]
+    # TODO: Or should the JSON output be written to a file instead of stdout? Then we could have autolog and logfile options for JSON output as well.
+    # For now, just disable all logging except JSON output
+    options.logfile        = nil 
+    options.logfile_append = nil
+    options.logfile_autolog = nil
   end
   @logger = DLogger.new( prefix = '', options )
 
@@ -4860,6 +4878,37 @@ begin
 
     # Inspection
     inspection = dcp_inspect( options, args[ 0 ] )
+
+    # JSON output
+    if options.json_output
+      require 'json'
+      payload = {
+        :meta => {
+          :tool             => AppName,
+          :version          => AppVersion,
+          :asdcplib_version => ASDCPVersion,
+          :ruby             => RubyVersionPlatform,
+          :run_at           => RunDatetime.iso8601,
+          :path             => Pathname( args[ 0 ] ).realpath.to_s,
+        },
+        :summary => {
+          :assetmap_count    => inspection[ :am_files ].size,
+          :package_count     => inspection[ :pkls ].size,
+          :composition_count => inspection[ :cpls ].size,
+          :total_size_bytes  => inspection[ :packages_size_bytes ],
+          :error_count       => inspection[ :errors ].size,
+          :hint_count        => inspection[ :hints ].size,
+        },
+        :compositions => inspection[ :composition_summaries ],
+        :errors  => inspection[ :errors ].map  { |s| strip_ansi( s ) },
+        :hints   => inspection[ :hints ].map   { |s| strip_ansi( s ) },
+        :siginfo => inspection[ :siginfo ].map { |s| strip_ansi( s ) },
+        :info    => inspection[ :info ].map    { |s| strip_ansi( s ) },
+      }
+      puts JSON.pretty_generate( payload )
+      exit inspection[ :errors ].size == 0 ? DCP_OK : DCP_ERROR
+    end
+
     print_inspection_messages( inspection ) unless @logger.is_quiet
 
     # Remove @dcp_inspect_temp
