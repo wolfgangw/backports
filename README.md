@@ -12,7 +12,88 @@ See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-d
         dcp_inspect <path to directory> --nh --na
         dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
+## Ruby API
+
+The inspection code is also available as a Ruby library for other tools.
+The standalone executable and library share one inspection engine, schema
+store, structured result, and TUI implementation. Add this checkout's `lib/`
+directory to Ruby's load path (for example, with `ruby -Ilib`) to use it.
+
+```ruby
+require "dcp_inspect"
+
+configuration = DcpInspect::Configuration.quick(verbosity: ["quiet"])
+result = DcpInspect::Inspector.new(configuration: configuration).call("/dcp")
+
+abort result.errors.join("\n") unless result.ok?
+puts result.inspection_run.fetch("compositions").length
+```
+
+`Configuration.quick` retains schema, signature, relationship, MXF, and
+subtitle inspection while disabling potentially lengthy hashing and audio
+analysis. `Configuration.new` preserves the standalone CLI's full defaults.
+
+The complete result can also be exported by the CLI with
+`--dump-result result.json`; `--dump-model` remains available for the
+`InspectionRun` graph alone.
+
+### Architecture
+
+Requiring `dcp_inspect` loads only namespaced library components; it does not
+evaluate the compatibility runtime or start the CLI. The root executable is
+a thin `DcpInspect::CLI` wrapper. Extracted components currently include CLI options, the inspection model, filesystem discovery, logging/TUI,
+signature verification, timecode, progress reporting, result handling, and the
+public engine boundary.
+
+`DcpInspect::Inspector` accepts any engine implementing `call`. The default
+`DcpInspect::Engine::Native` now runs the complete inspection in-process;
+`DcpInspect::Engine::Subprocess` remains available as an explicit compatibility
+and parity-testing backend. XML parsing and schema resolution are isolated under
+`DcpInspect::XML`, while `DcpInspect::Application` owns process-level CLI duties
+such as arguments, log destinations, the dashboard, and exit statuses.
+
+## Schema store
+
+The `xsd/` directory is the authoritative schema store for `dcp-inspect` and
+Dietrich. Its relocatable catalog includes the DCP and future KDM schema
+families. After intentionally changing schemas, run `ruby -Ilib -S rake
+xsd:manifest`; CI and consumers can verify the complete store with `ruby -Ilib
+-S rake xsd:check`.
+
+## Filesystem discovery
+
+`dcp-inspect` prefers `fd` (or Debian's `fdfind`) for fast parallel traversal
+and falls back to a behavior-matched Ruby walker when neither executable is
+available. Both backends include hidden and ignored regular files, traverse a
+symlink supplied as the discovery root, and do not follow symlinks encountered
+inside that tree. Output is NUL-delimited when using `fd`, so unusual but valid
+filenames remain intact.
+
+Only files named exactly `ASSETMAP` or `ASSETMAP.xml`, with that capitalization,
+are AssetMap candidates. Other case variants, suffixes, backups, and partial
+matches are never considered.
+
+Compare both traversal backends on a large local tree with:
+
+```sh
+ruby benchmark/filesystem_walker.rb /path/to/discovery-root
+```
+
 # Installation
+
+Run the standalone CLI from this checkout, keeping `lib/`, `VERSION`, and
+`xsd/` alongside the root executable:
+
+```sh
+./dcp_inspect /path/to/DCP
+./dcp_inspect --tfs /path/to/DCP
+```
+
+Fullscreen mode redraws automatically when the terminal is resized. On small terminals, Tab cycles through Package Tree, Compositions, and Findings one panel at a time. Arrow keys scroll or select entries. Findings puts messages related to the selected package, composition, reel, or asset first; Tab into Findings to browse them, with all other findings retained below. During inspection, `q` opens a confirmation: `y` interrupts and saves any requested partial log; `n`, Enter, or Escape continues. After inspection, `q` closes the dashboard immediately.
+
+
+For development checks, run `ruby -Ilib -S rake test` and
+`ruby -Ilib -S rake xsd:check`.
 
 See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki) for an easy-to-use [Setup](https://github.com/wolfgangw/digital_cinema_tools_distribution/wiki/Setup) script. This will install everything required.
 
@@ -82,5 +163,4 @@ Thanks to all the awesome people who test, provide test materials, discuss and c
 
 Runs on linux, macOS and windows (WSL) boxes.
 
-Wolfgang Woehl 2011-2025
-
+Wolfgang Woehl 2011-2023

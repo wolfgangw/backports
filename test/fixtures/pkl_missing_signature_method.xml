@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PackingList xmlns="http://www.smpte-ra.org/schemas/429-8/2007/PKL">
+  <Signer>
+    <X509IssuerName>CN=Stub Issuer</X509IssuerName>
+  </Signer>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <Reference URI="">
+        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+        <DigestValue>ZmFrZWRpZ2VzdA==</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>AAAA</SignatureValue>
+    <KeyInfo>
+      <X509Data>
+        <X509Certificate>INVALIDCERT</X509Certificate>
+      </X509Data>
+    </KeyInfo>
+  </Signature>
+</PackingList>
