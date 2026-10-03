@@ -8,6 +8,7 @@ require_relative "content_title"
 require_relative "subtitle_inspection"
 require_relative "media_inspection"
 require_relative "composition_audio_inspection"
+require_relative "audio_channels"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1914,26 +1915,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                   cpl_errors = true
                 end
 
-                # Channel configuration
+                # Container channel count does not establish a soundfield.
                 audio_channel_count = meta[ 'ChannelCount' ].to_i
-                case audio_channel_count
-                when 1, 3, 4, 5, 7
-                  errors << "#{ cpl_reel }: MainSound has #{ amount( 'channel', audio_channel_count ) } ❌: Use 5.1, 7.1, 7.1DS or wild track (2.0 is expected to mostly work)"
-                  cpl_errors = true
-                  audio_channel_count_moniker = audio_channel_count.to_s
-                when 2
-                  hints << "#{ cpl_reel }: MainSound has 2 channels: Expected to mostly work. Use 5.1, 7.1, 7.1DS or wild track to make sure"
-                  audio_channel_count_moniker = '20'
-                when 6
-                  audio_channel_count_moniker = '51'
-                when 8
-                  audio_channel_count_moniker = '71'
-                when 12
-                  audio_channel_count_moniker = '11.1'
-                else
-                  audio_channel_count_moniker = audio_channel_count.to_s
+                AudioChannels.findings(meta).each do |severity, message|
+                  (severity == :error ? errors : hints) << "#{cpl_reel}: #{message}"
+                  cpl_errors = true if severity == :error
+                  inspection_run.add_check(cpl_model, :audio_channels, severity, "#{cpl_reel}: #{message}") if cpl_model
                 end
-                composition_sound_channel_counts << audio_channel_count_moniker
+                composition_sound_channel_counts << audio_channel_count.to_s
 
                 # Block align
                 audio_block_align = meta[ 'BlockAlign' ].to_i

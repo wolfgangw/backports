@@ -93,6 +93,13 @@ profile conformance.
 
 ## Media inspection and composition loudness
 
+PCM channel count is reported as a container count, not an inferred soundfield.
+Four-channel Interop tracks (L/R/C/LFE, including centre-only programmes) are
+accepted. Odd counts receive an ISDCF delivery hint for Interop and a normative
+ST 429-2 Annex A error for SMPTE; invalid counts, the supported 16-channel limit,
+and declared static SMPTE channel-configuration capacity are checked separately.
+Silence in unused channels is not a channel-count failure.
+
 JPEG2000 inspection walks every plaintext codestream's headers and tile-part
 boundaries, checking cinema profile fields, dimensions, component precision,
 coding parameters, progression, and tile-part lengths against the MXF metadata.

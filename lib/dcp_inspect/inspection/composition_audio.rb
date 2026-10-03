@@ -44,9 +44,11 @@ module DcpInspect
 
       def measure(segments, layout, command: nil)
         first = segments.first
+        # Convert sample format before remapping: combining both can make FFmpeg
+        # rematrix/attenuate channels according to its guessed input layout.
         command ||= ['ffmpeg', '-hide_banner', '-nostats', '-nostdin', '-v', 'info',
           '-f', 's24le', '-ar', first[:sample_rate].to_s, '-ac', first[:channels].to_s,
-          '-i', 'pipe:0', '-af', "#{PcmLayout.pan(layout)},ebur128=peak=true,astats=metadata=0:reset=0",
+          '-i', 'pipe:0', '-af', "aformat=sample_fmts=dbl,#{PcmLayout.pan(layout)},ebur128=peak=true,astats=metadata=0:reset=0",
           '-f', 'null', '-']
         input_read, input_write = IO.pipe
         errors_read, errors_write = IO.pipe

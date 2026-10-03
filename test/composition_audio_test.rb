@@ -102,6 +102,23 @@ class CompositionAudioTest < Minitest::Test
     end
   end
 
+  def test_four_channel_center_only_programme_matches_mono_loudness
+    skip 'ffmpeg unavailable' unless system('ffmpeg', '-version', out: File::NULL, err: File::NULL)
+    Dir.mktmpdir do |dir|
+      mono = stereo_tone(0.1).bytes.each_slice(6).map { |bytes| bytes.take(3).pack('C3') }.join
+      padded = mono.bytes.each_slice(3).map { |bytes| "\0".b * 6 + bytes.pack('C3') + "\0".b * 3 }.join
+      path = File.join(dir, 'center.mxf')
+      write_pcm(path, [padded] * 48)
+      layout = Layout.resolve('ChannelCount' => '4', 'ChannelFormat' => '0')
+      diagnostic = Audio.measure([segment(path, 0, 48, channels: 4)], layout)
+      measured = runtime.parse_ffmpeg_audio_analysis(diagnostic)
+      _out, stderr, status = Open3.capture3('ffmpeg', '-hide_banner', '-nostats', '-f', 's24le', '-ar', '48000', '-ac', '1', '-i', 'pipe:0', '-af', 'ebur128=peak=true,astats=metadata=0:reset=0', '-f', 'null', '-', stdin_data: mono * 48, binmode: true)
+      assert status.success?, stderr
+      assert_in_delta runtime.parse_ffmpeg_audio_analysis(stderr)[:integrated_lufs], measured[:integrated_lufs], 0.01, diagnostic
+      assert_equal 'MEASURED', measured[:status]
+    end
+  end
+
   def test_native_pcm_mca_and_composition_exclude_hi
     skip 'native audio tools unavailable' unless %w[ffmpeg asdcp-wrap].all? { |tool| system(tool, tool == 'ffmpeg' ? '-version' : '-V', out: File::NULL, err: File::NULL) }
     Dir.mktmpdir do |dir|
