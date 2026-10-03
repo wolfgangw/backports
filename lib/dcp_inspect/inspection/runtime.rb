@@ -234,6 +234,7 @@ def initialize(options:, logger: nil, stdout: $stdout, dashboard: nil, started_a
   @c14n_available = Nokogiri::XML::Document.new.respond_to?('canonicalize')
   @check_hashes_hits = 0
   @check_hashes_limit_hits = 0
+  @check_hashes_png_hits = 0
   @check_hashes_limit_nice = hash_limit_label(options.check_hashes_limit)
   @signed_cpls_count = 0
   @signed_cpls_verified_count = 0
@@ -854,7 +855,9 @@ def digest_with_etabar( digest_algorithm, title, file, pbar_width, looks_like, o
       percentage = size.zero? ? 100 : [ ( bytes_read * 100 / size ), 100 ].min
       next unless percentage > last_percentage
 
-      ( last_percentage + 1 .. percentage ).each { |p| eta.update_terminal( p ) }
+      # Report the observed progress once, rather than replaying every integer
+      # percentage crossed by this read (100 redraws for a small asset).
+      eta.update_terminal( percentage )
       last_percentage = percentage
     end
   end

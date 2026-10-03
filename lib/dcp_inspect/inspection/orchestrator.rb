@@ -641,7 +641,15 @@ module DcpInspect
                           pkl_errors = true
                         else
                           if options.check_hashes
-                            if options.check_hashes_limit == :no_limit or bytes_from_nice_bytes( options.check_hashes_limit ) > size_asset
+                            if options.skip_png_hashes && File.binread(asset_file, 8) == "\x89PNG\r\n\x1a\n".b
+                              @check_hashes_png_hits += 1
+                              hints << "PKL #{ pkl_id }: Hash check skipped (--np): PNG asset #{ id }, Path #{ asset_file }, Expected hash: #{ hash_listed }"
+                              if asset_model
+                                asset_model.hash_status = 'skipped PNG (--np)'
+                                inspection_run.add_check( asset_model, :hash, :skipped, hints.last )
+                              end
+                              @logger.debug hints.last
+                            elsif options.check_hashes_limit == :no_limit or bytes_from_nice_bytes( options.check_hashes_limit ) > size_asset
                               @check_hashes_hits += 1
                               hash_jobs << {
                                 :priority => hash_priority_for_pkl_asset( id, type, pkl_asset_order, hash_priorities ),
@@ -888,7 +896,8 @@ module DcpInspect
         info << "Found #{ amount( 'Package', pkls ) } with total size #{ total_size }"
         info << 'Hash checks skipped' if ( options.check_hashes == false && pkls.size > 0 )
         info << "Hash checks skipped for assets bigger than #{ @check_hashes_limit_nice }" if @check_hashes_limit_nice
-        info << "Hash checks skipped for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits } total" if @check_hashes_limit_nice
+        info << "Hash checks skipped by size for #{ amount( 'asset', @check_hashes_limit_hits ) } of #{ @check_hashes_hits + @check_hashes_limit_hits + @check_hashes_png_hits } total" if @check_hashes_limit_nice
+        info << "PNG asset hash checks skipped (--np): #{ amount( 'asset', @check_hashes_png_hits ) }" if options.skip_png_hashes && options.check_hashes
         if options.schema_validate == false
           info << 'Schema checks skipped' unless am_files.empty?
         end

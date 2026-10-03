@@ -20,6 +20,19 @@ Hash comparisons use the containing PKL by default; `--as-asset-store` also
 compares declarations from the combined store. These checks do not replace
 file-content hashing.
 
+Use `--np` (or `--no-png-hash`) to skip hashes for standalone PNG subtitle
+assets while continuing to hash other assets. PNGs are identified by their file
+signature, regardless of filename. Each skipped hash gets a hint and a
+structured `skipped` result, plus a count in the final report. Presence, size,
+declared type, required hash metadata, and subtitle/resource checks still run.
+This does not skip the hash of an MXF containing embedded PNG resources.
+`--nh` takes precedence; with `--hl`, PNG skips are counted separately from
+size-based skips. The Ruby API exposes `Configuration.new(skip_png_hashes: true)`.
+
+Hash progress updates reflect the progress of each read instead of replaying
+every percentage crossed, avoiding 100 redraws per small asset. Hashing remains
+sequential; parallel read performance depends on the delivery medium.
+
 The inspector checks duplicate asset IDs within an AssetMap or PackingList and
 duplicate reel IDs within a CPL. Reuse of an asset across reels or compositions
 is permitted. Edit rates are compared as rational numbers, picture FrameRate is
