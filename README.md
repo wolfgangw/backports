@@ -12,6 +12,35 @@ See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-d
         dcp_inspect <path to directory> --nh --na
         dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
+## Metadata validation
+
+Quick inspection (`--nh --na`) still compares any CPL asset hash with its PKL
+declaration and checks PKL types against observed XML, MXF, font, or PNG content.
+Hash comparisons use the containing PKL by default; `--as-asset-store` also
+compares declarations from the combined store. These checks do not replace
+file-content hashing.
+
+The inspector checks duplicate asset IDs within an AssetMap or PackingList and
+duplicate reel IDs within a CPL. Reuse of an asset across reels or compositions
+is permitted. Edit rates are compared as rational numbers, picture FrameRate is
+checked separately against the MXF sample rate, and an omitted Duration defaults
+to IntrinsicDuration minus EntryPoint. Large durations remain reportable without
+overflowing timecode formatting. MPEG2 does not require JPEG2000 decomposition
+metadata.
+
+MainMarkers are inspected as timeline metadata. Reports include their reel,
+native offset, and composition position where the timeline is known. Validation
+covers standard labels, duplicate active standard markers, offsets, ordering,
+and composition/credits boundaries. Custom label scopes are retained without
+imposing the standard vocabulary. Both last-frame and end-boundary duration
+conventions are accepted; markers trimmed by EntryPoint/Duration are retained
+but excluded from composition ordering checks. Structured marker records appear
+in the composition's `markers` check details in result/model exports.
+
+For signed CPLs and PKLs, the Signer's issuer name, serial number, and optional
+subject name are compared with the signing certificate. Identity mismatches are
+validation errors even when the cryptographic signature itself verifies.
+
 ## Ruby API
 
 The inspection code is also available as a Ruby library for other tools.
