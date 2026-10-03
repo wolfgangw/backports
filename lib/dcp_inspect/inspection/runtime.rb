@@ -3,6 +3,7 @@ require_relative "orchestrator"
 require_relative "audio_analysis"
 require_relative "metadata_checks"
 require_relative "timing"
+require_relative "markers"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1126,8 +1127,7 @@ def cpl_reel_asset_references( xml )
   reels.each_with_index do |reel, index|
     reel_no = index + 1
     reel.xpath( "#{ cpl_ns_prefix }:AssetList/*" ).each do |asset|
-      next if asset.node_name == 'CompositionMetadataAsset'
-      next if asset.node_name == 'MainMarkers'
+      next if ['CompositionMetadataAsset', 'MainMarkers'].include?(asset.node_name)
 
       asset_ns = asset.namespaces
       asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.to_s.split( ':' ).last.to_s
@@ -1595,7 +1595,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       # CompositionMetadataAsset is already handled
       # Defer handling of MainMarkers to later on when we know reel duration
       #
-      next if asset.node_name == 'CompositionMetadataAsset'
+      next if ['CompositionMetadataAsset', 'MainMarkers'].include?(asset.node_name)
 
       # Collect reel referenced EssenceTypes (mainly to check for SMPTE reel completeness)
       case asset.node_name
@@ -2757,6 +2757,21 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       errors << "CPL #{ cpl_id }: Expected to scrounge #{ amount( 'audio type', expected_audio_types ) } (#{ amount( 'reel', reels.size ) }) but got #{ composition_sound_channel_counts.size } ❌"
       cpl_errors = true
     end
+  end
+
+  marker_result = DcpInspect::Inspection::Markers.inspect(reels)
+  marker_result[:errors].each do |message|
+    errors << "CPL #{cpl_id}: #{message}"
+    cpl_errors = true
+  end
+  marker_result[:records].each do |marker|
+    report << "Marker #{marker[:label]}: reel #{marker[:reel]}, offset #{marker[:offset]}, " +
+      (marker[:seconds] ? "composition position #{marker[:seconds]} s" : 'outside playback window or timeline unavailable')
+  end
+  if cpl_model && (marker_result[:records].any? || marker_result[:errors].any?)
+    inspection_run.add_check(cpl_model, :markers, marker_result[:errors].empty? ? :ok : :error,
+      marker_result[:errors].empty? ? 'Composition markers checked' : marker_result[:errors].join('; '),
+      { markers: marker_result[:records] })
   end
 
   # Check if reels reference both picture and sound. If not report an error for SMPTE CPL and a hint for Interop CPL
