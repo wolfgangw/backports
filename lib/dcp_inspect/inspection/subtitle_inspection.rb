@@ -9,7 +9,11 @@ module DcpInspect
         def inspect_subtitle_document(document, path, dict, context, embedded: false)
           expected = embedded ? 'SubtitleReel' : 'DCSubtitle'
           return { findings: [{ severity: :error, code: 'timed-text.root.invalid', message: "Expected #{expected}, got #{document.root&.name}" }], summary: {} } unless document.root&.name == expected
-          resources = (dict || {}).values.map { |relative| File.expand_path(package(relative)) }
+          resource_dict = context[:resource_dict] || dict || {}
+          resources = resource_dict.group_by { |_id, relative| File.expand_path(package(relative)) }
+          memberships = {}
+          membership_findings = []
+          pkl_ids = context[:pkl_asset_ids]&.to_h { |id| [id.to_s.downcase, true] }
           directory = File.dirname(path)
           inspection = TimedText.new(document, context) do |reference|
             if embedded
@@ -19,14 +23,25 @@ module DcpInspect
               uri = URI.parse(reference)
               next nil if uri.scheme || uri.host || uri.query || uri.fragment || reference.start_with?('/')
               candidate = File.expand_path(URI::RFC2396_PARSER.unescape(uri.path), directory)
-              next nil unless resources.include?(candidate)
+              entries = resources[candidate]
+              next nil unless entries
+              if context[:pkl_id] && pkl_ids && !memberships.key?(reference)
+                ids = entries.map(&:first)
+                listed = ids.any? { |id| pkl_ids.include?(id.to_s.downcase) }
+                memberships[reference] = { reference: reference, asset_ids: ids,
+                  pkl_id: context[:pkl_id], listed: listed }
+                unless listed
+                  membership_findings << { severity: :hint, code: 'timed-text.resource.not-in-pkl',
+                    message: "Subtitle resource #{reference.inspect} (#{ids.join(', ')}) is mapped by the AssetMap but absent from CPL context PKL #{context[:pkl_id]}; players ingesting only that PKL may miss it. Availability is checked separately" }
+                end
+              end
               # A declared symlink must still resolve inside the selected package.
               root = File.realpath(@package_dir)
               real = File.realpath(candidate) if File.exist?(candidate)
               candidate if real && (real == root || real.start_with?(root + File::SEPARATOR))
             end
           end
-          findings = inspection.findings
+          findings = inspection.findings + membership_findings
           if options.schema_validate
             schema = embedded ? (document.root.namespace&.href == 'http://www.smpte-ra.org/schemas/428-7/2010/DCST' ? 'DCDMSubtitle-2010.xsd' : nil) : 'DCSubtitle.v1.mattsson.xsd'
             if schema
@@ -37,7 +52,7 @@ module DcpInspect
               findings << { severity: :hint, code: 'timed-text.schema.unchecked', message: "No installed subtitle schema for #{document.root.namespace&.href}; semantic/resource checks only" }
             end
           end
-          { findings: findings, summary: inspection.summary }
+          { findings: findings, summary: inspection.summary, resource_memberships: memberships.values }
         end
 
         def inspect_embedded_subtitle(path, meta, dict, context)

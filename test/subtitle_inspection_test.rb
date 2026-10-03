@@ -14,7 +14,7 @@ class SubtitleInspectionTest < Minitest::Test
     instance
   end
 
-  def test_interop_resources_use_exact_relative_paths_and_pkl_membership
+  def test_interop_resources_use_exact_relative_paths_and_assetmap_membership
     with_inspection_fixture do
       FileUtils.mkdir_p(File.join(@directory, 'subs'))
       path = File.join(@directory, 'subs', 'subtitle.xml')

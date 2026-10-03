@@ -114,6 +114,14 @@ rate, and resource declarations. The installed 2010-namespace subtitle schema
 is used unless `--no-schema` is selected; other namespaces get an explicit
 schema-unchecked hint alongside semantic/resource checks.
 
+Standalone Interop PNG/font resources are resolved through the AssetMap and
+checked even when absent from the current CPL context's PKL. Missing PKL
+membership gets an ingest-compatibility hint naming the resource and PKL;
+resource unavailability or invalid content remains an error. Another PKL's
+listing does not hide that context-specific hint, including in asset-store mode.
+Listed resources still receive the normal PKL size/hash checks. Embedded SMPTE
+resources are checked against their MXF descriptor, not as separate PKL assets.
+
 PNG inspection checks the signature, header dimensions, and size relative to
 the picture where known; it does not decode pixels or validate every PNG chunk.
 Font resources are parsed with TTFunk and checked for required glyphs. These

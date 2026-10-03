@@ -778,6 +778,7 @@ module DcpInspect
                       :pkl_id => pkl_id,
                       :pkl_hashes => pkl_hashes,
                       :pkl_asset_ids => pkl_asset_ids.dup,
+                      :resource_dict => dict[index],
                       :dict => pkl_dict
                     }
                   end
@@ -853,6 +854,8 @@ module DcpInspect
                   :accounting => cpl_accounting,
                   :pkl_hashes => context[:pkl_hashes],
                   :pkl_asset_ids => context[:pkl_asset_ids],
+                  :pkl_id => context[:pkl_id],
+                  :resource_dict => context[:resource_dict],
                   :dict_label => options.as_asset_store ? 'asset-store dictionary' : "PKL #{ context[ :pkl_id ] } asset dictionary"
                 }
                 if cpl_context_counts[ cpl_id ] > 1

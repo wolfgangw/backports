@@ -1998,7 +1998,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                   descriptor_namespace: meta['NamespaceName'],
                   declared_resources: meta.select { |key, _value| TimedText::UUID.match?(key) },
                   reel: reel_no, kind: asset.node_name, edit_rate: edit_rate,
-                  intrinsic: intrinsic_duration, entry_point: entry_point, duration: duration
+                  intrinsic: intrinsic_duration, entry_point: entry_point, duration: duration,
+                  pkl_id: context[:pkl_id], pkl_asset_ids: context[:pkl_asset_ids],
+                  resource_dict: context[:resource_dict]
                 }.merge(subtitle_picture))
                 failed = record_subtitle_findings(subtitle_result, "#{cpl_reel}: SMPTE timed text #{asset_id}", errors, hints, inspection_run, cpl_model)
                 cpl_errors ||= failed
@@ -2033,7 +2035,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                 subtitle_result = inspect_subtitle_document(xml, asset_file, dict, {
                   document_id: asset_id, reel: reel_no, kind: asset.node_name,
                   edit_rate: edit_rate, intrinsic: intrinsic_duration,
-                  entry_point: entry_point, duration: duration
+                  entry_point: entry_point, duration: duration,
+                  pkl_id: context[:pkl_id], pkl_asset_ids: context[:pkl_asset_ids],
+                  resource_dict: context[:resource_dict]
                 }.merge(subtitle_picture))
                 failed = record_subtitle_findings(subtitle_result, "#{cpl_reel}: DCSubtitle #{asset_id}", errors, hints, inspection_run, cpl_model)
                 cpl_errors ||= failed
