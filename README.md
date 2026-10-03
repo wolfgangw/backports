@@ -12,6 +12,13 @@ See [Examples](https://github.com/wolfgangw/backports/wiki/Example-output-from-d
         dcp_inspect <path to directory> --nh --na
         dcp_inspect <path to directory> --as-asset-store --hash-limit <limit> --logfile <path>
 
+Overlong logfile basenames are recovered to a shorter, path-derived name in the
+requested directory, and the actual destination is reported. Recovery protects
+existing files; append mode reuses its deterministic shortened name. Other
+requested log destinations are still attempted if one fails. Unusable directory
+paths remain explicit failures, and saving partial logs preserves the original
+interruption/failure status.
+
 ## Metadata validation
 
 Quick inspection (`--nh --na`) still compares any CPL asset hash with its PKL

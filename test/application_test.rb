@@ -83,6 +83,33 @@ class ApplicationTest < Minitest::Test
     end
   end
 
+  def test_overlong_explicit_and_generated_names_preserve_partial_logs
+    with_cli_environment do |directory, environment|
+      logfile = File.join(directory, 'é' * 180 + '.txt')
+      environment['DCP_INSPECT_DIR'] = File.join(directory, 'autolog')
+      nested = File.join(directory, *Array.new(3) { 'directory-' + 'x' * 85 })
+      FileUtils.mkdir_p(nested)
+      stdout, stderr, status = run_with_runtime_body(environment, nested,
+        'raise Interrupt, "cancelled"', '--logfile', logfile, '--autolog')
+      assert_equal 18, status.exitstatus, stderr
+      assert_includes stdout, 'shortened overlong filename'
+      reports = Dir[File.join(directory, '*.log')] + Dir[File.join(environment['DCP_INSPECT_DIR'], '*')]
+      assert_equal 2, reports.size
+      reports.each { |report| assert_includes File.read(report), 'Reached asset checks' }
+    end
+  end
+
+  def test_one_failed_destination_does_not_prevent_another_log
+    with_cli_environment do |directory, environment|
+      bad, good = File.join(directory, 'bad'), File.join(directory, 'good.txt')
+      environment['TEST_LOGFILE'] = bad
+      _stdout, stderr, status = run_with_runtime_body(environment, directory,
+        'Dir.mkdir(ENV.fetch("TEST_LOGFILE")); { errors: [] }', '--logfile', bad, '--logfile-append', good)
+      assert_equal DcpInspect::Inspection::Runtime::LOGFILE_WRITE_ERROR, status.exitstatus, stderr
+      assert_includes File.read(good), 'Reached asset checks'
+    end
+  end
+
   private
 
   def run_with_runtime_body(environment, directory, body, *arguments)

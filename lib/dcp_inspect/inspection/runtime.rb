@@ -11,6 +11,7 @@ require_relative "composition_audio_inspection"
 require_relative "audio_channels"
 require_relative "picture_rates"
 require_relative "screen_aspect_ratio"
+require_relative "log_writer"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -2636,54 +2637,34 @@ def finish_tfs_dashboard( exit_code, wait = false )
 end
 
 
-def write_logfiles( options, args )
-  # Write autolog
+def write_logfiles(options, args, environment: ENV)
+  destinations = []
   if options.logfile_autolog
-    if ENV[ 'DCP_INSPECT_AUTOLOG_NAME_IS_BASENAME' ]
-      autologfile = File.join(
-        ENV[ 'DCP_INSPECT_DIR' ],
-        Pathname( args[ 0 ] ).basename.to_s
-      )
+    name = if environment['DCP_INSPECT_AUTOLOG_NAME_IS_BASENAME']
+      Pathname(args[0]).basename.to_s
     else
-      autologfile = File.join(
-        ENV[ 'DCP_INSPECT_DIR' ],
-        [
-          Pathname( args[ 0 ] ).realpath.to_s.gsub( '/', '___' ).gsub( /\s/, '_' ),
-          @run_datetime.to_s.gsub( /\D/, '-' ),
-          AppVersion.split( '.' ).join,
-          rand( 65536 ).to_s( 16 )
-        ].join( '_' ) + ".#{ AppName }"
-      )
+      [Pathname(args[0]).realpath.to_s.gsub('/', '___').gsub(/\s/, '_'),
+        @run_datetime.to_s.gsub(/\D/, '-'), AppVersion.delete('.'), rand(65_536).to_s(16)].join('_') + ".#{AppName}"
     end
-
+    destinations << [File.join(environment.fetch('DCP_INSPECT_DIR'), name), false, true, AUTOLOGFILE_WRITE_ERROR, 'autolog']
+  end
+  destinations << [options.logfile, false, options.overwrite_logfile, LOGFILE_WRITE_ERROR, 'logfile'] if options.logfile
+  destinations << [options.logfile_append, true, false, LOGFILE_WRITE_ERROR, 'logfile additions'] if options.logfile_append
+  failures = []
+  destinations.each do |path, append, overwrite, status, label|
     begin
-      File.write( autologfile, @logger.full_log_blob )
-      @logger.info "See autolog at #{ autologfile }"
-    rescue Exception => e
-      @logger.info e.message
-      raise DcpInspect::Inspection::Error.new(e.message, AUTOLOGFILE_WRITE_ERROR)
+      written = LogWriter.write(path, @logger.full_log_blob, append: append, overwrite: overwrite)
+      recovery = written[:recovered] ? " (shortened overlong filename requested as #{path.inspect})" : ''
+      @logger.info "See #{label} at #{written[:path]}#{recovery}"
+    rescue SystemCallError, IOError => error
+      message = "Cannot write #{label} at #{path.inspect}: #{error.message}"
+      @logger.info message
+      failures << DcpInspect::Inspection::Error.new(message, status)
     end
   end
-
-  # Write logfile
-  if options.logfile
-    begin
-      File.write( options.logfile, @logger.full_log_blob )
-      @logger.info "See logfile at #{ options.logfile }"
-    rescue Exception => e
-      @logger.info e.message
-      raise DcpInspect::Inspection::Error.new(e.message, LOGFILE_WRITE_ERROR)
-    end
-  end
-  if options.logfile_append
-    begin
-      File.open( options.logfile_append, 'a' ) { |logfile| logfile.write @logger.full_log_blob }
-      @logger.info "See additions to logfile at #{ options.logfile_append }"
-    rescue Exception => e
-      @logger.info e.message
-      raise DcpInspect::Inspection::Error.new(e.message, LOGFILE_WRITE_ERROR)
-    end
-  end
+  # Try every requested destination before reporting failure; this also retains
+  # partial logs at the other destinations when one write fails.
+  raise failures.first unless failures.empty?
 end
 
 #
