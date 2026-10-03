@@ -4,6 +4,7 @@ require_relative "audio_analysis"
 require_relative "metadata_checks"
 require_relative "timing"
 require_relative "markers"
+require_relative "content_title"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1279,6 +1280,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   cpl_file = package dict[ cpl_id ]
   context ||= {}
   dict_label = context[ :dict_label ] || 'Assetmap dictionary'
+  title_references = cpl_reel_asset_references(xml).map { |reference| reference[:id] }.uniq
   accounting = context[ :accounting ] || {}
   report << context[ :report_context ] if context[ :report_context ]
 
@@ -2425,7 +2427,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
             cpl_referenced_assets << { asset_id => false }
             cpl_referenced_assets_types << MStr::AssetTypeUnknown
-            meta_report = "Referenced asset file not listed in #{ dict_label }: Supplemental/VF/External"
+            meta_report = "Referenced asset file not listed in #{ dict_label }; external dependency"
             hints << "#{ cpl_reel }: #{ asset.node_name }: #{ meta_report }"
             case asset.node_name
             when 'MainPicture', 'MainStereoscopicPicture'
@@ -2802,6 +2804,21 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     hints << "CPL #{ cpl_id }: Interop composition with non-24 fps edit rate (#{ composition_edit_rate }). Playback may fail on very old legacy systems"
   end
 
+  title_claims = DcpInspect::Inspection::ContentTitle.parse(content_title_text)
+  declaring_ids = context[:pkl_asset_ids]
+  external_ids = declaring_ids && title_references.reject { |id| declaring_ids.include?(id) }
+  title_findings = DcpInspect::Inspection::ContentTitle.compare(title_claims, {
+    standard: cpl_type, dimension: composition_summary[:spatiality],
+    frame_rate: composition_edit_rate, resolution: composition_summary[:resolution],
+    external_ids: external_ids
+  })
+  title_findings.each { |message| hints << "CPL #{cpl_id}: #{message}" }
+  if cpl_model && title_claims[:recognized]
+    inspection_run.add_check(cpl_model, :naming, title_findings.empty? ? :info : :hint,
+      title_findings.empty? ? 'ContentTitleText naming claims parsed; no comparable mismatch found' : title_findings.join('; '),
+      { claims: title_claims, external_asset_ids: external_ids })
+  end
+
   # composition summary one-liner
   composition_summaries << composition_summary
   composition_summary_line = composition_summary_oneliner( composition_summary )
@@ -2816,9 +2833,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       errors << "CPL #{ cpl_id }: Composition incomplete ❌"
       cpl_errors = true
     else
-      report << "Composition incomplete: Supplemental/VF/External"
+      report << "Composition assets unavailable in selected inspection context"
       cpl_model.complete = report.last if cpl_model
-      hints << "CPL #{ cpl_id }: #{ cpl_file }: Composition incomplete: Supplemental/VF/External"
+      hints << "CPL #{ cpl_id }: #{ cpl_file }: Composition assets unavailable in selected inspection context"
     end
   elsif cpl_reels_references_complete.include?( false )
     incomplete_reels = Array.new
