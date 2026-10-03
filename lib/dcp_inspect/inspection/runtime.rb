@@ -7,6 +7,7 @@ require_relative "markers"
 require_relative "content_title"
 require_relative "subtitle_inspection"
 require_relative "media_inspection"
+require_relative "composition_audio_inspection"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -247,6 +248,7 @@ end
 def call(path)
   @mxf_metadata = {}
   @media_inspections = {}
+  @mca_headers = {}
   @dcp_inspect_temp = Pipe.new if options.audio_analysis || options.image_analysis
   inspection = dcp_inspect(options, path)
   print_inspection_messages(inspection) unless logger.is_quiet
@@ -405,23 +407,10 @@ def bars( list )
 end
 
 
-AudioLoudnessTargetLufs = -27.0
-
-def audio_loudness_state( integrated_lufs )
-  return { :status => 'UNKNOWN', :role => :warn, :delta => nil } unless integrated_lufs
-
-  delta = integrated_lufs - AudioLoudnessTargetLufs
-  distance = delta.abs
-  status = if distance <= 1.0
-             'OK'
-           elsif distance <= 3.0
-             delta.positive? ? 'WARN LOUD' : 'WARN LOW'
-           else
-             delta.positive? ? 'LOUD' : 'LOW'
-           end
-  role = distance <= 1.0 ? :ok : ( distance <= 3.0 ? :warn : :error )
-  { :status => status, :role => role, :delta => delta }
+def audio_loudness_state(integrated_lufs)
+  { status: integrated_lufs ? 'MEASURED' : 'UNKNOWN', role: :info, delta: nil }
 end
+
 
 def audio_silent?( stats )
   peak = stats.dig( :pk_lev_db, :overall )
@@ -493,8 +482,7 @@ def audio_analysis_report( stats )
 
   parts = []
   if stats[ :integrated_lufs ]
-    delta = stats[ :delta ] ? format( '%+.1f LU', stats[ :delta ] ) : nil
-    parts << "Loudness #{ format( '%.1f', stats[ :integrated_lufs ] ) } LUFS I #{ delta } [#{ stats[ :status ] }]"
+    parts << "Asset loudness #{format('%.1f', stats[:integrated_lufs])} LUFS I (all channels; not composition programme loudness)"
   end
   parts << "LRA #{ format( '%.1f', stats[ :lra_lu ] ) } LU" if stats[ :lra_lu ]
   if stats[ :pk_lev_db ] && stats[ :pk_lev_db ][ :overall ]
@@ -1153,6 +1141,7 @@ def cpl_reel_asset_references( xml )
         :entry_point => asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i,
         :duration => duration_node ? Timing.units(duration_node.text) : (intrinsic && intrinsic - entry),
         :edit_rate => reference_rate&.to_f,
+        :edit_rate_ratio => reference_rate&.to_s,
         :key_id => key_id
       }
     end
@@ -1283,7 +1272,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   cpl_file = package dict[ cpl_id ]
   context ||= {}
   dict_label = context[ :dict_label ] || 'Assetmap dictionary'
-  title_references = cpl_reel_asset_references(xml).map { |reference| reference[:id] }.uniq
+  composition_references = cpl_reel_asset_references(xml)
+  title_references = composition_references.map { |reference| reference[:id] }.uniq
   accounting = context[ :accounting ] || {}
   report << context[ :report_context ] if context[ :report_context ]
 
@@ -2479,6 +2469,12 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       { claims: title_claims, external_asset_ids: external_ids })
   end
 
+  if options.audio_analysis
+    measurement = composition_audio_measurement(composition_references, reels.size, dict, timing_complete)
+    audio_failed = record_composition_audio(measurement, cpl_id, report, errors, hints, inspection_run, cpl_model)
+    cpl_errors ||= audio_failed
+  end
+
   # composition summary one-liner
   composition_summaries << composition_summary
   composition_summary_line = composition_summary_oneliner( composition_summary )
@@ -2534,6 +2530,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 end # cpl_inspect_xml
 
 
+include DcpInspect::Inspection::Runtime::CompositionAudioInspection
 include DcpInspect::Inspection::Runtime::MediaInspection
 include DcpInspect::Inspection::Runtime::SubtitleInspection
 include DcpInspect::Inspection::Runtime::Orchestrator

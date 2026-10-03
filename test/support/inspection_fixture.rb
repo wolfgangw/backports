@@ -70,8 +70,8 @@ module InspectionFixture
       "<Id>urn:uuid:#{fixture_uuid(1)}</Id><AssetList>#{mapped}</AssetList></AssetMap>")
   end
 
-  def inspect_fixture(*flags)
-    options = DcpInspect::CLI::Options.parse(["--nh", "--na", "--no-schema", *flags])
+  def inspect_fixture(*flags, audio: false)
+    options = DcpInspect::CLI::Options.parse(["--nh", *(!audio ? ["--na"] : []), "--no-schema", *flags])
     metadata = @metadata
     inspector = ->(path) { metadata[File.basename(path)] }
     with_tool_method(:asdcplib_version, -> { [2, 13, 2] }) do
