@@ -423,6 +423,7 @@ module DcpInspect
         cpls = Array.new
         cpl_contexts = Array.new
         cpls_missing = Array.new
+        store_hashes = Hash.new { |hash, id| hash[id] = [] }
         packages_size_listed = 0
         packages_size_actual = 0
 
@@ -520,6 +521,12 @@ module DcpInspect
               pkl_cpls = Array.new
 
               pkl_assets = xml.xpath( '//Asset' )
+              pkl_hashes = options.as_asset_store ? store_hashes : Hash.new { |hash, id| hash[id] = [] }
+              pkl_assets.each do |asset|
+                id = asset.at_xpath('Id')&.text.to_s.split(':').last
+                digest = asset.at_xpath('Hash')&.text.to_s.gsub(/\s+/, '')
+                pkl_hashes[id] << { pkl_id: pkl_id, hash: digest } unless id.to_s.empty? || digest.empty?
+              end
               pkl_model.asset_count = pkl_assets.size
               @logger.debug "PKL #{ pkl_id } lists #{ amount( 'asset', pkl_assets.size ) }"
               pkl_asset_ids = pkl_assets.map { |asset| asset.xpath( 'Id' ).text.split( ':' ).last }.reject { |id| id.empty? }
@@ -755,6 +762,7 @@ module DcpInspect
                     cpl_contexts[ index ] << {
                       :cpl_id => cpl_id,
                       :pkl_id => pkl_id,
+                      :pkl_hashes => pkl_hashes,
                       :dict => pkl_dict
                     }
                   end
@@ -828,6 +836,7 @@ module DcpInspect
 
                 cpl_context = {
                   :accounting => cpl_accounting,
+                  :pkl_hashes => context[:pkl_hashes],
                   :dict_label => options.as_asset_store ? 'asset-store dictionary' : "PKL #{ context[ :pkl_id ] } asset dictionary"
                 }
                 if cpl_context_counts[ cpl_id ] > 1

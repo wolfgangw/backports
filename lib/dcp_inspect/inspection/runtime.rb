@@ -1589,6 +1589,15 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
       asset_ns = asset.namespaces
       asset_id = asset.xpath( "#{ cpl_ns_prefix }:Id", asset_ns ).text.split( ':' ).last
+      cpl_hash = asset.xpath("#{cpl_ns_prefix}:Hash", asset_ns).text.gsub(/\s+/, '')
+      unless cpl_hash.empty?
+        Array(context.fetch(:pkl_hashes, {})&.fetch(asset_id, nil)).each do |declaration|
+          next if cpl_hash == declaration[:hash]
+
+          errors << "#{cpl_reel}: #{asset.node_name} #{asset_id}: CPL/PKL Hash mismatch ❌: CPL: #{cpl_hash} PKL #{declaration[:pkl_id]}: #{declaration[:hash]}"
+          cpl_errors = true
+        end
+      end
       intrinsic_duration = asset.xpath( "#{ cpl_ns_prefix }:IntrinsicDuration", asset_ns ).text.to_i
       entry_point = asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i
       duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
