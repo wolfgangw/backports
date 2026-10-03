@@ -286,7 +286,27 @@ module DcpInspect
               end # path.nil?
 
               # PackingList?
-              unless asset.xpath( 'PackingList' ).empty?
+              packing_list = asset.at_xpath( 'PackingList' )
+              is_packing_list = false
+              if packing_list
+                case am_ns
+                when MStr::Interop_am
+                  is_packing_list = true
+                when MStr::Smpte_am
+                  # xs:boolean permits true/false and 1/0, with whitespace
+                  # collapsed. Presence alone does not identify a PKL.
+                  case packing_list.text.strip
+                  when 'true', '1'
+                    is_packing_list = true
+                  when 'false', '0'
+                    is_packing_list = false
+                  else
+                    errors << "AM #{ am_id }: Asset #{ listed_id }: Invalid SMPTE PackingList boolean #{ packing_list.text.inspect }; expected true, false, 1 or 0"
+                    am_errors = true
+                  end
+                end
+              end
+              if is_packing_list
                 if path
                   inspection_run.packing_list(
                     listed_id,
@@ -295,18 +315,7 @@ module DcpInspect
                     :absolute_path => package( dict[ index ][ listed_id ] ),
                     :present => File.exist?( package( dict[ index ][ listed_id ] ) )
                   )
-                  case am_ns
-                  when MStr::Interop_am
-                    pkls[ index ] << listed_id
-                  when MStr::Smpte_am
-                    if asset.xpath( 'PackingList' ).text == 'true'
-                      pkls[ index ] << listed_id
-                    else
-                      errors << "AM #{ am_id }: SMPTE AM requires a PackingList element to contain the value 'true' (value is missing). Continuing anyway"
-                      am_errors = true
-                      pkls[ index ] << listed_id
-                    end
-                  end
+                  pkls[ index ] << listed_id
                 else
                   errors << "AM #{ am_id }: Found alleged PackingList asset #{ listed_id } but Path element is empty. Not adding to dictionary ❌"
                   am_errors = true
