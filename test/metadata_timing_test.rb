@@ -79,6 +79,25 @@ class MetadataTimingTest < Minitest::Test
     end
   end
 
+  def test_summary_minutes_use_the_selected_timeline_and_keep_timecode
+    with_inspection_fixture do
+      write_cpl(reels: [reference('MainPicture', 4, duration: '120', entry: '24') + reference('MainSound', 5, duration: '120', entry: '24')])
+      write_package
+      summary = inspect_fixture[:inspection_run].compositions.values.first.summary
+      assert_includes summary, '00:00:05:00 (0.08 min)'
+    end
+  end
+
+  def test_invalid_timeline_does_not_report_plausible_minutes
+    with_inspection_fixture do
+      write_cpl(reels: [reference('MainPicture', 4, rate: '0 1') + reference('MainSound', 5)])
+      write_package
+      summary = inspect_fixture[:inspection_run].compositions.values.first.summary
+      assert_includes summary, 'Duration does not compute'
+      refute_match(/\d+\.\d+ min/, summary)
+    end
+  end
+
   def test_mpeg2_does_not_require_jpeg2000_decomposition_metadata
     with_inspection_fixture do
       @metadata["picture.mxf"]["EssenceType"] = V::Mpeg2

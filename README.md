@@ -146,6 +146,10 @@ Font resources are parsed with TTFunk and checked for required glyphs. These
 checks do not simulate subtitle rendering or establish complete application
 profile conformance.
 
+Composition durations show decimal minutes alongside timecode (or exact-rate
+edit-unit/seconds reporting for fractional rates). Minutes follow the CPL's
+selected reel windows; invalid timelines do not receive an estimated duration.
+
 ## Media inspection and composition loudness
 
 PCM channel count is reported as a container count, not an inferred soundfield.

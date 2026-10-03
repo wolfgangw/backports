@@ -2235,6 +2235,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   else
     composition_summary[ :duration ] = '[Duration does not compute] ❌'
   end
+  if timing_complete && total_seconds.positive?
+    composition_summary[:duration_seconds] = total_seconds.to_s
+    composition_summary[:duration] += " (#{format('%.2f', total_seconds / 60)} min)"
+  end
   reels_report << composition_summary[:duration]
 
   # Cosmetics: Interleave reels_report
