@@ -40,7 +40,18 @@ module DcpInspect
         # decode each attribute while retaining its RDN grouping ourselves.
         split_name(text, ',').reverse.map do |rdn|
           split_name(rdn, '+').flat_map do |attribute|
-            distinguished_name(OpenSSL::X509::Name.parse_rfc2253(attribute)).flatten(1)
+            # OpenSSL emits unescaped '=' in values (notably base64 dnQ),
+            # allowed by RFC 4514. Ruby's older RFC 2253 parser rejects it.
+            # Escape only unescaped value equals; retain all other validation.
+            type, delimiter, value = attribute.partition('=')
+            raise ArgumentError, 'missing attribute value delimiter' if delimiter.empty?
+            escaped = false
+            value = value.each_char.map do |char|
+              output = char == '=' && !escaped ? '\\=' : char
+              escaped = !escaped && char == '\\'
+              output
+            end.join
+            distinguished_name(OpenSSL::X509::Name.parse_rfc2253("#{type}=#{value}")).flatten(1)
           end.sort
         end
       end

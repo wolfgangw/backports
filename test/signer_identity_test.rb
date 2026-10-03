@@ -30,6 +30,14 @@ class SignerIdentityTest < Minitest::Test
     assert_empty Identity.errors(signer(subject: 'CN=CS.Signer,O=Example', serial: '+0042'), @certificate)
   end
 
+  def test_equals_in_attribute_values_preserves_identity
+    expected = Identity.distinguished_name(OpenSSL::X509::Name.new([['dnQualifier', 'abc+/=']]))
+    assert_equal expected, Identity.parse_name('dnQualifier=abc\\+/=')
+    assert_equal expected, Identity.parse_name('dnQualifier=abc\\+/\\=')
+    assert_equal expected, Identity.parse_name('dnQualifier="abc+/="')
+    refute_equal expected, Identity.parse_name('dnQualifier=abc\\+/')
+  end
+
   def test_subject_is_optional
     assert_empty Identity.errors(signer, @certificate)
   end
