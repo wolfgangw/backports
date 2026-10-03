@@ -756,7 +756,11 @@ module DcpInspect
                   end
                 end
               end
-              pkl_model.package_size_listed = package_size_listed
+              # Include declarations for assets absent from the AssetMap too.
+              # Invalid declarations must not become plausible zero-byte totals.
+              declared_sizes = pkl_assets.map { |asset| Timing.units(asset.xpath('Size').text) }
+              package_size_listed = declared_sizes.sum if declared_sizes.all?
+              pkl_model.package_size_listed = declared_sizes.all? ? package_size_listed : nil
               pkl_model.package_size_actual = package_size_actual
               @logger.debug "PKL #{ pkl_id }: Package size: #{ package_size_actual == package_size_listed ? package_size_actual.to_k : package_size_actual.to_k + ' (Listed: ' + package_size_listed.to_k + ')' }"
               # List this PKLs CPLs

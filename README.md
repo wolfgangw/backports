@@ -146,6 +146,15 @@ Font resources are parsed with TTFunk and checked for required glyphs. These
 checks do not simulate subtitle rendering or establish complete application
 profile conformance.
 
+Composition summaries include content kind (and custom scope), observed PCM
+channel count, sample rate and bit depth, and IAB/Atmos presence. Channel counts
+describe the container; they do not imply a speaker layout. Programme loudness
+is included when measured. Missing MainSound references are identified explicitly.
+Sizes are reported separately for each PKL containing the CPL: available versus
+declared asset bytes, including declarations missing from the AssetMap. These
+are whole PKL asset totals, not trimmed composition sizes; overlapping PKLs are
+not added together. The model export also retains structured `summary_details`.
+
 Composition durations show decimal minutes alongside timecode (or exact-rate
 edit-unit/seconds reporting for fractional rates). Minutes follow the CPL's
 selected reel windows; invalid timelines do not receive an estimated duration.

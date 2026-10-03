@@ -12,6 +12,7 @@ require_relative "audio_channels"
 require_relative "picture_rates"
 require_relative "screen_aspect_ratio"
 require_relative "log_writer"
+require_relative "composition_reporting"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1113,7 +1114,7 @@ end
 
 def composition_summary_oneliner( composition_summary )
   context = composition_summary[ :context ].nil? ? '' : " (#{ composition_summary[ :context ] })"
-  "CPL #{ composition_summary[ :cpl_id ] }#{ context }: Composition summary: " + [ [ :content_title_text, :type, :crypto, :spatiality, :aspect, :resolution, :picture_bitrate_avg, :duration, :edit_rate ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ', ' )
+  "CPL #{ composition_summary[ :cpl_id ] }#{ context }: Composition summary: " + [ [ :content_title_text, :type, :crypto, :spatiality, :aspect, :resolution, :picture_bitrate_avg, :duration, :edit_rate, :kind_label, :sound_label, :package_label ].reject { |k| composition_summary[k].nil? }.map { |k| composition_summary[k] } ].join( ', ' )
 end
 
 def cpl_reel_asset_references( xml )
@@ -1567,6 +1568,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   composition_picture_bitrates_avg = Array.new
   composition_sound_channel_formats = Array.new
   composition_sound_channel_counts = Array.new
+  composition_sound_tracks = []
+  composition_immersive_ids = []
   supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0, :aux_data => 0 }
 
   reels.each_with_index do |reel, index|
@@ -1690,6 +1693,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
             # MXF?
             if meta
 
+              composition_immersive_ids << asset_id if meta['EssenceType'] == MStr::Atmos
               media_result = inspect_media_headers(asset_file, meta)
               media_failed = record_media_headers(media_result, "#{cpl_reel}: #{asset.node_name} #{asset_id}", errors, hints, report, inspection_run, cpl_model)
               cpl_errors ||= media_failed
@@ -1907,6 +1911,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               # Check audio
               case asset.node_name
               when 'MainSound'
+                composition_sound_tracks << { asset_id: asset_id, reel: reel_no,
+                  essence: meta['EssenceType'], channels: meta['ChannelCount'],
+                  sample_rate: meta['AudioSamplingRate'], bits: meta['QuantizationBits'],
+                  channel_format: meta['ChannelFormat'], encrypted: meta['EncryptedEssence'] }
 
                 # channel format
                 if meta[ 'ChannelFormat' ]
@@ -2380,12 +2388,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     if composition_picture_resolutions.uniq.size == 1
       case composition_picture_resolutions.first
       when '2K'
-        case composition_edit_rate
-        when 48.0
-          composition_picture_resolution = { :abbrev => '48' } # yeah, well. Look it up in 3.9, it's true :) (Changed in 8.2)
-        else
-          composition_picture_resolution = { :abbrev => '2K' }
-        end
+        composition_picture_resolution = { :abbrev => '2K' }
       when '4K'
         composition_picture_resolution = { :abbrev => '4K' }
       when 'HD'
@@ -2412,10 +2415,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       composition_picture_bitrate_avg = ( composition_picture_bitrates_avg.map { |w| w[ :duration ] * w[ :picture_bitrate_avg_mbs ] }.inject( 0, :+ ) / composition_picture_bitrates_avg.map { |w| w[ :duration ] }.inject( 0, :+ ) ).round( 2 )
       composition_summary[ :picture_bitrate_avg ] = "Avg #{ composition_picture_bitrate_avg } Mb/s"
     else
-      composition_summary[ :picture_bitrate_avg ] = "Avg [NaN Mb/s]"
+      composition_summary[ :picture_bitrate_avg ] = 'Picture bitrate unknown'
     end
   else
-    composition_summary[ :picture_bitrate_avg ] = "Avg [NaN Mb/s]"
+    composition_summary[ :picture_bitrate_avg ] = 'Picture bitrate unknown'
   end
 
   # Check consistency of channel formats in sound essence
@@ -2505,10 +2508,25 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     cpl_errors ||= audio_failed
   end
 
+  composition_summary[:content_kind] = content_kind
+  composition_summary[:content_kind_scope] = content_kind_scope&.value
+  composition_summary[:kind_label] = "Kind: #{content_kind.empty? ? 'unknown' : content_kind}"
+  if content_kind_scope && !content_kind_scope_is_default
+    composition_summary[:kind_label] += " (scope #{content_kind_scope.value})"
+  end
+  composition_summary[:sound] = CompositionReporting.sound(composition_sound_tracks, composition_references, composition_immersive_ids)
+  composition_summary[:sound_label] = composition_summary[:sound][:text]
+  if measurement && !measurement[:skipped] && !measurement[:error]
+    composition_summary[:sound_label] += measurement[:silent] ? '; programme silent' : "; programme #{format('%.1f', measurement[:integrated_lufs])} LUFS"
+  end
+  composition_summary[:packages] = CompositionReporting.packages(cpl_model ? cpl_model.packing_lists : [])
+  composition_summary[:package_label] = CompositionReporting.package_text(composition_summary[:packages])
+
   # composition summary one-liner
   composition_summaries << composition_summary
   composition_summary_line = composition_summary_oneliner( composition_summary )
   report << composition_summary_line
+  cpl_model.summary_details = composition_summary if cpl_model
   cpl_model.summary = composition_summary_line.sub( /^CPL #{ cpl_id }(?: \([^)]+\))?: Composition summary: /, '' ) if cpl_model
 
   # Composition completeness
