@@ -158,6 +158,10 @@ module DcpInspect
             #
             # collect all asset nodes
             assets = xml.xpath( '//Asset' )
+            MetadataChecks.duplicate_ids(assets.xpath('Id')).each do |id|
+              errors << "AM #{am_id}: Duplicate Asset Id #{id} ❌"
+              am_errors = true
+            end
             assetmap_model.asset_count = assets.size
 
             @logger.debug "AM #{ am_id }: #{ am_file }"
@@ -445,6 +449,7 @@ module DcpInspect
             if xml
 
               @logger.debug "PKL #{ pkl_id }: #{ pkl_file }"
+              pkl_namespace = xml.root.namespace&.href
 
               if options.schema_validate
                 begin
@@ -521,6 +526,10 @@ module DcpInspect
               pkl_cpls = Array.new
 
               pkl_assets = xml.xpath( '//Asset' )
+              MetadataChecks.duplicate_ids(pkl_assets.xpath('Id')).each do |id|
+                errors << "PKL #{pkl_id}: Duplicate Asset Id #{id} ❌"
+                pkl_errors = true
+              end
               pkl_hashes = options.as_asset_store ? store_hashes : Hash.new { |hash, id| hash[id] = [] }
               pkl_assets.each do |asset|
                 id = asset.at_xpath('Id')&.text.to_s.split(':').last
@@ -602,6 +611,11 @@ module DcpInspect
                   size_listed = asset.xpath( 'Size' ).text.to_i
 
                   if File.exist?( asset_file )
+                    inspect_pkl_asset_type(asset_file, type, pkl_namespace).each do |message|
+                      errors << "PKL #{pkl_id}: Asset #{id}: #{message} ❌"
+                      pkl_errors = true
+                      inspection_run.add_check(asset_model, :type, :error, errors.last) if asset_model
+                    end
                     size_asset = File.size( asset_file )
                     asset_model.size_actual = size_asset if asset_model
                     #

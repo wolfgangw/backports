@@ -1,6 +1,7 @@
 # encoding: utf-8
 require_relative "orchestrator"
 require_relative "audio_analysis"
+require_relative "metadata_checks"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -222,7 +223,7 @@ def initialize(options:, logger: nil, stdout: $stdout, dashboard: nil, started_a
   @schema_store = DcpInspect::XML::SchemaStore.new(XSDDir)
   @document_reader = DcpInspect::XML::DocumentReader.new(
     logger: @logger,
-    mxf_inspector: ->(file) { MxfTools.mxf_inspect(file) }
+    mxf_inspector: ->(file) { inspect_mxf(file) }
   )
   @c14n_available = Nokogiri::XML::Document.new.respond_to?('canonicalize')
   @check_hashes_hits = 0
@@ -997,6 +998,40 @@ def get_asset_uuid( file )
   @document_reader.asset_uuid(file)
 end
 
+def inspect_mxf(file)
+  @mxf_metadata ||= {}
+  return @mxf_metadata[file] if @mxf_metadata.key?(file)
+
+  @mxf_metadata[file] = MxfTools.mxf_inspect(file)
+end
+
+def inspect_pkl_asset_type(file, declared, namespace)
+  format = { MStr::Interop_pkl => 'Interop', MStr::Smpte_pkl => 'SMPTE' }[namespace]
+  return [] unless format
+
+  metadata = inspect_mxf(file)
+  if metadata
+    kind = case metadata['EssenceType']
+           when MStr::Pictures, MStr::Stereoscopic_pictures, MStr::Mpeg2 then :picture
+           when MStr::Audio then :sound
+           else :mxf
+           end
+  else
+    header = File.binread(file, 12)
+    kind = if header.start_with?("\x89PNG\r\n\x1a\n".b)
+      :png
+    elsif ["\x00\x01\x00\x00".b, 'OTTO', 'true', 'typ1'].include?(header.byteslice(0, 4))
+      :font
+    else
+      document = xml?(file)
+      { 'CompositionPlaylist' => :cpl, 'DCSubtitle' => :subtitle }[document && document.root.name]
+    end
+  end
+  MetadataChecks.type_errors(format, declared, kind, mxf: !metadata.nil?)
+rescue SystemCallError, IOError => error
+  ["Could not inspect asset Type: #{error.message}"]
+end
+
 def element_text( xml, xpath_query, ns )
   text = xml.xpath( xpath_query, ns )
   if text.empty?
@@ -1518,6 +1553,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   # Reels
   reels = xml.xpath( "/#{ cpl_ns_prefix }:CompositionPlaylist/#{ cpl_ns_prefix }:ReelList/#{ cpl_ns_prefix }:Reel" )
   report << "Number of Reels:  #{ reels.size }"
+  MetadataChecks.duplicate_ids(reels.xpath("#{cpl_ns_prefix}:Id")).each do |id|
+    errors << "CPL #{cpl_id}: Duplicate Reel Id #{id} ❌"
+    cpl_errors = true
+  end
   total_duration = 0
   composition_edit_rates = Array.new
   #
@@ -1630,7 +1669,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
           if File.exist?( asset_file )
 
-            meta = MxfTools.mxf_inspect( asset_file )
+            meta = inspect_mxf( asset_file )
 
             # MXF?
             if meta
