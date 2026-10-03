@@ -292,6 +292,7 @@ module DcpInspect
         result[:errors] = issues.values
         result
       rescue MxfEssence::Error, SystemCallError => error
+        counts.each { |key, range| result[key] = range }
         result[:errors] = issues.values + [{ message: error.message, count: 1 }]
         result
       end

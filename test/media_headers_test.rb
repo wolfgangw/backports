@@ -75,4 +75,16 @@ class MediaHeadersTest < Minitest::Test
       assert_match(/beyond the file/, result[:errors].first[:message])
     end
   end
+
+  def test_iab_preserves_observed_counts_when_a_later_klv_is_truncated
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'truncated.mxf')
+      File.binwrite(path, mxf(klv(Mxf::ATMOS + "\x01".b, iab_frame)) + 'truncated key')
+      result = Iab.inspect_track(path)
+      assert_equal 1, result[:parsed_frames]
+      assert_equal({ min: 1, max: 1 }, result[:beds])
+      assert_equal({ min: 1, max: 1 }, result[:objects])
+      assert result[:errors].any? { |finding| finding[:message].include?('Truncated') }
+    end
+  end
 end
