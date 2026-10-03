@@ -12,6 +12,12 @@ module DcpInspect
         Rational(match[1].to_i, match[2].to_i)
       end
 
+      def format_rate(value)
+        return '[invalid rate]' unless value && value.positive?
+        rate = value.to_r
+        rate.denominator == 1 ? "#{rate.numerator} fps" : "#{rate} (≈#{format('%.3f', rate)}) fps"
+      end
+
       def units(value)
         text = value.to_s.strip
         text.match?(/\A\d+\z/) ? text.to_i : nil

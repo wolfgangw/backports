@@ -283,3 +283,13 @@ Thanks to all the awesome people who test, provide test materials, discuss and c
 Runs on linux, macOS and windows (WSL) boxes.
 
 Wolfgang Woehl 2011-2026
+
+Picture-rate findings distinguish JPEG2000 cinema delivery from legacy Interop
+MPEG2 (24 or 24000/1001 fps). Fractional JPEG2000 video rates are reported as
+cinema-delivery compatibility errors, even when CPL and MXF metadata agree.
+Rates are compared as exact rationals and displayed with a decimal approximation
+where useful. Stereo sample rates are checked against twice the per-eye edit
+rate. SMPTE baseline checks use ST 429-2:2023; additional-frame-rate, HFR and
+archival profiles outside that baseline are explicitly left unchecked, with a
+compatibility hint. Interop integer-rate extensions similarly require explicit
+target-system support. These findings do not change asset completeness.

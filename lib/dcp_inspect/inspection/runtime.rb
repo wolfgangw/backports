@@ -9,6 +9,7 @@ require_relative "subtitle_inspection"
 require_relative "media_inspection"
 require_relative "composition_audio_inspection"
 require_relative "audio_channels"
+require_relative "picture_rates"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1708,6 +1709,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                 cpl_errors = true
               end
               if %w[MainPicture MainStereoscopicPicture].include?(asset.node_name)
+                PictureRates.findings(meta, composition_type: cpl_type,
+                  stereoscopic: asset.node_name == 'MainStereoscopicPicture').each do |severity, message|
+                  message = "#{cpl_reel}: #{asset.node_name} #{asset_id}: #{message}"
+                  (severity == :error ? errors : hints) << message
+                  cpl_errors = true if severity == :error
+                  inspection_run.add_check(cpl_model, :picture_rate, severity, message,
+                    { asset_id: asset_id, edit_rate: meta['EditRate'], sample_rate: meta['SampleRate'], essence: meta['EssenceType'] }) if cpl_model
+                end
                 frame_node = asset.at_xpath("#{cpl_ns_prefix}:FrameRate", asset_ns)
                 if frame_node
                   frame_rate = Timing.rate(frame_node.text)
@@ -2207,7 +2216,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   reels_report << 'Total duration:'
   if timing_complete && composition_edit_rate
     composition_summary[:duration] = Timing.format_units(total_duration, composition_edit_rate)
-    composition_summary[:edit_rate] = "#{composition_edit_rate} fps"
+    composition_summary[:edit_rate] = Timing.format_rate(composition_edit_rate)
   elsif timing_complete
     composition_summary[:duration] = "#{format('%.3f', total_seconds)} s (multiple edit rates)"
   else
@@ -2441,10 +2450,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   end
 
   # Fire off a hint wrt Interop composition and non-24 fps composition edit rate
-  if composition_type == 'Interop' && composition_edit_rate && composition_edit_rate != 24
-    report << "Interop composition with non-24 fps edit rate (#{ composition_edit_rate })"
-    hints << "CPL #{ cpl_id }: Interop composition with non-24 fps edit rate (#{ composition_edit_rate }). Playback may fail on very old legacy systems"
-  end
+
 
   title_claims = DcpInspect::Inspection::ContentTitle.parse(content_title_text)
   declaring_ids = context[:pkl_asset_ids]
