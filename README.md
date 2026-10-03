@@ -78,6 +78,41 @@ Font resources are parsed with TTFunk and checked for required glyphs. These
 checks do not simulate subtitle rendering or establish complete application
 profile conformance.
 
+## Media inspection and composition loudness
+
+JPEG2000 inspection walks every plaintext codestream's headers and tile-part
+boundaries, checking cinema profile fields, dimensions, component precision,
+coding parameters, progression, and tile-part lengths against the MXF metadata.
+It skips compressed packet bodies; it does not decode pixels. Coding overrides
+outside the implemented subset produce an explicit partial-coverage hint.
+
+IAB/Atmos inspection walks plaintext IAFrames and checks element boundaries,
+frame metadata, bed channels, IDs, and audio-data references. Reports include
+minimum/maximum bed and object definition counts across frames, with top-level
+counts separately. These are observed definitions, not descriptor capacity or
+simultaneously active/rendered object counts. Audio payload coding and full
+application-profile conformance are not validated; unknown elements are reported
+as partial coverage. Encrypted essence is explicitly unchecked.
+
+Both checks run with `--nh --na`, and their findings and summaries appear in
+composition `jpeg2000` and `iab` check details in structured exports. They do not
+perform active-picture detection.
+
+With audio analysis enabled, each CPL's selected MainSound EntryPoint/Duration
+windows are streamed in reel order through one continuous FFmpeg EBU R128
+measurement. Integrated loudness is measured across the composition, not
+averaged from reel LUFS values. Programme channels are selected from supported
+MCA labels and soundfield links or explicitly reported channel-format mappings;
+HI, VI, and synchronization channels are excluded. Ambiguous mappings,
+incompatible reel formats, encrypted audio, and unavailable assets produce an
+explicit skipped result. IAB is not rendered or included in this measurement.
+
+Composition integrated loudness, loudness range, and true peak appear in the
+report and `composition_audio` check details. Measurements are informational:
+there is no universal target-LUFS pass/fail threshold. Existing per-asset audio
+statistics remain available and are labeled as all-channel asset measurements.
+`--na` skips these waveform and loudness analyses.
+
 ## Ruby API
 
 The inspection code is also available as a Ruby library for other tools.
@@ -215,12 +250,10 @@ in backports to keep up-to-date.
 
 - Composition metadata (CMA)
 - Full naming-claim comparison with Composition Metadata Asset (CMA) fields
-- Deep inspection of j2c markers/codestreams
+- JPEG2000 compressed-packet validation and deeper coding/profile checks
 - Decryption-key support for encrypted timed text; additional subtitle schema editions
-- Better audio analysis wrt loudness
+- IAB rendering/loudness and additional programme channel mappings
 - Assetmap options chunks, offsets, volume indices
-- Markers
-- Check Signer.X509IssuerSerial issuer name
 
 # Thank you
 
