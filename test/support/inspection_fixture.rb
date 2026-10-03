@@ -83,10 +83,14 @@ module InspectionFixture
   end
 
   def with_tool_method(name, replacement)
+    singleton = Runtime::MxfTools.singleton_class
+    owned = singleton.instance_methods(false).include?(name)
     original = Runtime::MxfTools.method(name)
+    singleton.remove_method(name) if owned
     Runtime::MxfTools.define_singleton_method(name, replacement)
     yield
   ensure
-    Runtime::MxfTools.define_singleton_method(name, original)
+    singleton.remove_method(name) if singleton.instance_methods(false).include?(name)
+    Runtime::MxfTools.define_singleton_method(name, original) if owned
   end
 end

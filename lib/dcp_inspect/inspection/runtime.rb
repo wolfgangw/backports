@@ -2,6 +2,7 @@
 require_relative "orchestrator"
 require_relative "audio_analysis"
 require_relative "metadata_checks"
+require_relative "timing"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -240,6 +241,7 @@ def initialize(options:, logger: nil, stdout: $stdout, dashboard: nil, started_a
 end
 
 def call(path)
+  @mxf_metadata = {}
   @dcp_inspect_temp = Pipe.new if options.audio_analysis || options.image_analysis
   inspection = dcp_inspect(options, path)
   print_inspection_messages(inspection) unless logger.is_quiet
@@ -1135,7 +1137,10 @@ def cpl_reel_asset_references( xml )
       key_id = asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns ).text.to_s.split( ':' ).last.to_s
       key_id = nil if key_id.empty?
       edit_rate_text = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text
-      n, d = edit_rate_text.split( ' ' ).map { |num| num.to_i }
+      reference_rate = Timing.rate(edit_rate_text)
+      intrinsic = Timing.units(asset.xpath("#{cpl_ns_prefix}:IntrinsicDuration", asset_ns).text)
+      entry = Timing.units(asset.xpath("#{cpl_ns_prefix}:EntryPoint", asset_ns).text) || 0
+      duration_node = asset.at_xpath("#{cpl_ns_prefix}:Duration", asset_ns)
 
       refs << {
         :reel_no => reel_no,
@@ -1143,8 +1148,8 @@ def cpl_reel_asset_references( xml )
         :id => asset_id,
         :intrinsic_duration => asset.xpath( "#{ cpl_ns_prefix }:IntrinsicDuration", asset_ns ).text.to_i,
         :entry_point => asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i,
-        :duration => asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i,
-        :edit_rate => n && d && d != 0 ? Rational( n, d ).to_f : nil,
+        :duration => duration_node ? Timing.units(duration_node.text) : (intrinsic && intrinsic - entry),
+        :edit_rate => reference_rate&.to_f,
         :key_id => key_id
       }
     end
@@ -1558,6 +1563,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     cpl_errors = true
   end
   total_duration = 0
+  total_seconds = Rational(0)
+  timing_complete = true
   composition_edit_rates = Array.new
   #
   # A composition can be "incomplete" in different ways:
@@ -1599,6 +1606,8 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
     # Check a whole bunch of other things
     assets.each do |asset|
+      meta = nil
+      asset_snippet = nil
 
       #
       # CompositionMetadataAsset is already handled
@@ -1639,21 +1648,37 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       end
       intrinsic_duration = asset.xpath( "#{ cpl_ns_prefix }:IntrinsicDuration", asset_ns ).text.to_i
       entry_point = asset.xpath( "#{ cpl_ns_prefix }:EntryPoint", asset_ns ).text.to_i
-      duration = asset.xpath( "#{ cpl_ns_prefix }:Duration", asset_ns ).text.to_i
+      duration_node = asset.at_xpath("#{cpl_ns_prefix}:Duration", asset_ns)
+      duration = duration_node ? duration_node.text.to_i : intrinsic_duration - entry_point
+      timing_valid = true
+      %w[IntrinsicDuration EntryPoint Duration].each do |field|
+        node = asset.at_xpath("#{cpl_ns_prefix}:#{field}", asset_ns)
+        next if !node && field != 'IntrinsicDuration'
+        next unless Timing.units(node&.text).nil?
+
+        errors << "#{cpl_reel}: #{asset.node_name} #{field} must be a nonnegative integer ❌"
+        timing_valid = false
+        cpl_errors = true
+      end
       if asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns )
         cpl_key_id = asset.xpath( "#{ cpl_ns_prefix }:KeyId", asset_ns ).text.split( ':' ).last
       else
         cpl_key_id = nil
       end
 
-      # FIXME Timecode will die on edit_rate == 0
       cpl_asset_edit_rate_text = asset.xpath( "#{ cpl_ns_prefix }:EditRate", asset_ns ).text
-      n, d = cpl_asset_edit_rate_text.split( ' ' ).map { |num| num.to_i }
-      if n and d
-        edit_rate = Rational( n, d ).to_f
-      else
-        edit_rate = nil
+      edit_rate = Timing.rate(cpl_asset_edit_rate_text)
+      unless edit_rate
+        errors << "#{cpl_reel}: #{asset.node_name} invalid EditRate #{cpl_asset_edit_rate_text.inspect}: numerator and denominator must be positive integers ❌"
+        timing_valid = false
+        cpl_errors = true
       end
+      if duration <= 0 || entry_point >= intrinsic_duration || entry_point + duration > intrinsic_duration
+        errors << "#{cpl_reel}: #{asset.node_name} invalid playback interval: IntrinsicDuration #{intrinsic_duration}, EntryPoint #{entry_point}, Duration #{duration} ❌"
+        timing_valid = false
+        cpl_errors = true
+      end
+      timing_complete = false unless timing_valid
 
       case asset.node_name
       when 'MainMarkers'
@@ -1681,12 +1706,25 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               end
 
               # Get asset edit rate early
-              begin
-                n, d = ( meta[ 'EditRate' ] || meta[ 'SampleRate' ] ).split( '/' ).map { |num| num.to_i }
-                asset_edit_rate = Rational( n, d ).to_f
-              rescue Exception => e
+              asset_edit_rate = Timing.rate(meta['EditRate'] || meta['SampleRate'])
+              unless asset_edit_rate
                 errors << "#{ cpl_reel }: Could not scrounge edit rate from #{ asset.node_name } asset #{ asset_id } ❌"
                 cpl_errors = true
+              end
+              if edit_rate && asset_edit_rate && edit_rate != asset_edit_rate
+                errors << "#{cpl_reel}: #{asset.node_name} EditRate #{edit_rate} does not match asset EditRate #{asset_edit_rate} ❌"
+                cpl_errors = true
+              end
+              if %w[MainPicture MainStereoscopicPicture].include?(asset.node_name)
+                frame_node = asset.at_xpath("#{cpl_ns_prefix}:FrameRate", asset_ns)
+                if frame_node
+                  frame_rate = Timing.rate(frame_node.text)
+                  sample_rate = Timing.rate(meta['SampleRate'] || meta['EditRate'])
+                  if !frame_rate || !sample_rate || frame_rate != sample_rate
+                    errors << "#{cpl_reel}: #{asset.node_name} FrameRate #{frame_node.text.inspect} does not match asset SampleRate #{meta['SampleRate'] || meta['EditRate']} ❌"
+                    cpl_errors = true
+                  end
+                end
               end
 
               # Label types Interop/SMPTE
@@ -1731,7 +1769,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               end
 
               # IntrinsicDuration / EntryPoint / Duration sane?
-              sane_IntrinsicDuration_EntryPoint_Duration = true
+              sane_IntrinsicDuration_EntryPoint_Duration = timing_valid
               if intrinsic_duration - entry_point < duration
                 errors << "#{ cpl_reel }: Duration #{ duration } in #{ asset.node_name } does not compute ❌: IntrinsicDuration #{ intrinsic_duration } - EntryPoint #{ entry_point } < Duration #{ duration }"
                 sane_IntrinsicDuration_EntryPoint_Duration = false
@@ -1761,7 +1799,9 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               when 'MainPicture', 'MainStereoscopicPicture'
 
                 # decomposition levels
-                if meta[ 'DecompositionLevels' ]
+                if meta['EssenceType'] == MStr::Mpeg2
+                  # MPEG2 has no JPEG2000 decomposition levels.
+                elsif meta[ 'DecompositionLevels' ]
                   picture_decomposition_levels = meta[ 'DecompositionLevels' ].to_i
                   composition_picture_decomposition_levels << picture_decomposition_levels
                 else
@@ -1912,11 +1952,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                 end
 
                 # Edit rate
-                if asset_edit_rate != edit_rate
-                  errors << "#{ cpl_reel }: MainSound EditRate #{ edit_rate } does not match asset EditRate #{ asset_edit_rate } ❌"
-                  cpl_errors = true
-                end
-
                 # Audio characteristics (EBU R-128 loudness, peak levels, silent channels)
                 audio_stats[ asset_id ] ||= Hash.new
                 dkdms = Hash.new
@@ -1971,7 +2006,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               # This meta_report (and edit_rate) abomination below needs to go. Ugh
               meta_report = [
                 meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
-                meta[ 'ContainerDuration' ] ? meta[ 'EditRate' ] || meta[ 'SampleRate' ] ? Timecode.new( meta[ 'ContainerDuration' ].to_i, asset_edit_rate ).to_s : '[NaN]' : 'ContainerDuration:' + MStr::AssetTypeUnknown,
+                Timing.format_units(meta['ContainerDuration'], asset_edit_rate),
                 meta[ 'EncryptedEssence' ] ? meta[ 'EncryptedEssence' ] == 'Yes' ? 'encrypted' : 'plaintext' : 'Encrypted:' + MStr::AssetTypeUnknown,
                 asset.node_name =~ /Picture/ ? ( meta[ 'StoredWidth' ] || 'StoredWidth:' + MStr::AssetTypeUnknown ) + 'x' + ( meta[ 'StoredHeight' ] || 'StoredHeight:' + MStr::AssetTypeUnknown ) : '',
                 asset.node_name =~ /Picture/ ? meta[ 'Average BitRate' ] ? 'avg ' + meta[ 'Average BitRate' ] : 'avg [NaN Mb/s]' : '',
@@ -2443,7 +2478,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
           :intrinsic_duration => intrinsic_duration,
           :entry_point => entry_point,
           :duration => duration,
-          :edit_rate => edit_rate,
+          :edit_rate => edit_rate&.to_f,
           :key_id => cpl_key_id,
           :details => meta_report,
           :resolved => asset_file_for_model ? File.exist?( asset_file_for_model ) : false
@@ -2451,7 +2486,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       end
 
       begin
-        reels_report << "#{ "%6s" % duration }  #{ edit_rate.nil? ? 'EditRate funk' : Timecode.new( duration, edit_rate ) } @ #{ edit_rate }  Entry #{ Timecode.new( entry_point, edit_rate ) }  #{ asset_id.split( '-' ).first }  #{ asset.node_name }\t(#{ meta_report })"
+        reels_report << "#{ '%6s' % duration }  #{Timing.format_units(duration, edit_rate)} @ #{edit_rate}  Entry #{Timing.format_units(entry_point, edit_rate)}  #{asset_id.to_s.split('-').first}  #{asset.node_name}\t(#{meta_report})"
       rescue Exception => e
         errors << "#{ cpl_reel }: Duration #{ duration }: EditRate #{ edit_rate }: #{ e.message }"
         cpl_errors = true
@@ -2495,11 +2530,12 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     end # assets.each
 
     # Check reel's editrate sanity
-    if edit_rates.uniq.size != 1
+    if edit_rates.empty? || edit_rates.include?(nil) || edit_rates.uniq.size != 1
       reels_report << "\tEditRate mismatch ❌"
-      composition_edit_rates << edit_rates.max
+      composition_edit_rates << nil
       errors << "#{ cpl_reel }: EditRate mismatch ❌"
       cpl_errors = true
+      timing_complete = false
     else
       composition_edit_rates << edit_rates.min
     end
@@ -2509,9 +2545,11 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
       reels_report << "\tDuration mismatch ❌"
       errors << "#{ cpl_reel }: Duration mismatch ❌: #{ durations.inspect }"
       cpl_errors = true
-    else
-      reel_duration = durations.first / edit_rates.min # seconds. gets it done but ugh
+      timing_complete = false
+    elsif composition_edit_rates.last && durations.first.positive?
+      reel_duration = durations.first / composition_edit_rates.last
       total_duration += durations.first # frames
+      total_seconds += reel_duration
       if edit_rates.min > 0 and reel_duration < 1
         reels_report << "\tReel duration less than 1 second ❌"
         errors << "#{ cpl_reel }: Reel duration less than 1 second (#{ "%0.3f" % reel_duration } seconds, #{ amount( 'frame', durations.first.to_i ) }@#{ edit_rates.min } fps) ❌"
@@ -2531,27 +2569,25 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 
 
   # Composition duration
-  if composition_edit_rates.uniq.size == 1
-    composition_edit_rate = composition_edit_rates.first
-  else
-    composition_edit_rate = 0
-  end
-  reels_report << 'Total duration:'
-  begin
-    total_duration_tc = Timecode.new( total_duration, composition_edit_rate )
-  rescue Exception => e
-    errors << "CPL #{ cpl_id }: Exception in reel report ❌: #{ e.message }"
-  end
-  if composition_edit_rate == 0
+  if composition_edit_rates.compact.uniq.size > 1
+    errors << "CPL #{cpl_id}: EditRate mismatch across reels ❌: #{composition_edit_rates.each_with_index.map { |rate, i| "Reel #{i + 1}: #{rate || '[invalid]'}" }.join(', ')}"
     cpl_errors = true
   end
-  reels_report << "#{ "%6s" % total_duration }  #{ composition_edit_rate == 0 ? 'EditRate funk' : total_duration_tc } @ #{ composition_edit_rate }" # FIXME edit_rate
-  if total_duration_tc
-    composition_summary[ :duration ] = total_duration_tc.to_s
-    composition_summary[ :edit_rate ] = "#{ composition_edit_rate } fps"
+  if composition_edit_rates.uniq.size == 1 && composition_edit_rates.first
+    composition_edit_rate = composition_edit_rates.first
+  else
+    composition_edit_rate = nil
+  end
+  reels_report << 'Total duration:'
+  if timing_complete && composition_edit_rate
+    composition_summary[:duration] = Timing.format_units(total_duration, composition_edit_rate)
+    composition_summary[:edit_rate] = "#{composition_edit_rate} fps"
+  elsif timing_complete
+    composition_summary[:duration] = "#{format('%.3f', total_seconds)} s (multiple edit rates)"
   else
     composition_summary[ :duration ] = '[Duration does not compute] ❌'
   end
+  reels_report << composition_summary[:duration]
 
   # Cosmetics: Interleave reels_report
   reels_report.each do |rp|
@@ -2764,7 +2800,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   end
 
   # Fire off a hint wrt Interop composition and non-24 fps composition edit rate
-  if composition_type == 'Interop' && composition_edit_rate != 24.0
+  if composition_type == 'Interop' && composition_edit_rate && composition_edit_rate != 24
     report << "Interop composition with non-24 fps edit rate (#{ composition_edit_rate })"
     hints << "CPL #{ cpl_id }: Interop composition with non-24 fps edit rate (#{ composition_edit_rate }). Playback may fail on very old legacy systems"
   end
