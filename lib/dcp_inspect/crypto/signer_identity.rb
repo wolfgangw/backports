@@ -40,6 +40,11 @@ module DcpInspect
         # decode each attribute while retaining its RDN grouping ourselves.
         split_name(text, ',').reverse.map do |rdn|
           split_name(rdn, '+').flat_map do |attribute|
+            # Accept legacy separator spacing (RFC 2253 section 4). Strip
+            # only before the attribute type, never from the value: escaped
+            # or quoted value spaces remain part of the identity. This parses
+            # a copy of the name and does not alter the signed XML.
+            attribute = attribute.sub(/\A[ \t\r\n]+/, '')
             # OpenSSL emits unescaped '=' in values (notably base64 dnQ),
             # allowed by RFC 4514. Ruby's older RFC 2253 parser rejects it.
             # Escape only unescaped value equals; retain all other validation.

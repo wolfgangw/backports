@@ -42,6 +42,26 @@ class SignerIdentityTest < Minitest::Test
     assert_empty Identity.errors(signer, @certificate)
   end
 
+  def test_separator_whitespace_does_not_change_identity
+    assert_empty Identity.errors(signer(issuer: 'CN=Root, O=Example\\, Inc.'), @certificate)
+    assert_equal Identity.parse_name('CN=Root+O=Example,OU=Authority'),
+      Identity.parse_name("CN=Root+ O=Example,\n\tOU=Authority")
+    # Dolby Unfold's issuer spelling includes both separator spaces and an
+    # unescaped base64 padding equals sign.
+    issuer = 'dnQualifier=GCx2vAlHzkdwGCcO8/RwVow0PAo=, CN=.Cinea.CA.1, O=DC256.Cinea.Com, OU=CA1.DC256.Cinea.Com'
+    assert_equal Identity.parse_name(issuer.gsub(', ', ',')), Identity.parse_name(issuer)
+  end
+
+  def test_separator_tolerance_preserves_value_whitespace_and_escaped_commas
+    expected = Identity.distinguished_name(OpenSSL::X509::Name.new([
+      ['O', 'Example, Inc.'], ['CN', ' Root ']
+    ]))
+    assert_equal expected, Identity.parse_name('CN=\\20Root\\20, O=Example\\, Inc.')
+    assert_equal expected, Identity.parse_name('CN=" Root ", O="Example, Inc."')
+    refute_equal expected, Identity.parse_name('CN=Root, O=Example\\, Inc.')
+    assert Identity.errors(signer(issuer: 'CN=Other, O=Example\\, Inc.'), @certificate).any? { |m| m.include?('issuer name mismatch') }
+  end
+
   def test_issuer_subject_and_serial_mismatches_are_independent
     errors = Identity.errors(signer(issuer: 'CN=Other', subject: 'CN=Other', serial: '43'), @certificate)
     assert_equal 3, errors.size
