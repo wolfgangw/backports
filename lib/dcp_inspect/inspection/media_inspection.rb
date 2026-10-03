@@ -57,6 +57,10 @@ module DcpInspect
             end
             partial = data[:unknown_elements]&.any? || data[:unchecked_overrides]&.any?
             hints << "#{prefix}: #{result[:kind]} contains elements/overrides outside this inspection's coverage" if partial
+            if data[:unchecked_descriptor_fields]&.any?
+              hints << "#{prefix}: MXF JPEG2000 descriptor/essence comparison unchecked for fields not exposed by metadata inspection: #{data[:unchecked_descriptor_fields].join(', ')}"
+              partial = true
+            end
             status = data[:errors].any? ? :error : partial ? :hint : :ok
           end
           inspection_run.add_check(cpl_model, result[:kind], status, "#{prefix}: #{summary}", result) if cpl_model

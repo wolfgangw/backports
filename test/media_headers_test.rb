@@ -57,6 +57,27 @@ class MediaHeadersTest < Minitest::Test
     assert_includes bad[:errors], 'SIZ dimensions differ from MXF picture descriptor'
   end
 
+  def test_every_siz_descriptor_field_is_compared_to_essence
+    bytes = jpeg2000
+    fields = { 'Rsize' => '3', 'Xsize' => '1998', 'Ysize' => '1080', 'XOsize' => '0', 'YOsize' => '0',
+      'XTsize' => '1998', 'YTsize' => '1080', 'XTOsize' => '0', 'YTOsize' => '0' }
+    assert_empty J2k.inspect_frame(StringIO.new(bytes), 0, bytes.size, fields)[:errors]
+    fields.each do |field, value|
+      [value.to_i + 1, 'broken'].each do |bad|
+        header = J2k.inspect_frame(StringIO.new(bytes), 0, bytes.size, fields.merge(field => bad.to_s))
+        assert header[:errors].any? { |m| m.include?("descriptor #{field}=") && m.include?('essence SIZ') }, field
+      end
+    end
+    with_track(Mxf::J2K, [bytes, bytes]) do |path|
+      result = J2k.inspect_track(path, fields.merge('Xsize' => '409867776', 'YTsize' => '0'))
+      assert_equal 2, result[:errors].size
+      assert result[:errors].all? { |finding| finding[:count] == 2 && finding[:first_codestream] == 1 }
+      assert_equal 1998, result[:first_header][:siz]['Xsize']
+      assert_empty result[:unchecked_descriptor_fields]
+      assert_equal J2k::SIZ_FIELDS, result[:descriptor_fields_checked]
+    end
+  end
+
   def test_jpeg2000_reports_style_and_profile_with_frame_evidence
     with_track(Mxf::J2K, [jpeg2000, jpeg2000(block_style: 1, profile: 2)]) do |path|
       result = J2k.inspect_track(path, { 'ContainerDuration' => '2' })

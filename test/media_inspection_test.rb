@@ -33,6 +33,21 @@ class MediaInspectionTest < Minitest::Test
     end
   end
 
+  def test_quvis_style_descriptor_corruption_is_a_composition_error
+    with_inspection_fixture do
+      picture_track
+      @metadata['picture.mxf'].merge!('Rsize' => '3', 'Xsize' => '409867776', 'Ysize' => '1',
+        'XOsize' => '4102', 'YOsize' => '0', 'XTsize' => '560', 'YTsize' => '0', 'XTOsize' => '409867776', 'YTOsize' => '1')
+      write_package
+      result = inspect_fixture
+      assert result[:errors].any? { |message| message.include?('Xsize="409867776"') && message.include?('Xsize=1998') }
+      check = result[:inspection_run].compositions.values.first.checks.find { |entry| entry.kind == :jpeg2000 }
+      assert_equal :error, check.status
+      assert_empty check.details[:data][:unchecked_descriptor_fields]
+      assert_equal :complete, result[:inspection_run].compositions.values.first.completeness_status
+    end
+  end
+
   def test_iab_counts_are_exported_as_actual_definitions_not_descriptor_capacity
     with_inspection_fixture do
       picture_track

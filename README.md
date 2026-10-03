@@ -132,7 +132,11 @@ Silence in unused channels is not a channel-count failure.
 JPEG2000 inspection walks every plaintext codestream's headers and tile-part
 boundaries, checking cinema profile fields, dimensions, component precision,
 coding parameters, progression, and tile-part lengths against the MXF metadata.
-It skips compressed packet bodies; it does not decode pixels. Coding overrides
+The SIZ profile, dimensions, image origins, tile dimensions and tile origins
+are compared field by field with the MXF JPEG2000 descriptor for every inspected
+codestream. Findings identify the field, declared/observed values and affected
+codestream count. Missing descriptor fields and encrypted essence are explicitly
+unchecked. It skips compressed packet bodies; it does not decode pixels. Coding overrides
 outside the implemented subset produce an explicit partial-coverage hint.
 
 IAB/Atmos inspection walks plaintext IAFrames and checks element boundaries,

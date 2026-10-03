@@ -8,6 +8,7 @@ module DcpInspect
     # See BROWSER_BACKPORT_LICENSE. Compressed packet bodies are never decoded.
     module Jpeg2000Headers
       class Error < StandardError; end
+      SIZ_FIELDS = %w[Rsize Xsize Ysize XOsize YOsize XTsize YTsize XTOsize YTOsize].freeze
       module_function
       def read(io, count, limit)
         raise Error, 'JPEG2000 marker extends beyond the codestream' if count < 0 || io.pos + count > limit
@@ -69,6 +70,14 @@ module DcpInspect
         raise Error, 'Invalid SIZ component count/length' unless components > 0 && siz.size == 36 + 3 * components
         raise Error, 'Invalid SIZ dimensions or tile size' unless xs > xo && ys > yo && xt > 0 && yt > 0 && xs > xto && ys > yto
         width, height = xs - xo, ys - yo
+        siz_fields = SIZ_FIELDS.zip([profile, xs, ys, xo, yo, xt, yt, xto, yto]).to_h
+        siz_fields.each do |field, observed|
+          next unless descriptor.key?(field)
+          declared = Timing.units(descriptor[field])
+          unless declared == observed
+            errors << "MXF JPEG2000 descriptor #{field}=#{descriptor[field].inspect} differs from essence SIZ #{field}=#{observed}"
+          end
+        end
         four_k = width > 2048 || height > 1080
         expected_parts = four_k ? 6 : 3
         errors << "DCI cinema SIZ profile must be #{four_k ? 4 : 3}; found #{profile}" unless profile == (four_k ? 4 : 3)
@@ -76,7 +85,7 @@ module DcpInspect
         errors << 'Cinema JPEG2000 must use one tile' unless (xs - xto + xt - 1) / xt * ((ys - yto + yt - 1) / yt) == 1
         errors << 'Cinema JPEG2000 requires three unsigned 12-bit, unsubsampled components' unless components == 3 && siz.byteslice(36..).bytes.each_slice(3).all? { |values| values == [11, 1, 1] }
         if descriptor['StoredWidth'] && descriptor['StoredHeight']
-          errors << 'SIZ dimensions differ from MXF picture descriptor' unless width == descriptor['StoredWidth'].to_i && height == descriptor['StoredHeight'].to_i
+          errors << 'SIZ dimensions differ from MXF picture descriptor' unless width == Timing.units(descriptor['StoredWidth']) && height == Timing.units(descriptor['StoredHeight'])
         end
         levels = cod.getbyte(5)
         errors << 'COD must declare one quality layer' unless u16(cod, 2) == 1
@@ -110,11 +119,13 @@ module DcpInspect
         end
         errors << 'TLM is missing or disagrees with SOT tile-part lengths' unless tlm.any? && entries == tiles.map { |tile| [tile[:tile], tile[:length]] }
         { errors: errors, unchecked_overrides: overrides, width: width, height: height, profile: profile,
-          components: components, decomposition_levels: levels, tile_parts: tiles.size }
+          components: components, decomposition_levels: levels, tile_parts: tiles.size, siz: siz_fields }
       end
 
       def inspect_track(path, descriptor = {})
         result = { codestreams: 0, checked: 0, errors: [], unchecked_overrides: [], first_header: nil,
+          descriptor_fields_checked: SIZ_FIELDS.select { |field| descriptor.key?(field) },
+          unchecked_descriptor_fields: SIZ_FIELDS.reject { |field| descriptor.key?(field) },
           scope: 'Plaintext JPEG2000 headers and tile-part boundaries; compressed packets/pixels unchecked' }
         issues = {}
         record = lambda do |message|
