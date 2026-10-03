@@ -502,6 +502,8 @@ module DcpInspect
               end
 
               # FIXME
+              pkl_unsigned = xml.xpath('//*[local-name()="Signature" and namespace-uri()="http://www.w3.org/2000/09/xmldsig#"]').empty?
+              pkl_encrypted_asset_ids = []
               xml.remove_namespaces!
 
               pkl_annotation_text = xml.xpath( '/PackingList/AnnotationText' ).text
@@ -603,6 +605,9 @@ module DcpInspect
                   size_listed = asset.xpath( 'Size' ).text.to_i
 
                   if File.exist?( asset_file )
+                    if pkl_namespace == MStr::Smpte_pkl && inspect_mxf(asset_file)&.fetch('EncryptedEssence', nil) == 'Yes'
+                      pkl_encrypted_asset_ids << id
+                    end
                     inspect_pkl_asset_type(asset_file, type, pkl_namespace).each do |message|
                       errors << "PKL #{pkl_id}: Asset #{id}: #{message} ❌"
                       pkl_errors = true
@@ -755,6 +760,13 @@ module DcpInspect
                     inspection_run.add_check( asset_model, :hash, :ok, info.last )
                   end
                 end
+              end
+              if pkl_namespace == MStr::Smpte_pkl && pkl_unsigned && pkl_encrypted_asset_ids.any?
+                message = "PKL #{pkl_id}: Unsigned SMPTE PKL lists observed encrypted essence. DCI DCSS 5.5.2.3 requires signing such Packing Lists for transport integrity. PKL signing does not establish CPL ContentAuthenticator compatibility or determine a KDM formulation."
+                hints << message
+                @logger.debug message
+                inspection_run.add_check(pkl_model, :unsigned_encrypted, :hint, message,
+                  { encrypted_asset_ids: pkl_encrypted_asset_ids.uniq })
               end
               # Include declarations for assets absent from the AssetMap too.
               # Invalid declarations must not become plausible zero-byte totals.

@@ -1570,6 +1570,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   composition_sound_channel_counts = Array.new
   composition_sound_tracks = []
   composition_immersive_ids = []
+  observed_encrypted_assets = []
   supplemental_refs = { :main_picture => 0, :main_sound => 0, :main_subtitle => 0, :main_caption => 0, :aux_data => 0 }
 
   reels.each_with_index do |reel, index|
@@ -1756,6 +1757,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               end
 
               # Encrypted essence?
+              observed_encrypted_assets << asset_id if meta['EncryptedEssence'] == 'Yes'
               if meta[ 'EncryptedEssence' ]
                 if meta[ 'EncryptedEssence' ] == 'Yes'
                   if meta[ 'CryptographicKeyID' ]
@@ -2309,6 +2311,15 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     end
   else
     composition_summary[ :crypto ] = 'Plaintext'
+  end
+
+  if cpl_ns == MStr::Smpte_cpl && xml.xpath('//*[local-name()="Signature" and namespace-uri()="http://www.w3.org/2000/09/xmldsig#"]').empty? &&
+      (observed_encrypted_assets.any? || composition_references.any? { |ref| ref[:key_id] })
+    evidence = observed_encrypted_assets.any? ? 'observed encrypted essence' : 'KeyId declarations (essence encryption not confirmed)'
+    message = "CPL #{cpl_id}: Unsigned SMPTE CPL with #{evidence}. DCI DCSS 5.4.3.7 requires signing for encrypted essence. This CPL cannot satisfy a KDM ContentAuthenticator check; playback requirements depend on the intended KDM workflow. No KDM formulation inferred."
+    hints << message
+    report << message
+    inspection_run.add_check(cpl_model, :unsigned_encrypted, :hint, message) if cpl_model
   end
 
   # Eligibility is separate from signature/certificate compliance. The CLI does

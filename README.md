@@ -161,6 +161,13 @@ selected reel windows; invalid timelines do not receive an estimated duration.
 
 ## Media inspection and composition loudness
 
+Unsigned SMPTE CPLs referencing encrypted essence receive a contextual signing
+hint (KeyId declarations are labelled when encryption is not confirmed).
+Unsigned SMPTE PKLs receive a hint when their own listed assets contain observed
+encrypted essence, including packages without a CPL. These cite the DCI signing
+requirements without inferring a KDM formulation or guaranteeing playback.
+Present but invalid signatures retain their verification errors.
+
 PCM channel count is reported as a container count, not an inferred soundfield.
 Four-channel Interop tracks (L/R/C/LFE, including centre-only programmes) are
 accepted. Odd counts receive an ISDCF delivery hint for Interop and a normative
