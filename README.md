@@ -41,6 +41,43 @@ For signed CPLs and PKLs, the Signer's issuer name, serial number, and optional
 subject name are compared with the signing certificate. Identity mismatches are
 validation errors even when the cryptographic signature itself verifies.
 
+## Naming and subtitles
+
+ContentTitleText is parsed as a set of naming claims, preserving spelling and
+case. Modern and legacy forms use a pinned ISDCF registry snapshot (2026-10-01).
+Missing or ambiguous fields remain unknown. Explicit format, dimension, frame
+rate, resolution, and OV/VF claims are compared with available evidence;
+disagreements are hints, not substitutes for technical validation. OV/VF is
+compared with membership in the declaring PKL, independently of whether an
+external asset is available elsewhere in an asset store. Parsed claims and
+external asset IDs appear in composition `naming` check details.
+
+Interop DCSubtitle XML and extracted SMPTE timed text share timing, font,
+resource, and content checks. These cover subtitle ordering, positive intervals,
+fade durations, native timeline bounds, font IDs and glyph availability,
+unexpected text outside Text/Image elements, and closed-display/stereoscopic
+constraints. Spot-number discontinuities and off-center horizontal alignment
+are review hints. CPL EntryPoint/Duration may trim the native subtitle timeline.
+Detailed findings and resource summaries appear in composition `subtitles`
+check details; subtitle errors make composition validation fail independently
+of asset completeness.
+
+Interop resources resolve by their exact relative URI and must be listed in the
+inspection dictionary. SMPTE XML and ancillary resources are extracted with
+`asdcp-unwrap` into a private temporary directory, removed after inspection or
+interruption. This runs with `--nh --na` as well. Missing `asdcp-unwrap` or
+encrypted timed text produces an explicit unchecked hint. Extraction failures
+are errors. Embedded XML is compared with the MXF document ID, namespace, edit
+rate, and resource declarations. The installed 2010-namespace subtitle schema
+is used unless `--no-schema` is selected; other namespaces get an explicit
+schema-unchecked hint alongside semantic/resource checks.
+
+PNG inspection checks the signature, header dimensions, and size relative to
+the picture where known; it does not decode pixels or validate every PNG chunk.
+Font resources are parsed with TTFunk and checked for required glyphs. These
+checks do not simulate subtitle rendering or establish complete application
+profile conformance.
+
 ## Ruby API
 
 The inspection code is also available as a Ruby library for other tools.
@@ -144,7 +181,7 @@ See [Digital Cinema Tools Distribution](https://github.com/wolfgangw/digital_cin
 
     This includes composition type consistency and completeness checks.
 
-- Deep-inspects DCSubtitle
+- Inspects Interop DCSubtitle and unencrypted SMPTE timed-text XML/resources
 
 - Reports in detail all errors encountered
 
@@ -177,9 +214,9 @@ in backports to keep up-to-date.
 # What's missing
 
 - Composition metadata (CMA)
-- Cross-check of updated naming convention with CMA / claimed asset properties / actual asset properties
+- Full naming-claim comparison with Composition Metadata Asset (CMA) fields
 - Deep inspection of j2c markers/codestreams
-- Deep inspection of SMPTE timed text trackfiles
+- Decryption-key support for encrypted timed text; additional subtitle schema editions
 - Better audio analysis wrt loudness
 - Assetmap options chunks, offsets, volume indices
 - Markers
