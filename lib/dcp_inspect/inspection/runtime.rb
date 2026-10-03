@@ -5,6 +5,7 @@ require_relative "metadata_checks"
 require_relative "timing"
 require_relative "markers"
 require_relative "content_title"
+require_relative "subtitle_inspection"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1578,6 +1579,13 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     durations = Array.new
     edit_rates = Array.new
     assets = reel.xpath( "#{ cpl_ns_prefix }:AssetList/*" )
+    picture_reference = assets.find { |node| ['MainPicture', 'MainStereoscopicPicture'].include?(node.name) }
+    picture_id = picture_reference&.at_xpath("#{cpl_ns_prefix}:Id")&.text&.split(':')&.last
+    picture_meta = dict && dict[picture_id] && inspect_mxf(package(dict[picture_id]))
+    subtitle_picture = picture_meta ? {
+      picture_width: Timing.units(picture_meta['StoredWidth']),
+      picture_height: Timing.units(picture_meta['StoredHeight'])
+    } : {}
 
     # Check uniqueness of asset kinds which need to be unique in a reel.
     # Multiple instances of ClosedCaption, MainCaption and ClosedSubtitle allowed.
@@ -1987,6 +1995,18 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
               end # Check audio (MainSound)
 
 
+              if meta['EssenceType'] == MStr::Timed_text
+                subtitle_result = inspect_embedded_subtitle(asset_file, meta, dict, {
+                  document_id: meta['AssetID'], descriptor_rate: asset_edit_rate,
+                  descriptor_namespace: meta['NamespaceName'],
+                  declared_resources: meta.select { |key, _value| TimedText::UUID.match?(key) },
+                  reel: reel_no, kind: asset.node_name, edit_rate: edit_rate,
+                  intrinsic: intrinsic_duration, entry_point: entry_point, duration: duration
+                }.merge(subtitle_picture))
+                failed = record_subtitle_findings(subtitle_result, "#{cpl_reel}: SMPTE timed text #{asset_id}", errors, hints, inspection_run, cpl_model)
+                cpl_errors ||= failed
+              end
+
               # This meta_report (and edit_rate) abomination below needs to go. Ugh
               meta_report = [
                 meta[ 'Label Set Type' ] || 'Label Set Type:' + MStr::AssetTypeUnknown,
@@ -2013,380 +2033,14 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                 cpl_referenced_assets << { asset_id => true }
                 cpl_referenced_assets_types << MStr::AssetTypeInterop
 
-                #
-                # DCSubtitle Schema validation
-                #
-                if options.schema_validate
-                  begin
-                    valid, errors, cpl_errors = schema_validation( errors, cpl_errors, xml, asset_file, asset_id, 'DCSubtitle' )
-                    report << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Schema check: #{ valid ? 'OK ✅' : "Errors ❌ (See #{ error_output })" }"
-                  rescue Exception => e
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Exception in Schema check ❌: #{ e.message }"
-                    cpl_errors = true
-                    report << errors.last
-                  end
-                end
-
-                #
-                # Check for content of ReelNumber element
-                #
-                if ( reelnumber_el = xml.xpath( '/DCSubtitle/ReelNumber' ) and reelnumber_el.size == 1 )
-                  if reelnumber_el.children.size == 1
-                    if reelnumber_el.children.first.class == Nokogiri::XML::Text
-                      reelnumber_el_content = reelnumber_el.children.first.content
-                      if reelnumber_el_content.strip =~ /\d+/
-                        if reelnumber_el_content.to_i != reel_no
-                          hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber '#{ reelnumber_el_content.to_i }' does not match its CPL reel number '#{ reel_no }'"
-                          report << hints.last
-                        end
-                      else
-                        hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber content is not numerical: #{ reelnumber_el_content.inspect }"
-                        report << hints.last
-                      end
-                    else
-                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has unexpected content ❌: #{ reelnumber_el.children.first.class }"
-                      cpl_errors = true
-                      report << errors.last
-                    end
-                  else
-                    if reelnumber_el.children.size == 0
-                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has no content"
-                      report << hints.last
-                    elsif reelnumber_el.children.size > 1 # Note that TI's DTD says CDATA (non-parsed character data)
-                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber has more than 1 subelement"
-                      report << hints.last
-                    end
-                  end
-                else
-                  if reelnumber_el.size == 0
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: ReelNumber element not found ❌"
-                    cpl_errors = true
-                    report << errors.last
-                  else
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: More than 1 ReelNumber element found ❌"
-                    cpl_errors = true
-                    report << errors.last
-                  end
-                end
-
-                #
-                # Check for content of Language element
-                #
-                if ( language_el = xml.xpath( '/DCSubtitle/Language' ) and language_el.size == 1 )
-                  if language_el.children.size == 1
-                    if language_el.children.first.class == Nokogiri::XML::Text
-                      language_el_content = language_el.children.first.content
-                      if ! ( language_el_content.strip =~ /[[:alpha:]]/ )
-                        hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language content contains unexpected characters: #{ language_el_content.inspect }"
-                        report << hints.last
-                      end
-                    else
-                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has unexpected content ❌: #{ language_el.children.first.class }"
-                      cpl_errors = true
-                      report << errors.last
-                    end
-                  else
-                    if language_el.children.size == 0
-                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has no content"
-                      report << hints.last
-                    elsif language_el.children.size > 1 # Note that TI's DTD says CDATA (non-parsed character data)
-                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language has more than 1 subelement"
-                      report << hints.last
-                    end
-                  end
-                else
-                  if language_el.size == 0
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Language element not found ❌"
-                    cpl_errors = true
-                    report << errors.last
-                  else
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: More than 1 Language element found ❌"
-                    cpl_errors = true
-                    report << errors.last
-                  end
-                end
-
-                xml.remove_namespaces!
-                if ( subtitles = xml.xpath( '//Subtitle' ) and subtitles.size > 0 )
-
-                  #
-                  # Check for TC range violations
-                  #
-                  subtitles.each do |sub|
-                    [ 'TimeIn', 'TimeOut' ].each do |tc_attr_name|
-                      tc_string = sub.attributes[ tc_attr_name ].value
-                      begin
-                        parse_dcsubtitle_tc_string( tc_string, edit_rate )
-                      rescue Exception => e
-                        spot_number = ( sub.attributes[ 'SpotNumber' ] ? sub.attributes[ 'SpotNumber' ].value : nil )
-                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Spot #{ spot_number }: #{ e.inspect }"
-                      end
-                    end
-                  end
-
-                  #
-                  # Scan all subtitles to find actual first_time_in and last_time_out
-                  # Last subtitle is not necessarily the last displayed
-                  # Scrounge content snippets along the way
-                  #
-                  # See CRAWL which sports empty Subtitle elements
-                  #
-                  # TI spec 2.9 Subtitle says
-                  #
-                  #   "The Subtitle element is a parent element. It includes [...] one or more child elements [...]"
-                  #
-                  # The XSD we're using right now (DCSubtitle.v1.mattsson.xsd), though, has
-                  #
-                  #     <xs:choice minOccurs="0" maxOccurs="unbounded">
-                  #       <xs:element minOccurs="0" maxOccurs="unbounded" ref="Font"/>
-                  #       <xs:element minOccurs="0" maxOccurs="unbounded" ref="Text"/>
-                  #       <xs:element ref="Image"/>
-                  #     </xs:choice>
-                  #
-                  # Correctness tbd
-                  #
-                  # First
-                  #
-                  first_time_in = subtitles.first.attributes[ 'TimeIn' ].value
-                  nodeset = subtitles.first.xpath( '*/Text|Text|*/Image|Image' )
-                  if nodeset.empty?
-                    first_time_in_text = '[No child element]'
-                    hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: First Subtitle element has neither Text nor Image"
-                  else
-                    first_time_in_text = truncate( nodeset.first.text.strip, 3 ) # first line
-                  end
-                  subtitles[ 1 .. -1 ].each do |sub|
-                    if first_time_in < sub.attributes[ 'TimeIn' ].value
-                      break
-                    end
-                    first_time_in = sub.attributes[ 'TimeIn' ].value
-                  end
-                  #
-                  # Last
-                  #
-                  last_time_out = subtitles.last.attributes[ 'TimeOut' ].value
-                  nodeset = subtitles.last.xpath( '*/Text|Text|*/Image|Image' )
-                  if nodeset.empty?
-                    last_time_out_text = '[No child element]'
-                    hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last Subtitle element has neither Text nor Image"
-                  else
-                    last_time_out_text = truncate( nodeset.last.text.strip, 3 )
-                  end
-                  subtitles.reverse[ 1 .. -1 ].each do |sub|
-                    if last_time_out > sub.attributes[ 'TimeOut' ].value
-                      break
-                    end
-                    last_time_out = sub.attributes[ 'TimeOut' ].value
-                    nodeset = sub.xpath( '*/Text|Text|*/Image|Image' )
-                    if nodeset.empty?
-                      last_time_out_text = '[No child element]'
-                      hints << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last to-be-displayed Subtitle element has neither Text nor Image"
-                    else
-                      last_time_out_text = truncate( nodeset.last.text.strip, 3 ) # last line
-                    end
-                  end
-
-                  begin
-                    first_time_in = parse_dcsubtitle_tc_string( first_time_in, edit_rate )
-                    last_time_out = parse_dcsubtitle_tc_string( last_time_out, edit_rate )
-                  rescue Exception => e
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Timecode: #{ e.message } ❌"
-                    cpl_errors = true
-                  end
-
-                  #
-                  # Cross-check duration/reel duration and last TimeOut
-                  # We don't have reel_duration yet so here's an indirect way to tell if something's wrong
-                  # FIXME
-                  # Boy-oh-boy, this an ugly hack which exposes nicely the essential design flaw
-                  #
-                  # duration (self) and last TimeOut
-                  #
-                  if last_time_out.to_i > duration
-                    errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last TimeOut #{ last_time_out.to_s } exceeds MainSubtitle duration #{ Timecode.new( duration, edit_rate ).to_s } ❌"
-                    cpl_errors = true
-                  end
-                  #
-                  # reel duration (preliminary) and last TimeOut
-                  #
-                  if durations.size > 1 # Assume we have one previous asset duration
-                    begin
-                      reel_duration_prelim = Timecode.new( durations[ 0 .. -2 ].min, edit_rates[ 0 .. -2 ].min )
-                      if last_time_out > reel_duration_prelim
-                        errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Last TimeOut #{ last_time_out.to_s } exceeds reel duration #{ reel_duration_prelim } ❌"
-                        cpl_errors = true
-                      end
-                    rescue Exception => e
-                      errors << "#{ cpl_reel }: DCSubtitle #{ asset_id }: Timecode: #{ e.message }"
-                      cpl_errors = true
-                    end
-                  end
-
-
-                  #
-                  # Check for empty elements. Thanks to Mattias Mattsson, Lilian Lefranc and Johann Hohenwarter for the field feedback
-                  #
-                  empty_subtitles = 0
-                  subtitles.each do |sub|
-                    spot_number = ( sub.attributes[ 'SpotNumber' ] ? sub.attributes[ 'SpotNumber' ].value : nil )
-                    if sub.children.empty? or ( sub.children.size == 1 and sub.children.first.is_a? Nokogiri::XML::Text )
-                      empty_subtitles += 1
-                      errors << "#{ cpl_reel }: DCSubtitle: Empty Subtitle element#{ spot_number ? ': SpotNumber ' + spot_number : '' } ❌"
-                      cpl_errors = true
-                    elsif ( nodeset = sub.xpath( '*/Text|Text|*/Image|Image' ) )
-                      nodeset.each do |node|
-                        if node.text == ''
-                          empty_subtitles += 1
-                          hints << "#{ cpl_reel }: DCSubtitle: Empty #{ node.name } element#{ spot_number ? ': SpotNumber ' + spot_number : '' }. While not a specification error this can lead to playback problems in the field. Consider fixing"
-                        end
-                      end
-                    end
-                  end
-
-                  #
-                  # Check whether all referenced resources (font, subtitle images)
-                  # are in the dictionary and exist on the medium
-                  #
-                  text_elements = false
-                  text_elements_values = Array.new
-                  load_font_el = xml.xpath( '//LoadFont' )
-                  font_el = xml.xpath( '//Font' )
-
-                  subtitles.each do |sub|
-                    spot_number = ( sub.attributes[ 'SpotNumber' ] ? sub.attributes[ 'SpotNumber' ].value : nil )
-                    nodeset = sub.xpath( '*/Text|Text|*/Image|Image' )
-                    nodeset.each do |node|
-                      case node.name
-                      when 'Text'
-                        text_elements = true
-                        text_elements_values << { :number => spot_number, :text => node.text.strip }
-                      when 'Image'
-                        unless node.text.empty? # Checked above
-                          asset_name = File.join( asset_id, node.text )
-                          asset_pick = dict.select { |k, v| v =~ Regexp.new( asset_name ) }
-
-                          if asset_pick.empty?
-                            errors << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not in AssetMap"
-                            cpl_errors = true
-                          else
-                            unless File.exist?( package asset_pick.values.first ) # FIXME
-                              errors << "#{ cpl_reel }: DCSubtitle: #{ spot_number ? 'SpotNumber ' + spot_number + ': ' : '' }Referenced subtitle image #{ asset_name.inspect } not found on the medium"
-                              cpl_errors = true
-                            end
-                          end
-
-                        end
-                      end
-                    end
-                  end
-
-                  # Check referenced font file
-                  if text_elements
-                    if load_font_el.empty?
-                      hints << "#{ cpl_reel }: DCSubtitle: No LoadFont element found. Playback will use a default font"
-                    else
-                      # FIXME 1 LoadFont element
-                      load_font_uri = load_font_el.first.attributes[ 'URI' ].value
-                      font_asset = File.join( asset_id, File.basename( load_font_uri ) )
-                      font_path = nil
-                      if dict.values.any? { |val| val =~ /#{ font_asset }$/ && font_path = val }
-                        font_asset = package font_path
-                        if File.exist?( font_asset )
-                          if font?( font_asset )
-                            # Check for font max size recommendation
-                            font_asset_size = File.size font_asset
-                            if font_asset_size > 655360 # 640 KB
-                              errors << "#{ cpl_reel }: DCSubtitle: Font #{ font_asset } size #{ font_asset_size.to_k } exceeds 640 KB ❌"
-                              cpl_errors = true
-                            end
-                            # Get font name
-                            begin
-                              # Scrounge font subfamily name
-                              font_fu = TTFunk::File.open font_asset
-                              begin
-                                font_unique_subfamily = font_fu.name.unique_subfamily[ 1 ].to_s # FIXME not always 2nd element. Why/how?
-                                info << "#{ cpl_reel }: DCSubtitle: Referenced font subfamily: #{ font_unique_subfamily }"
-                              rescue TypeError => e
-                                hints << "#{ cpl_reel }: DCSubtitle: Referenced font #{ font_asset }: Failed to extract internal name structure"
-                              end
-
-                              # Check if all glyphs can be rendered with provided font
-                              glyphs_missing = false
-                              text_elements_values.each do |spot|
-                                unless font_fu.provides_glyphs_for?( spot[ :text ] )
-                                  glyphs_missing = true
-                                  # pick the exact ones
-                                  glyphs_missing_list = Array.new
-                                  spot[ :text ].split( '' ).each do |char|
-                                    glyphs_missing_list << char unless font_fu.provides_glyphs_for?( char )
-                                  end
-                                  hints << "#{ cpl_reel }: DCSubtitle: SpotNumber #{ spot[ :number ] }: Font is missing #{ amount( 'glyph', glyphs_missing_list ) } to render #{ spot[ :text ].inspect } (#{ spot[ :text ].encoding }) ❌: #{ glyphs_missing_list.inspect }"
-                                end
-                              end
-                              if glyphs_missing
-                                hints << "#{ cpl_reel }: DCSubtitle: Font #{ font_asset } is missing some required glyphs ❌"
-                              end
-                            rescue NoMethodError => e
-                              errors << "#{ cpl_reel }: DCSubtitle: Referenced font #{ font_asset } not valid ❌: #{ e.message }"
-                              cpl_errors = true
-                            end
-                          else
-                            errors << "#{ cpl_reel }: DCSubtitle: Font #{ font_asset } referenced in LoadFont is neither #{ MStr::TTF } nor #{ MStr::OTF } ❌"
-                            cpl_errors = true
-                          end
-                        end
-                      else
-                        errors << "#{ cpl_reel }: DCSubtitle: Referenced font #{ font_asset } not in AssetMap ❌"
-                        cpl_errors = true
-                      end
-                      if load_font_el.size > 1
-                        hints << "#{ cpl_reel }: DCSubtitle: Found multiple LoadFont elements. Playback will use 1st: #{ load_font_uri }"
-                      end
-                    end
-                  end # text_elements
-
-                  # Check LoadFont / Font Id dependency
-                  # See https://github.com/wolfgangw/digital_cinema_tools_distribution/issues/15 for discussion
-                  # TI's Subtitle_Specification_TI_1.1.pdf: Font's attributes are all #IMPLIED (not required)
-                  font_ids = Array.new
-                  font_el.each do |el|
-                    font_ids << el.attributes[ 'Id' ].value if el.attributes[ 'Id' ]
-                  end
-                  font_ids.uniq!
-                  if font_ids.size > 1
-                    errors << "#{ cpl_reel }: DCSubtitle: Multiple Font Ids referenced ❌: #{ font_ids.inspect }"
-                    cpl_errors = true
-                  end
-                  if load_font_el.empty?
-                    if font_ids.size > 0
-                      errors << "#{ cpl_reel }: DCSubtitle: No Font Id declared via LoadFont but referenced Font Ids found ❌: #{ font_ids.inspect }"
-                      cpl_errors = true
-                    end
-                  else
-                    if load_font_el.first.attributes[ 'Id' ]
-                      load_font_id = load_font_el.first.attributes[ 'Id' ].value
-                      font_ids.each do |font_id|
-                        if font_id != load_font_id
-                          errors << "#{ cpl_reel }: DCSubtitle: Referenced font Id '#{ font_id }' does not match the Id '#{ load_font_id }' declared in LoadFont. Font cannot be loaded ❌"
-                          cpl_errors = true
-                        end
-                      end
-                    end
-                  end
-
-                  #
-                  # Check DCSubtitle's edit rate and nag about non-24-fps rates
-                  #
-                  if edit_rate != 24.0
-                    hints << "#{ cpl_reel }: DCSubtitle: EditRate != 24 fps: #{ edit_rate } fps. Playback may fail"
-                  end
-
-                  # DCSubtitle meta report
-                  meta_report = "DCSubtitle, #{ amount( 'subtitle', subtitles.to_a ) }, #{ first_time_in } '#{ first_time_in_text.nil? ? '[nil]' : first_time_in_text }' - #{ last_time_out } '#{ last_time_out_text.nil? ? '[nil]' : last_time_out_text }'#{ empty_subtitles > 0 ? ' Error: ' + empty_subtitles.to_s + ' empty Subtitle element' + ( empty_subtitles > 1 ? 's' : '' ) : '' }"
-
-                else
-                  meta_report = 'DCSubtitle, no Subtitle found'
-                end
+                subtitle_result = inspect_subtitle_document(xml, asset_file, dict, {
+                  document_id: asset_id, reel: reel_no, kind: asset.node_name,
+                  edit_rate: edit_rate, intrinsic: intrinsic_duration,
+                  entry_point: entry_point, duration: duration
+                }.merge(subtitle_picture))
+                failed = record_subtitle_findings(subtitle_result, "#{cpl_reel}: DCSubtitle #{asset_id}", errors, hints, inspection_run, cpl_model)
+                cpl_errors ||= failed
+                meta_report = "DCSubtitle, #{subtitle_result[:summary][:count]} subtitles; last TimeOut #{subtitle_result[:summary][:last_time_out]} s"
                 meta = { 'EssenceType' => MStr::Timed_text }
 
               else # No meta and not DCSubtitle either
@@ -2874,6 +2528,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 end # cpl_inspect_xml
 
 
+include DcpInspect::Inspection::Runtime::SubtitleInspection
 include DcpInspect::Inspection::Runtime::Orchestrator
 
 def print_internal_error_backtrace( result )
