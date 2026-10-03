@@ -938,6 +938,10 @@ def check_signature( xml )
 end
 
 def signature_verification_errors( errors, error_status, signature_result, id, file, type_indicator )
+  signature_result.identity_errors.each do |message|
+    errors << "#{type_indicator} #{id}: #{message}"
+    error_status = true
+  end
   if signature_result.crypto.errors[ :context ].values.flatten.any?
     signature_result.crypto.errors[ :context ].each do |sigerr|
       next if sigerr[1].empty?
@@ -1047,17 +1051,12 @@ def uuid_from_urn_scheme( string )
   string.split( 'urn:uuid:' ).last
 end
 
-# Returns subject, issuer and serial (from signing certificate) and x509serialnumber (from Signer..X509SerialNumber)
+# Return signing certificate names for display; identity validation lives in Crypto.
 def signer_info( xml, sig )
   sig_info = Hash.new
   if ! sig.signature_node.empty?
     sig_info[ :signer_name ] = sig.signer_name
     sig_info[ :signer_issuer_name ] = sig.signer_issuer
-    if ! sig.signer_node.empty?
-      signer_ns_prefix = namespace_prefix( xml, MStr::Ns_Xmldsig )
-      sig_info[ :x509serialnumber ] = sig.signer_node.first.xpath( "//#{ signer_ns_prefix }:X509SerialNumber", signer_ns_prefix => MStr::Ns_Xmldsig ).first.text.to_i
-      sig_info[ :cert_serial ] = sig.crypto.context.first.serial.to_i unless sig.crypto.context.empty?
-    end
   end
   return sig_info
 end
@@ -1328,7 +1327,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
   # Check signature
   if @c14n_available
     signature_result = check_signature( xml )
-    if signature_result.verified? and signature_result.crypto.errors[ :context ].values.flatten.empty?
+    if signature_result.check_status == :ok
       if accounting[ :verified_cpl_ids ]
         unless accounting[ :verified_cpl_ids ][ cpl_id ]
           @signed_cpls_verified_count += 1
@@ -1367,23 +1366,6 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     unless short_report.empty?
       report << short_report[ 0 ]
       report << short_report[ 1 ]
-    end
-
-    # Todo: Compare names in Signer and certificate
-    #
-
-    # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
-    # See e.g. dcp_2/V174* for a serial mismatch
-    if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
-      if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
-        report << "CPL Signer serial mismatch ❌: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
-        errors << "CPL #{ cpl_id }: Signer serial mismatch ❌: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
-        cpl_errors = true
-      end
-    else
-      report << 'CPL Signer info :x509serialnumber or :cert_serial could not be retrieved ❌'
-      errors << "CPL #{ cpl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved ❌"
-      cpl_errors = true
     end
   end
 

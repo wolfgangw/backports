@@ -2,6 +2,7 @@
 
 require "base64"
 require "openssl"
+require_relative "crypto/signer_identity"
 
 module DcpInspect
   module Crypto
@@ -494,10 +495,11 @@ module DcpInspect
 
 
     class SignatureVerification
-      attr_reader :messages, :signer_node, :signature_node, :crypto, :reference_digests_check, :signature_value_check
+      attr_reader :messages, :signer_node, :signature_node, :crypto, :reference_digests_check, :signature_value_check, :identity_errors
 
       def initialize( doc )
         @messages = Array.new
+        @identity_errors = []
         @signer_node = nil
         @signature_node = nil
         @crypto = nil
@@ -518,7 +520,7 @@ module DcpInspect
       def check_status
         return :info unless signed?
 
-        verified? && @crypto.errors[ :context ].values.flatten.empty? ? :ok : :error
+        verified? && @identity_errors.empty? && @crypto.errors[ :context ].values.flatten.empty? ? :ok : :error
       end
 
       def signer_name
@@ -560,7 +562,7 @@ module DcpInspect
 
           if @reference_digests_check and @signature_value_check
             @verified = true
-            @messages << 'Signature check: OK ✅'
+            @messages << (@identity_errors.empty? ? 'Signature check: OK ✅' : 'Signature cryptographically verified; Signer identity mismatch ❌')
           else
             @verified = false
             @messages << 'Signature check: Verification failure ❌'
@@ -656,6 +658,9 @@ module DcpInspect
         #
         # See 3 for @crypto validity hop-over
         #
+
+        @identity_errors = SignerIdentity.errors(@signer_node.first, @crypto.context.first)
+        @messages.concat(@identity_errors)
 
         # 4. Get signer's public key
         pub_k = @crypto.context.first.public_key

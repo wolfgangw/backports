@@ -468,7 +468,7 @@ module DcpInspect
 
               if @c14n_available
                 signature_result = check_signature( xml )
-                if signature_result.verified? and signature_result.crypto.errors[ :context ].values.flatten.empty?
+                if signature_result.check_status == :ok
                   @signed_pkls_verified_count += 1
                 end
                 unless signature_result.signature_node.empty?
@@ -486,23 +486,6 @@ module DcpInspect
                   unless short_report.empty?
                     @logger.debug short_report[ 0 ]
                     @logger.debug short_report[ 1 ]
-                  end
-
-                  # Todo: Compare names in Signer and certificate
-                  #
-
-                  # Check Signer.X509Data.X509IssuerSerial info vs signer certificate
-                  # See e.g. dcp_2/V174* for a serial mismatch
-                  if ! signature_result.signer_node.empty? and sig_info[ :x509serialnumber ] and sig_info[ :cert_serial ]
-                    if sig_info[ :x509serialnumber ] != sig_info[ :cert_serial ]
-                      errors << "PKL #{ pkl_id }: Signer serial mismatch ❌: X509SerialNumber: #{ sig_info[ :x509serialnumber ] } Certificate: #{ sig_info[ :cert_serial ] }"
-                      pkl_errors = true
-                      @logger.debug errors.last
-                    end
-                  else
-                    errors << "PKL #{ pkl_id }: Signer info :x509serialnumber or :cert_serial could not be retrieved"
-                    pkl_errors = true
-                    @logger.debug errors.last
                   end
                 end
               else
