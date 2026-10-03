@@ -932,7 +932,7 @@ def schema_validation( errors, error_status, xml, source_file, id, type_indicato
 end
 
 def check_signature( xml )
-  DC_Signature_Verification.new( xml )
+  DC_Signature_Verification.new(xml, desired_role: %w[CompositionPlaylist PackingList].include?(xml.root.name) ? 'CS' : nil)
 end
 
 def signature_verification_errors( errors, error_status, signature_result, id, file, type_indicator )
@@ -940,11 +940,11 @@ def signature_verification_errors( errors, error_status, signature_result, id, f
     errors << "#{type_indicator} #{id}: #{message}"
     error_status = true
   end
-  if signature_result.crypto.errors[ :context ].values.flatten.any?
+  if signature_result.crypto && signature_result.crypto.errors[ :context ].values.flatten.any?
     signature_result.crypto.errors[ :context ].each do |sigerr|
       next if sigerr[1].empty?
       sigerr[1].each do |err|
-        errors << "#{ type_indicator } #{ id }: Signature ❌: #{ err }"
+        errors << "#{ type_indicator } #{ id }: Certificate validation ❌: #{ err }"
       end
     end
     error_status = true
@@ -957,7 +957,7 @@ def signature_verification_errors( errors, error_status, signature_result, id, f
 end
 
 def signature_verification_hints( hints, signature_result, id, file, type_indicator )
-  if signature_result.crypto.hints[ :context ].values.flatten.any?
+  if signature_result.crypto && signature_result.crypto.hints[ :context ].values.flatten.any?
     signature_result.crypto.hints[ :context ].each do |sighint|
       next if sighint[1].empty?
       sighint[1].each do |hint|
@@ -969,7 +969,7 @@ def signature_verification_hints( hints, signature_result, id, file, type_indica
 end
 
 def signature_verification_siginfo( siginfo, signature_result, id, file, type )
-  if signature_result.crypto.siginfo[ :context ].values.flatten.any?
+  if signature_result.crypto && signature_result.crypto.siginfo[ :context ].values.flatten.any?
     signature_result.crypto.siginfo[ :context ].each do |info|
       next if info[1].empty?
       info[1].each do |infoblob|
@@ -977,7 +977,7 @@ def signature_verification_siginfo( siginfo, signature_result, id, file, type )
       end
     end
   end
-  if signature_result.crypto.siginfo[ :expired_certs ].any?
+  if signature_result.crypto && signature_result.crypto.siginfo[ :expired_certs ].any?
     amount_expired = signature_result.crypto.siginfo[ :expired_certs ].size
     siginfo << "#{ type } #{ id }: Signature: #{ type } has #{ amount_expired } expired #{ plural( 'certificate', amount_expired ) }. This is not an error".bold
   end
@@ -1244,7 +1244,7 @@ end
 # FIXME ad-hoc 02.01.2024
 def build_signer_issuer_short_report( xml, signature_result, sig_info, type_moniker )
   report = Array.new
-  if signature_result.crypto.context.size >= 2
+  if signature_result.crypto && signature_result.crypto.context.size >= 2
     signer_not_before_dt = time_to_datetime( signature_result.crypto.context[0].not_before )
     signer_not_after_dt = time_to_datetime( signature_result.crypto.context[0].not_after )
     issuer_not_before_dt = time_to_datetime( signature_result.crypto.context[1].not_before )
@@ -1344,7 +1344,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     end
     if cpl_model
       cpl_model.signature_status = signature_result.messages.last
-      inspection_run.add_check( cpl_model, :signature, signature_result.check_status, signature_result.messages.last )
+      inspection_run.add_check( cpl_model, :signature, signature_result.check_status, signature_result.messages.last, signature_result.verification_details )
     end
     report << "CPL #{ cpl_id }: #{ signature_result.messages.last }"
   else
@@ -2284,6 +2284,21 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
     end
   else
     composition_summary[ :crypto ] = 'Plaintext'
+  end
+
+  # Eligibility is separate from signature/certificate compliance. The CLI does
+  # not consume a KDM, so it cannot verify which certificate a KDM selects.
+  encrypted_for_authenticator = composition_references.any? { |ref| ref[:key_id] } || !cpl_referenced_assets_encrypted.empty?
+  if encrypted_for_authenticator
+    authenticator = DcpInspect::Crypto::ContentAuthenticator.assess(signature_result&.crypto,
+      encrypted: true, signed: !!signature_result&.signed?)
+    message = "CPL #{cpl_id}: #{authenticator[:message]}"
+    report << message
+    if authenticator[:status] == :error
+      errors << message
+      cpl_errors = true
+    end
+    inspection_run.add_check(cpl_model, :dci_content_authenticator, authenticator[:status], message, authenticator) if cpl_model
   end
 
   # Monoscopic/Stereoscopic composition?

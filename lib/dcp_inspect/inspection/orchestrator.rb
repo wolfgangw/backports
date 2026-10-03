@@ -486,7 +486,7 @@ module DcpInspect
                   siginfo = signature_verification_siginfo( siginfo, signature_result, pkl_id, pkl_file, 'PKL' )
                 end
                 pkl_model.signature_status = signature_result.messages.last
-                inspection_run.add_check( pkl_model, :signature, signature_result.check_status, signature_result.messages.last )
+                inspection_run.add_check( pkl_model, :signature, signature_result.check_status, signature_result.messages.last, signature_result.verification_details )
                 @logger.debug "PKL #{ pkl_id }: #{ signature_result.messages.last }"
                 if signature_result and ! signature_result.signature_node.empty?
                   @signed_pkls_count += 1

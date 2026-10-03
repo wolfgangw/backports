@@ -41,6 +41,16 @@ to IntrinsicDuration minus EntryPoint. Large durations remain reportable without
 overflowing timecode formatting. MPEG2 does not require JPEG2000 decomposition
 metadata.
 
+Picture-rate findings distinguish JPEG2000 cinema delivery from legacy Interop
+MPEG2 (24 or 24000/1001 fps). Fractional JPEG2000 video rates are reported as
+cinema-delivery compatibility errors, even when CPL and MXF metadata agree.
+Rates are compared as exact rationals and displayed with a decimal approximation
+where useful. Stereo sample rates are checked against twice the per-eye edit
+rate. SMPTE baseline checks use ST 429-2:2023; additional-frame-rate, HFR and
+archival profiles outside that baseline are explicitly left unchecked, with a
+compatibility hint. Interop integer-rate extensions similarly require explicit
+target-system support. These findings do not change asset completeness.
+
 MainMarkers are inspected as timeline metadata. Reports include their reel,
 native offset, and composition position where the timeline is known. Validation
 covers standard labels, duplicate active standard markers, offsets, ordering,
@@ -53,6 +63,25 @@ in the composition's `markers` check details in result/model exports.
 For signed CPLs and PKLs, the Signer's issuer name, serial number, and optional
 subject name are compared with the signing certificate. Identity mismatches are
 validation errors even when the cryptographic signature itself verifies.
+
+SMPTE CommonNames follow ST 430-2:2017 clauses 5.3.4 and 6.2(8): one
+PrintableString CN in subject and issuer, a leftmost-period separator, a nonempty
+entity name, and case-sensitive roles made of letters separated by single
+spaces. Leaf certificates require a role; the CPL/PKL content-signing context
+requires `CS`, but permits additional roles (including unfamiliar ones).
+SMPTE CA role naming contrary to informative Annex A receives a hint; the
+historical Interop CA rule remains an error. Interop leaf policy is unchanged.
+Malformed or missing names are reported without aborting inspection.
+
+For encrypted, signed CPLs, the separate `dci_content_authenticator` check looks
+for a **CS-only certificate anywhere in the signer chain**, as required by DCI
+DCSS 1.5 §9.4.3.5(4)(a). No candidate is a DCI compatibility error. A candidate
+only establishes role eligibility: **KDM binding is unchecked**, because the CLI
+does not inspect KDMs. This exclusivity rule is not applied to plaintext CPLs
+or PKLs. Missing/unusable chains leave eligibility unchecked. The `signature`
+check details independently expose cryptographic verification, certificate
+compliance, and Signer identity; role errors do not become signature-math errors.
+Certificate compliance here does not assert external trust or revocation status.
 
 ## Naming and subtitles
 
@@ -283,13 +312,3 @@ Thanks to all the awesome people who test, provide test materials, discuss and c
 Runs on linux, macOS and windows (WSL) boxes.
 
 Wolfgang Woehl 2011-2026
-
-Picture-rate findings distinguish JPEG2000 cinema delivery from legacy Interop
-MPEG2 (24 or 24000/1001 fps). Fractional JPEG2000 video rates are reported as
-cinema-delivery compatibility errors, even when CPL and MXF metadata agree.
-Rates are compared as exact rationals and displayed with a decimal approximation
-where useful. Stereo sample rates are checked against twice the per-eye edit
-rate. SMPTE baseline checks use ST 429-2:2023; additional-frame-rate, HFR and
-archival profiles outside that baseline are explicitly left unchecked, with a
-compatibility hint. Interop integer-rate extensions similarly require explicit
-target-system support. These findings do not change asset completeness.
