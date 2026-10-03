@@ -51,6 +51,12 @@ archival profiles outside that baseline are explicitly left unchecked, with a
 compatibility hint. Interop integer-rate extensions similarly require explicit
 target-system support. These findings do not change asset completeness.
 
+ScreenAspectRatio is compared with JPEG2000 stored dimensions as an advisory
+check, allowing conventional two-decimal rounding. SMPTE rational and standard
+Interop decimal declarations are understood; custom Interop scopes are left
+unchecked. MPEG2 uses its MXF display aspect ratio rather than assuming square
+pixels. These hints do not claim to measure active picture or black padding.
+
 MainMarkers are inspected as timeline metadata. Reports include their reel,
 native offset, and composition position where the timeline is known. Validation
 covers standard labels, duplicate active standard markers, offsets, ordering,

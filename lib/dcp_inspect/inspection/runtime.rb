@@ -10,6 +10,7 @@ require_relative "media_inspection"
 require_relative "composition_audio_inspection"
 require_relative "audio_channels"
 require_relative "picture_rates"
+require_relative "screen_aspect_ratio"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -1716,6 +1717,13 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
                   cpl_errors = true if severity == :error
                   inspection_run.add_check(cpl_model, :picture_rate, severity, message,
                     { asset_id: asset_id, edit_rate: meta['EditRate'], sample_rate: meta['SampleRate'], essence: meta['EssenceType'] }) if cpl_model
+                end
+                aspect_node = asset.at_xpath("#{cpl_ns_prefix}:ScreenAspectRatio", asset_ns)
+                if (aspect_finding = ScreenAspectRatio.finding(aspect_node, meta, composition_type: cpl_type))
+                  message = "#{cpl_reel}: #{asset.node_name} #{asset_id}: #{aspect_finding[:message]}"
+                  hints << message
+                  inspection_run.add_check(cpl_model, :screen_aspect_ratio, :hint, message,
+                    aspect_finding.merge(asset_id: asset_id, reel: reel_no)) if cpl_model
                 end
                 frame_node = asset.at_xpath("#{cpl_ns_prefix}:FrameRate", asset_ns)
                 if frame_node
