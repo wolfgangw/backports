@@ -77,6 +77,9 @@ module InspectionFixture
     with_tool_method(:asdcplib_version, -> { [2, 13, 2] }) do
       with_tool_method(:mxf_inspect, inspector) do
         runtime = Runtime.new(options: options, stdout: StringIO.new)
+        # Metadata fixtures deliberately use placeholder essence bytes. Media
+        # mechanism/integration tests opt into the real bounded header scanner.
+        runtime.define_singleton_method(:inspect_media_headers) { |_path, _meta| nil } unless @inspect_media
         runtime.call(@directory)
       end
     end

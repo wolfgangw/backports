@@ -6,6 +6,7 @@ require_relative "timing"
 require_relative "markers"
 require_relative "content_title"
 require_relative "subtitle_inspection"
+require_relative "media_inspection"
 #
 # dcp_inspect checks and validates DCPs (Digital Cinema Packages)
 #
@@ -245,6 +246,7 @@ end
 
 def call(path)
   @mxf_metadata = {}
+  @media_inspections = {}
   @dcp_inspect_temp = Pipe.new if options.audio_analysis || options.image_analysis
   inspection = dcp_inspect(options, path)
   print_inspection_messages(inspection) unless logger.is_quiet
@@ -1691,6 +1693,10 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
             # MXF?
             if meta
 
+              media_result = inspect_media_headers(asset_file, meta)
+              media_failed = record_media_headers(media_result, "#{cpl_reel}: #{asset.node_name} #{asset_id}", errors, hints, report, inspection_run, cpl_model)
+              cpl_errors ||= media_failed
+
               # Check asset Id for RFC-4122 compliance. All assets except DCSubtitle require this
               if asset_id !~ MStr::Uuid_rfc4122_re
                 errors << "#{ cpl_reel }: Listed asset Id #{ asset_id } is not RFC-4122 compliant ❌"
@@ -2528,6 +2534,7 @@ def cpl_inspect_xml( xml, dict, audio_stats, package_dir, composition_summaries,
 end # cpl_inspect_xml
 
 
+include DcpInspect::Inspection::Runtime::MediaInspection
 include DcpInspect::Inspection::Runtime::SubtitleInspection
 include DcpInspect::Inspection::Runtime::Orchestrator
 
