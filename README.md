@@ -33,6 +33,11 @@ Hash progress updates reflect the progress of each read instead of replaying
 every percentage crossed, avoiding 100 redraws per small asset. Hashing remains
 sequential; parallel read performance depends on the delivery medium.
 
+Identical nonempty ContentTitleText values on distinct CPL UUIDs produce a
+single advisory hint naming the compositions, also attached to each CPL in the
+structured model. Re-encountering one CPL through multiple PKLs does not count
+as a duplicate; title case and whitespace are preserved for comparison.
+
 The inspector checks duplicate asset IDs within an AssetMap or PackingList and
 duplicate reel IDs within a CPL. Reuse of an asset across reels or compositions
 is permitted. Edit rates are compared as rational numbers, picture FrameRate is

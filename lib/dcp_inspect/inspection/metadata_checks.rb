@@ -33,6 +33,16 @@ module DcpInspect
         ["Type #{declared.inspect} does not match inspected #{kind} asset; expected #{expected} for #{format} PKL"]
       end
 
+      # Exact XML text equality: preserve case and whitespace. Re-encountering
+      # the same CPL UUID through multiple PKLs is not a duplicate title.
+      def duplicate_titles(titles_by_id)
+        titles_by_id.group_by { |_id, title| title }.filter_map do |title, entries|
+          next if title.to_s.strip.empty?
+          ids = entries.map(&:first).uniq { |id| id.downcase }
+          { title: title, cpl_ids: ids } if ids.size > 1
+        end
+      end
+
       def duplicate_ids(nodes)
         nodes.map { |node| node.text.strip.sub(/\Aurn:uuid:/i, "").downcase }
           .reject(&:empty?).tally.select { |_id, count| count > 1 }.keys

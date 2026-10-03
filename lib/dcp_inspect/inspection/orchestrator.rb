@@ -834,6 +834,7 @@ module DcpInspect
         cpl_inspection_contexts = cpl_contexts.flatten
         cpl_context_counts = Hash.new( 0 )
         cpl_inspection_contexts.each { |context| cpl_context_counts[ context[ :cpl_id ] ] += 1 }
+        cpl_titles = {}
         cpl_accounting = {
           :signed_cpl_ids => {},
           :verified_cpl_ids => {},
@@ -849,6 +850,8 @@ module DcpInspect
             if File.exist?( cpl_file )
               xml = xml?( cpl_file )
               if xml
+                title_node = xml.root.element_children.find { |node| node.name == 'ContentTitleText' && node.namespace&.href == xml.root.namespace&.href }
+                cpl_titles[cpl_id] = title_node&.text.to_s
 
                 cpl_context = {
                   :accounting => cpl_accounting,
@@ -874,6 +877,14 @@ module DcpInspect
           end
         end
 
+
+        MetadataChecks.duplicate_titles(cpl_titles).each do |duplicate|
+          message = "Identical ContentTitleText #{duplicate[:title].inspect} in distinct CPLs #{duplicate[:cpl_ids].join(', ')}; review version naming (advisory, not a specification violation)"
+          hints << message
+          duplicate[:cpl_ids].each do |id|
+            inspection_run.add_check(inspection_run.compositions[id], :duplicate_title, :hint, message, duplicate)
+          end
+        end
 
         # prep for Info summary block
         pkls = pkls.flatten
