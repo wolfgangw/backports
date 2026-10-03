@@ -54,7 +54,7 @@ module DcpInspect
               # EntryPoint maps that timeline to the reel; trimmed markers are
               # retained for inspection but excluded from composition checks.
               active = valid && offset && offset >= entry && offset <= entry + duration
-              position = elapsed + (offset - entry) / rate if active && elapsed
+              position = active && elapsed ? elapsed + (offset - entry) / rate : nil
               if active && reel_seconds && (offset - entry) / rate > reel_seconds
                 errors << "#{prefix}: marker #{label} lies beyond the reel"
               end

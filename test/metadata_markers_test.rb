@@ -44,6 +44,16 @@ class MetadataMarkersTest < Minitest::Test
     end
   end
 
+  def test_trimmed_markers_do_not_inherit_another_markers_position
+    run_markers(markers([['FFOC', 24], ['FFTC', 0], ['LFOC', 264]], intrinsic: '264', entry: '24', duration: '240')) do |result|
+      assert_empty result[:errors]
+      check = result[:inspection_run].compositions.values.first.checks.find { |c| c.kind == :markers }
+      trimmed = check.details[:markers][1]
+      refute trimmed[:active]
+      assert_nil trimmed[:seconds]
+    end
+  end
+
   def test_bad_offsets_and_rates_are_findings
     run_markers(markers([['FFOC', '-1'], ['LFOC', 241]])) do |result|
       assert result[:errors].any? { |m| m.include?('invalid Offset') }
