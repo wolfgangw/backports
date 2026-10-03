@@ -2,7 +2,7 @@
 
 Work on the Ruby DCP inspector: `dcp_inspect`, `lib/dcp_inspect/`, `xsd/`, related tests and documentation. Leave unrelated repository tools alone.
 
-- `VERSION`: shared release version for CLI, library, fullscreen UI, and reports; currently `1.2026.10.02`.
+- `VERSION`: shared release version for CLI, library, fullscreen UI, and reports; currently `1.2026.10.03`.
 - `dcp_inspect`: standalone entry point; `lib/dcp_inspect.rb`: library loader.
 - `application.rb` and `cli/`: CLI lifecycle, options, dependency checks, logs, exports, exit status.
 - `inspector.rb`, `configuration.rb`, `result.rb`, `engine/`: public Ruby API; Native runs in-process, Subprocess runs the CLI.
