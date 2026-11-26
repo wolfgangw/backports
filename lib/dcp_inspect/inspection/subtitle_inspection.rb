@@ -6,6 +6,11 @@ module DcpInspect
   module Inspection
     class Runtime
       module SubtitleInspection
+        SMPTE_SUBTITLE_SCHEMAS = {
+          'http://www.smpte-ra.org/schemas/428-7/2007/DCST' => 'DCDMSubtitle-2007.xsd',
+          'http://www.smpte-ra.org/schemas/428-7/2010/DCST' => 'DCDMSubtitle-2010.xsd',
+          'http://www.smpte-ra.org/schemas/428-7/2014/DCST' => 'DCDMSubtitle-2014.xsd'
+        }.freeze
         def inspect_subtitle_document(document, path, dict, context, embedded: false)
           expected = embedded ? 'SubtitleReel' : 'DCSubtitle'
           return { findings: [{ severity: :error, code: 'timed-text.root.invalid', message: "Expected #{expected}, got #{document.root&.name}" }], summary: {} } unless document.root&.name == expected
@@ -43,7 +48,7 @@ module DcpInspect
           end
           findings = inspection.findings + membership_findings
           if options.schema_validate
-            schema = embedded ? (document.root.namespace&.href == 'http://www.smpte-ra.org/schemas/428-7/2010/DCST' ? 'DCDMSubtitle-2010.xsd' : nil) : 'DCSubtitle.v1.mattsson.xsd'
+            schema = embedded ? SMPTE_SUBTITLE_SCHEMAS[document.root.namespace&.href] : 'DCSubtitle.v1.mattsson.xsd'
             if schema
               @schema_store.validate(document, schema).each do |error|
                 findings << { severity: :error, code: 'timed-text.schema.invalid', message: error.message.strip, line: error.line }
