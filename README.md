@@ -128,8 +128,8 @@ inspection dictionary. SMPTE XML and ancillary resources are extracted with
 interruption. This runs with `--nh --na` as well. Missing `asdcp-unwrap` or
 encrypted timed text produces an explicit unchecked hint. Extraction failures
 are errors. Embedded XML is compared with the MXF document ID, namespace, edit
-rate, and resource declarations. The installed 2010-namespace subtitle schema
-is used unless `--no-schema` is selected; other namespaces get an explicit
+rate, and resource declarations. The inspector selects the ST 428-7 schema for the
+2007, 2010, or 2014 DCST namespace unless `--no-schema` is selected; other namespaces get an explicit
 schema-unchecked hint alongside semantic/resource checks.
 
 Standalone Interop PNG/font resources are resolved through the AssetMap and

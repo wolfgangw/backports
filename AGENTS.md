@@ -42,7 +42,7 @@ Use `ruby -Ilib` and `require 'dcp_inspect'` for the Ruby API. `--dump-result` e
 
 # Schemas and verification
 
-`xsd/` is the authoritative, relocatable schema store. Keep filenames, `catalog.xml` namespace mappings, and `MANIFEST.sha256` consistent. It includes SMPTE/Interop infrastructure, XML Signature, KDM-family schemas, and `DCDMSubtitle-2010.xsd`; the latter validates extracted SMPTE subtitle XML using the 2010 DCST namespace.
+`xsd/` is the authoritative, relocatable schema store. Keep filenames, `catalog.xml` namespace mappings, and `MANIFEST.sha256` consistent. It includes SMPTE/Interop infrastructure, XML Signature, KDM-family schemas, and ST 428-7 subtitle schemas for the 2007, 2010, and 2014 DCST namespaces. The inspector selects the matching schema for extracted SMPTE subtitle XML.
 
 ```sh
 ruby -Ilib -S rake test

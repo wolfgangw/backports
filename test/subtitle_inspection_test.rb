@@ -37,6 +37,37 @@ class SubtitleInspectionTest < Minitest::Test
     end
   end
 
+  def embedded_schema_findings(edition, issue_date: '2026-10-03T00:00:00Z')
+    xml = Nokogiri::XML(<<~XML)
+      <SubtitleReel xmlns="http://www.smpte-ra.org/schemas/428-7/#{edition}/DCST">
+        <Id>urn:uuid:#{fixture_uuid(6)}</Id><ContentTitleText>Schema test</ContentTitleText>
+        <IssueDate>#{issue_date}</IssueDate><EditRate>24 1</EditRate><TimeCodeRate>24</TimeCodeRate>
+        #{'<DisplayType>subtitle</DisplayType>' if edition == 2014}
+        #{%(<LoadFont ID="Main">urn:uuid:#{fixture_uuid(7)}</LoadFont>) if edition == 2007}
+        <SubtitleList><Subtitle TimeIn="00:00:01:00" TimeOut="00:00:02:00"><Text>Hello</Text></Subtitle></SubtitleList>
+      </SubtitleReel>
+    XML
+    result = runtime(schema: true).inspect_subtitle_document(xml, 'subtitle.xml', {}, {}, embedded: true)
+    result[:findings].select { |finding| finding[:code].start_with?('timed-text.schema.') }
+  end
+
+  def test_embedded_2007_and_2014_schema_selection
+    with_inspection_fixture do
+      [2007, 2014].each do |edition|
+        assert_empty embedded_schema_findings(edition), edition.to_s
+        findings = embedded_schema_findings(edition, issue_date: 'yesterday')
+        assert findings.any? { |f| f[:code] == 'timed-text.schema.invalid' && f[:severity] == :error && f[:message].include?('IssueDate') }, findings.inspect
+      end
+    end
+  end
+
+  def test_unknown_embedded_subtitle_namespace_reports_unchecked
+    with_inspection_fixture do
+      findings = embedded_schema_findings('unknown')
+      assert_equal [['timed-text.schema.unchecked', :hint]], findings.map { |f| f.values_at(:code, :severity) }
+    end
+  end
+
   def test_native_smpte_extraction_resources_identity_and_schema
     skip 'asdcp-wrap unavailable' unless system('asdcp-wrap', '-V', out: File::NULL, err: File::NULL)
     with_inspection_fixture do
